@@ -1,0 +1,343 @@
+ Running CPU instructions in double precision. 
++++ RELION MetaDataLabel (EMDL) definitions: +++
+           rlnAccumMotionEarly (double) : Accumulated global motion during the first frames of the movie (in A)
+            rlnAccumMotionLate (double) : Accumulated global motion during the last frames of the movie (in A)
+           rlnAccumMotionTotal (double) : Accumulated global motion during the entire movie (in A)
+          rlnAccuracyRotations (double) : Estimated accuracy (in degrees) with which rotations can be assigned
+       rlnAccuracyTranslations (double) : Estimated accuracy (in pixels) with which translations can be assigned
+ rlnAdaptiveOversampleFraction (double) : Fraction of the weights that will be oversampled in a second pass of the adaptive oversampling strategy
+    rlnAdaptiveOversampleOrder (int)    : Order of the adaptive oversampling (0=no oversampling, 1= 2x oversampling; 2= 4x oversampling, etc)
+          rlnAmplitudeContrast (double) : Amplitude contrast (as a fraction, i.e. 10% = 0.1)
+rlnAmplitudeCorrelationMaskedMaps (double) : Correlation coefficient between amplitudes in Fourier shells of masked maps
+rlnAmplitudeCorrelationUnmaskedMaps (double) : Correlation coefficient between amplitudes in Fourier shells of unmasked maps
+                   rlnAnglePsi (double) : Third Euler, or in-plane angle (psi, in degrees)
+          rlnAnglePsiFlipRatio (double) : Flip ratio of bimodal psi prior (0~0.5, 0 means an ordinary prior, 0.5 means a perfect bimodal prior)
+              rlnAnglePsiPrior (double) : Center of the prior (in degrees) on the third Euler angle (psi)
+                   rlnAngleRot (double) : First Euler angle (rot, in degrees)
+              rlnAngleRotPrior (double) : Center of the prior (in degrees) on the first Euler angle (rot)
+                  rlnAngleTilt (double) : Second Euler angle (tilt, in degrees)
+             rlnAngleTiltPrior (double) : Center of the prior (in degrees) on the second Euler angle (tilt)
+         rlnAngstromResolution (double) : Resolution (in Angstroms)
+                     rlnAreaId (int)    : ID (i.e. a unique number) of an area (i.e. field-of-view)
+                   rlnAreaName (string) : Name of an area (i.e. field-of-view)
+rlnAutoLocalSearchesHealpixOrder (int)    : Healpix order (before oversampling) from which autosampling procedure will use local angular searches
+      rlnAutopickFigureOfMerit (double) : Autopicking FOM for a particle
+            rlnAvailableMemory (double) : Available memory per computing node (i.e. per MPI-process)
+          rlnAverageNrOfFrames (int)    : Number of movie frames that one averages over upon extraction of movie-particles
+                rlnAveragePmax (double) : Average value (over all images) of the maxima of the probability distributions
+               rlnAverageValue (double) : Average value for the pixels in an image
+              rlnBeamTiltClass (int)    : Beam-tilt class of a particle
+          rlnBeamTiltGroupName (string) : Name of a group (of images) with assumedly identical beam-tilts
+                  rlnBeamTiltX (double) : Beam tilt in the X-direction (in mrad)
+                  rlnBeamTiltY (double) : Beam tilt in the Y-direction (in mrad)
+      rlnBestResolutionThusFar (double) : The highest resolution that has been obtained in this optimization thus far
+   rlnBfactorUsedForSharpening (double) : Applied B-factor in the sharpening of the map
+              rlnBodyKeepFixed (int)    : Flag to indicate whether to keep a body fixed (value 1) or keep on refining it (0)
+               rlnBodyMaskName (string) : Name of an image that contains a [0,1] body mask for multi-body refinement
+          rlnBodyReferenceName (string) : Name of an image that contains the initial reference for one body of a multi-body refinement
+       rlnBodyRotateDirectionX (double) : X-component of axis around which to rotate this body
+       rlnBodyRotateDirectionY (double) : Y-component of axis around which to rotate this body
+       rlnBodyRotateDirectionZ (double) : Z-component of axis around which to rotate this body
+       rlnBodyRotateRelativeTo (int)    : Number of the body relative to which this body rotates (if negative, use rlnBodyRotateDirectionXYZ)
+            rlnBodySigmaAngles (double) : Width of prior on all three Euler angles of a body in multibody refinement (in degrees)
+            rlnBodySigmaOffset (double) : Width of prior on origin offsets of a body in multibody refinement (in pixels)
+               rlnBodySigmaPsi (double) : Width of prior on psi angles of a body in multibody refinement (in degrees)
+               rlnBodySigmaRot (double) : Width of prior on rot angles of a body in multibody refinement (in degrees)
+              rlnBodySigmaTilt (double) : Width of prior on tilt angles of a body in multibody refinement (in degrees)
+               rlnBodyStarFile (string) : Name of STAR file with body masks and metadata
+      rlnChangesOptimalClasses (double) : The number of particles that changed their optimal clsas assignment in the last iteration
+      rlnChangesOptimalOffsets (double) : The average change in optimal translation in the last iteration (in pixels) 
+ rlnChangesOptimalOrientations (double) : The average change in optimal orientation in the last iteration (in degrees) 
+        rlnChromaticAberration (double) : Chromatic aberration (in millimeters)
+          rlnClassDistribution (double) : Probability Density Function of the different classes (i.e. fraction of images assigned to each class)
+                rlnClassNumber (int)    : Class number for which a particle has its highest probability
+          rlnClassPriorOffsetX (double) : Prior in the X-offset for a class (in pixels)
+          rlnClassPriorOffsetY (double) : Prior in the Y-offset for a class (in pixels)
+            rlnCoarseImageSize (int)    : Current size of the images to be used in the first pass of the adaptive oversampling strategy (may be smaller than the original image size)
+                    rlnComment (string) : A metadata comment (This is treated in a special way)
+            rlnConvergenceCone (double) : Convergence cone (in mrad)
+                rlnCoordinateX (double) : X-Position of an image in a micrograph (in pixels)
+                rlnCoordinateY (double) : Y-Position of an image in a micrograph (in pixels)
+                rlnCoordinateZ (double) : Z-Position of an image in a 3D micrograph, i.e. tomogram (in pixels)
+rlnCorrectedFourierShellCorrelationPhaseRandomizedMaskedMaps (double) : FSC value after masking of the randomized-phases maps
+  rlnCorrelationFitGuinierPlot (double) : The correlation coefficient of the fitted line through the Guinier-plot
+             rlnCtfAstigmatism (double) : Absolute value of the difference between defocus in U- and V-direction (in A)
+                 rlnCtfBfactor (double) : B-factor (in A^2) that describes CTF power spectrum fall-off
+ rlnCtfDataAreCtfPremultiplied (bool)   : Flag to indicate that the input images have been premultiplied with their CTF
+     rlnCtfDataArePhaseFlipped (bool)   : Flag to indicate that the input images have been phase-flipped
+           rlnCtfFigureOfMerit (double) : Figure of merit for the fit of the CTF (not used inside relion_refine)
+                   rlnCtfImage (string) : Name of an image with all CTF values
+           rlnCtfMaxResolution (double) : Estimated maximum resolution (in A) of significant CTF Thon rings
+             rlnCtfScalefactor (double) : Linear scale-factor on the CTF (values between 0 and 1)
+         rlnCtfValidationScore (double) : Gctf-based validation score for the quality of the CTF fit
+                   rlnCtfValue (double) : Value of the Contrast Transfer Function
+           rlnCurrentImageSize (int)    : Current size of the images used in the refinement
+           rlnCurrentIteration (int)    : The number of the current iteration
+          rlnCurrentResolution (double) : Current resolution where SSNR^MAP drops below 1 (in 1/Angstroms)
+         rlnDataDimensionality (int)    : Dimensionality of the data (2D/3D)
+                   rlnDataType (int)    : Type of data stored in an image (e.g. int, RFLOAT etc)
+               rlnDefocusAngle (double) : Angle between X and defocus U direction (in degrees)
+                   rlnDefocusU (double) : Defocus in U-direction (in Angstroms, positive values for underfocus)
+                   rlnDefocusV (double) : Defocus in V-direction (in Angstroms, positive values for underfocus)
+          rlnDetectorPixelSize (double) : Pixel size of the detector (in micrometers)
+          rlnDiff2RandomHalves (double) : Power of the differences between two independent reconstructions from random halves of the data
+rlnDifferentialPhaseResidualMaskedMaps (double) : Differential Phase Residual in Fourier shells of masked maps
+rlnDifferentialPhaseResidualUnmaskedMaps (double) : Differential Phase Residual in Fourier shells of unmasked maps
+               rlnDoAutoRefine (bool)   : Flag to indicate that 3D auto-refine procedure is being used
+               rlnDoCorrectCtf (bool)   : Flag to indicate that CTF-correction should be performed
+     rlnDoCorrectMagnification (bool)   : Flag to indicate that (per-group) magnification correction should be performed
+              rlnDoCorrectNorm (bool)   : Flag to indicate that (per-image) normalisation-error correction should be performed
+             rlnDoCorrectScale (bool)   : Flag to indicate that internal (per-group) intensity-scale correction should be performed
+   rlnDoFastSubsetOptimisation (bool)   : Use subsets of the data in the earlier iterations to speed up convergence
+            rlnDoHelicalRefine (bool)   : Flag to indicate that helical refinement should be performed
+  rlnDoIgnoreCtfUntilFirstPeak (bool)   : Flag to indicate that the CTFs should be ignored until their first peak
+            rlnDoMapEstimation (bool)   : Flag to indicate that MAP estimation should be performed (otherwise ML estimation)
+        rlnDoOnlyFlipCtfPhases (bool)   : Flag to indicate that CTF-correction should only comprise phase-flipping
+            rlnDoRealignMovies (bool)   : Flag to indicate that individual frames of movies are being re-aligned
+                rlnDoSkipAlign (bool)   : Flag to indicate that orientational (i.e. rotational and translational) searches will be omitted from the refinement, only marginalisation over classes will take place
+               rlnDoSkipRotate (bool)   : Flag to indicate that rotational searches will be omitted from the refinement, only marginalisation over classes and translations will take place
+        rlnDoSolventFlattening (bool)   : Flag to indicate that the references should be masked to set their solvent areas to a constant density
+     rlnDoSolventFscCorrection (bool)   : Flag to indicate that the FSCs should be solvent-corrected during refinement
+        rlnDoSplitRandomHalves (bool)   : Flag to indicate that the data should be split into two completely separate, random halves
+rlnDoStochasticGradientDescent (bool)   : Flag to indicate that SGD-optimisation should be performed (otherwise expectation maximisation)
+                 rlnDoZeroMask (bool)   : Flag to indicate that the surrounding solvent area in the experimental particles will be masked to zeros (by default random noise will be used
+                    rlnEnabled (bool)   : Not used in RELION, only included for backward compatibility with XMIPP selfiles
+                 rlnEnergyLoss (double) : Energy loss (in eV)
+        rlnEstimatedResolution (double) : Estimated resolution (in A) for a reference
+   rlnExperimentalDataStarFile (string) : STAR file with metadata for the experimental images
+            rlnFinalResolution (double) : Final estimated resolution after postprocessing (in Angstroms)
+ rlnFittedInterceptGuinierPlot (double) : The fitted intercept of the Guinier-plot
+     rlnFittedSlopeGuinierPlot (double) : The fitted slope of the Guinier-plot
+     rlnFixSigmaNoiseEstimates (bool)   : Flag to indicate that the estimates for the power spectra of the noise should be kept constant
+    rlnFixSigmaOffsetEstimates (bool)   : Flag to indicate that the estimates for the stddev in the origin offsets should be kept constant
+            rlnFixTauEstimates (bool)   : Flag to indicate that the estimates for the power spectra of the signal (i.e. the references) should be kept constant
+        rlnFourierCompleteness (double) : Fraction of Fourier components (per resolution shell) with SNR>1
+    rlnFourierShellCorrelation (double) : FSC value (of unspecified type, e.g. masked or unmasked)
+rlnFourierShellCorrelationCorrected (double) : Final FSC value: i.e. after correction based on masking of randomized-phases maps
+rlnFourierShellCorrelationMaskedMaps (double) : FSC value after masking of the original maps
+rlnFourierShellCorrelationUnmaskedMaps (double) : FSC value before masking of the original maps
+   rlnFourierSpaceInterpolator (int)    : The kernel used for Fourier-space interpolation (NN=0, linear=1)
+            rlnGoldStandardFsc (double) : Fourier shell correlation between two independent reconstructions from random halves of the data
+                  rlnGroupName (string) : The name of a group of images (e.g. all images from a micrograph)
+           rlnGroupNrParticles (int)    : Number particles in a group of images
+                rlnGroupNumber (int)    : The number of a group of images
+       rlnGroupScaleCorrection (double) : Intensity-scale correction for a group of images
+               rlnHasConverged (bool)   : Flag to indicate that the optimization has converged
+     rlnHasHighFscAtResolLimit (bool)   : Flag to indicate that the FSC at the resolution limit is significant
+rlnHasLargeSizeIncreaseIterationsAgo (int)    : How many iterations have passed since the last large increase in image size
+               rlnHealpixOrder (int)    : Healpix order for the sampling of the first two Euler angles (rot, tilt) on the 3D sphere
+   rlnHelicalCentralProportion (double) : Only expand this central fraction of the Z axis when imposing real-space helical symmetry
+  rlnHelicalKeepTiltPriorFixed (bool)   : Flag to indicate that helical tilt priors are kept fixed (at 90 degrees) in global angular searches
+rlnHelicalMaskTubeInnerDiameter (double) : Inner diameter of helical tubes in Angstroms (for masks of helical references and particles)
+rlnHelicalMaskTubeOuterDiameter (double) : Outer diameter of helical tubes in Angstroms (for masks of helical references and particles)
+          rlnHelicalOffsetStep (double) : Step size for the searches of offsets along helical axis (in Angstroms)
+                rlnHelicalRise (double) : The helical rise (translation per subunit) in Angstroms
+         rlnHelicalRiseInitial (double) : The initial helical rise (translation per subunit) in Angstroms before refinement
+     rlnHelicalRiseInitialStep (double) : Initial step of helical rise search (in Angstroms)
+             rlnHelicalRiseMax (double) : Maximum helical rise (in Angstroms)
+             rlnHelicalRiseMin (double) : Minimum helical rise (in Angstroms)
+       rlnHelicalSigmaDistance (double) : Sigma of distance along the helical tracks
+rlnHelicalSymmetryLocalRefinement (bool)   : Flag to indicate that local refinement of helical parameters should be performed
+         rlnHelicalTrackLength (double) : Distance from the position of this helical segment to the starting point of the tube
+              rlnHelicalTubeID (int)    : Helical tube ID for a helical segment
+           rlnHelicalTubePitch (double) : Cross-over distance for a helical segment (A)
+               rlnHelicalTwist (double) : The helical twist (rotation per subunit) in degrees
+        rlnHelicalTwistInitial (double) : The intial helical twist (rotation per subunit) in degrees before refinement
+    rlnHelicalTwistInitialStep (double) : Initial step of helical twist search (in degrees)
+            rlnHelicalTwistMax (double) : Maximum helical twist (in degrees, + for right-handedness)
+            rlnHelicalTwistMin (double) : Minimum helical twist (in degrees, + for right-handedness)
+    rlnHighresLimitExpectation (double) : High-resolution-limit (in Angstrom) for the expectation step
+            rlnHighresLimitSGD (double) : High-resolution-limit (in Angstrom) for Stochastic Gradient Descent
+      rlnIgnoreHelicalSymmetry (bool)   : Flag to indicate that helical symmetry is ignored in 3D reconstruction
+        rlnImageDimensionality (int)    : Dimensionality of data stored in an image (i.e. 2 or 3)
+                    rlnImageId (int)    : ID (i.e. a unique number) of an image
+                  rlnImageName (string) : Name of an image
+          rlnImageOriginalName (string) : Original name of an image
+                  rlnImageSize (int)    : Size of an image (in pixels)
+                 rlnImageSizeX (int)    : Size of an image in the X-direction (in pixels)
+                 rlnImageSizeY (int)    : Size of an image in the Y-direction (in pixels)
+                 rlnImageSizeZ (int)    : Size of an image in the Z-direction (in pixels)
+                rlnImageWeight (double) : Relative weight of an image
+         rlnIncrementImageSize (int)    : Number of Fourier shells to be included beyond the resolution where SSNR^MAP drops below 1
+               rlnIs3DSampling (bool)   : Flag to indicate this concerns a 3D sampling 
+  rlnIs3DTranslationalSampling (bool)   : Flag to indicate this concerns a x,y,z-translational sampling 
+                     rlnIsFlip (bool)   : Flag to indicate that an image should be mirrored
+                    rlnIsHelix (bool)   : Flag to indicate that helical refinement should be performed
+rlnJoinHalvesUntilThisResolution (double) : Resolution (in Angstrom) to join the two random half-reconstructions to prevent their diverging orientations (for C-symmetries)
+  rlnKullbackLeiblerDivergence (double) : Kullback-Leibler divergence for a particle
+        rlnKurtosisExcessValue (double) : Kurtosis excess (4th moment - 3) for the pixel values in an image
+              rlnLensStability (double) : Lens stability (in ppm)
+          rlnLocalSymmetryFile (string) : Local symmetry description file containing list of masks and their operators
+     rlnLogAmplitudesIntercept (double) : Y-value for Guinier plot: the fitted plateau of the logarithm of the radially averaged amplitudes
+  rlnLogAmplitudesMTFCorrected (double) : Y-value for Guinier plot: the logarithm of the radially averaged amplitudes after MTF correction
+      rlnLogAmplitudesOriginal (double) : Y-value for Guinier plot: the logarithm of the radially averaged amplitudes of the input map
+     rlnLogAmplitudesSharpened (double) : Y-value for Guinier plot: the logarithm of the radially averaged amplitudes after sharpening
+      rlnLogAmplitudesWeighted (double) : Y-value for Guinier plot: the logarithm of the radially averaged amplitudes after FSC-weighting
+      rlnLogLikeliContribution (double) : Contribution of a particle to the log-likelihood target function
+              rlnLogLikelihood (double) : Value of the log-likelihood target function
+   rlnLongitudinalDisplacement (double) : Longitudinal displacement (in Angstroms)
+              rlnMagnification (double) : Magnification at the detector (in times)
+    rlnMagnificationCorrection (double) : Magnification correction value for an image
+   rlnMagnificationSearchRange (double) : Search range for magnification correction
+    rlnMagnificationSearchStep (double) : Step size  for magnification correction
+                   rlnMaskName (string) : Name of an image that contains a [0,1] mask
+                 rlnMatrix_1_1 (double) : Matrix element (1,1) of a 3x3 matrix
+                 rlnMatrix_1_2 (double) : Matrix element (1,2) of a 3x3 matrix
+                 rlnMatrix_1_3 (double) : Matrix element (1,3) of a 3x3 matrix
+                 rlnMatrix_2_1 (double) : Matrix element (2,1) of a 3x3 matrix
+                 rlnMatrix_2_2 (double) : Matrix element (2,1) of a 3x3 matrix
+                 rlnMatrix_2_3 (double) : Matrix element (2,1) of a 3x3 matrix
+                 rlnMatrix_3_1 (double) : Matrix element (3,1) of a 3x3 matrix
+                 rlnMatrix_3_2 (double) : Matrix element (3,1) of a 3x3 matrix
+                 rlnMatrix_3_3 (double) : Matrix element (3,1) of a 3x3 matrix
+ rlnMaxNumberOfPooledParticles (int)    : Maximum number particles that are processed together to speed up calculations
+   rlnMaxValueProbDistribution (double) : Maximum value of the (normalised) probability function for a particle
+     rlnMaximumCoarseImageSize (int)    : Maximum size of the images to be used in the first pass of the adaptive oversampling strategy (may be smaller than the original image size)
+               rlnMaximumValue (double) : Maximum value for the pixels in an image
+          rlnMicrographBinning (double) : Micrograph binning factor
+       rlnMicrographDefectFile (string) : Name of a defect list file
+         rlnMicrographDoseRate (double) : Dose rate in electrons per square Angstrom per frame
+         rlnMicrographEndFrame (int)    : End frame of a motion model
+      rlnMicrographFrameNumber (int)    : Micrograph frame number
+         rlnMicrographGainName (string) : Name of a gain reference
+               rlnMicrographId (int)    : ID (i.e. a unique number) of a micrograph
+         rlnMicrographMetadata (string) : Name of a micrograph metadata file
+        rlnMicrographMovieName (string) : Name of a micrograph movie stack
+             rlnMicrographName (string) : Name of a micrograph
+         rlnMicrographNameNoDW (string) : Name of a micrograph without dose weighting
+rlnMicrographOriginalPixelSize (double) : Pixel size of original movie before binning in Angstrom/pixel.
+      rlnMicrographPreExposure (double) : Pre-exposure dose in electrons per square Angstrom
+           rlnMicrographShiftX (double) : X shift of a (patch of) micrograph
+           rlnMicrographShiftY (double) : Y shift of a (patch of) micrograph
+       rlnMicrographStartFrame (int)    : Start frame of a motion model
+        rlnMicrographTiltAngle (double) : Tilt angle (in degrees) used to collect a micrograph
+rlnMicrographTiltAxisDirection (double) : Direction of the tilt-axis (in degrees) used to collect a micrograph
+rlnMicrographTiltAxisOutOfPlane (double) : Out-of-plane angle (in degrees) of the tilt-axis used to collect a micrograph (90=in-plane)
+   rlnMinRadiusNnInterpolation (int)    : Minimum radius for NN-interpolation (in Fourier pixels), for smaller radii linear int. is used
+               rlnMinimumValue (double) : Minimum value for the pixels in an image
+              rlnModelStarFile (string) : STAR file with metadata for the model that is being refined
+             rlnModelStarFile2 (string) : STAR file with metadata for the second model that is being refined (from random halves of the data)
+           rlnMotionModelCoeff (double) : A coefficient of a motion model
+       rlnMotionModelCoeffsIdx (int)    : Index of a coefficient of a motion model
+         rlnMotionModelVersion (int)    : Version of micrograph motion model
+           rlnMovieFrameNumber (int)    : Number of a movie frame
+  rlnMovieFramesRunningAverage (int)    : Number of movie frames inside the running average that will be used for movie-refinement
+                   rlnMtfValue (double) : Value of the detectors modulation transfer function (between 0 and 1)
+             rlnNormCorrection (double) : Normalisation correction value for an image
+      rlnNormCorrectionAverage (double) : Average value (over all images) of the normalisation correction values
+                   rlnNrBodies (int)    : The number of independent rigid bodies to be refined in multi-body refinement
+                  rlnNrClasses (int)    : The number of references (i.e. classes) to be used in refinement
+                   rlnNrGroups (int)    : The number of different groups of images (each group has its own noise spectrum, and intensity-scale correction)
+         rlnNrHelicalAsymUnits (int)    : How many new helical asymmetric units are there in each box
+                 rlnNrOfFrames (int)    : Number of movie frames that were collected for this particle
+     rlnNrOfSignificantSamples (int)    : Number of orientational/class assignments (for a particle) with sign.probabilities in the 1st pass of adaptive oversampling
+rlnNumberOfIterWithoutChangingAssignments (int)    : Number of iterations that have passed without large changes in orientation and class assignments
+rlnNumberOfIterWithoutResolutionGain (int)    : Number of iterations that have passed without a gain in resolution
+         rlnNumberOfIterations (int)    : Maximum number of iterations to be performed
+                rlnOffsetRange (double) : Search range for the origin offsets (in Angstroms)
+                 rlnOffsetStep (double) : Step size for the searches in the origin offsets (in Angstroms)
+     rlnOrientSamplingStarFile (string) : STAR file with metadata for the orientational sampling
+    rlnOrientationDistribution (double) : Probability Density Function of the orientations  (i.e. fraction of images assigned to each orient)
+     rlnOrientationalPriorMode (int)    : Mode for prior distributions on the orientations (0=no prior; 1=(rot,tilt,psi); 2=(rot,tilt); 3=rot; 4=tilt; 5=psi) 
+             rlnOrientationsID (int)    : ID (i.e. a unique number) for an orientation
+                    rlnOriginX (double) : X-coordinate (in pixels) for the origin of rotation
+               rlnOriginXPrior (double) : Center of the prior on the X-coordinate (in pixels) for the origin of rotation
+                    rlnOriginY (double) : Y-coordinate (in pixels) for the origin of rotation
+               rlnOriginYPrior (double) : Center of the prior on the X-coordinate (in pixels) for the origin of rotation
+                    rlnOriginZ (double) : Z-coordinate (in pixels) for the origin of rotation
+               rlnOriginZPrior (double) : Center of the prior on the X-coordinate (in pixels) for the origin of rotation
+          rlnOriginalImageSize (int)    : Original size of the images (in pixels)
+       rlnOriginalParticleName (string) : Original name for a particles
+             rlnOutputRootName (string) : Rootname for all output files (this may include a directory structure, which should then exist)
+   rlnOverallAccuracyRotations (double) : Overall accuracy of the rotational assignments (in degrees)
+rlnOverallAccuracyTranslations (double) : Overall accuracy of the translational assignments (in pixels)
+ rlnOverallFourierCompleteness (double) : Fraction of all Fourier components up to the current resolution with SNR>1
+              rlnPaddingFactor (double) : Oversampling factor for Fourier transforms of the references
+           rlnParticleDiameter (double) : Diameter of the circular mask to be applied to all experimental images (in Angstroms)
+      rlnParticleFigureOfMerit (double) : Developmental FOM for a particle
+                 rlnParticleId (int)    : ID (i.e. a unique number) for a particle
+               rlnParticleName (string) : Name for a particle
+             rlnParticleNumber (int)    : Number of particles
+       rlnParticleSelectZScore (double) : Sum of Z-scores from particle_select. High Z-scores are likely to be outliers.
+   rlnPerFrameCumulativeWeight (double) : Sum of the resolution-dependent relative weights from the first frame until the given frame
+     rlnPerFrameRelativeWeight (double) : The resolution-dependent relative weights for a given frame
+                 rlnPhaseShift (double) : Phase-shift from a phase-plate (in degrees)
+       rlnPipeLineEdgeFromNode (string) : Name of the origin of an edge
+        rlnPipeLineEdgeProcess (string) : Name of the destination of an edge
+         rlnPipeLineEdgeToNode (string) : Name of the to-Node in an edge
+         rlnPipeLineJobCounter (int)    : Number of the last job in the pipeline
+           rlnPipeLineNodeName (string) : Name of a Node in the pipeline
+           rlnPipeLineNodeType (int)    : Type of a Node in the pipeline
+       rlnPipeLineProcessAlias (string) : Alias of a Process in the pipeline
+        rlnPipeLineProcessName (string) : Name of a Process in the pipeline
+      rlnPipeLineProcessStatus (int)    : Status of a Process in the pipeline (running, scheduled, finished or cancelled)
+        rlnPipeLineProcessType (int)    : Type of a Process in the pipeline
+                  rlnPixelSize (double) : Size of the pixels in the references and images (in Angstroms)
+                    rlnPsiStep (double) : Step size (in degrees) for the sampling of the in-plane rotation angle (psi)
+        rlnRadiusMaskExpImages (int)    : Radius of the circular mask to be applied to all experimental images (in Angstroms)
+              rlnRadiusMaskMap (int)    : Radius of the spherical mask to be applied to all references (in Angstroms)
+                 rlnRandomSeed (int)    : Seed (i.e. a number) for the random number generator
+               rlnRandomSubset (int)    : Random subset to which this particle belongs
+              rlnRandomiseFrom (double) : Resolution (in A) from which the phases are randomised in the postprocessing step
+       rlnReconstructImageName (string) : Name of an image to be used for reconstruction only
+    rlnReferenceDimensionality (int)    : Dimensionality of the references (2D/3D)
+             rlnReferenceImage (string) : Name of a reference image
+            rlnReferenceSigma2 (double) : Spherical average of the estimated power in the noise of a reference
+     rlnReferenceSpectralPower (double) : Spherical average of the power of the reference
+              rlnReferenceTau2 (double) : Spherical average of the estimated power in the signal of a reference
+        rlnRefsAreCtfCorrected (bool)   : Flag to indicate that the input references have been CTF-amplitude corrected
+                 rlnResolution (double) : Resolution (in 1/Angstroms)
+     rlnResolutionInversePixel (double) : Resolution (in 1/pixel, Nyquist = 0.5)
+          rlnResolutionSquared (double) : X-value for Guinier plot: squared resolution in 1/Angstrom^2
+           rlnSGDGradientImage (string) : Name of image containing the SGD gradient
+      rlnSamplingPerturbFactor (double) : Factor for random perturbation on the orientational sampling (between 0 no perturbation and 1 very strong perturbation)
+    rlnSamplingPerturbInstance (double) : Random instance of the random perturbation on the orientational sampling
+               rlnSamplingRate (double) : Sampling rate of an image (in Angstrom/pixel)
+              rlnSamplingRateX (double) : Sampling rate in X-direction of an image (in Angstrom/pixel)
+              rlnSamplingRateY (double) : Sampling rate in Y-direction of an image (in Angstrom/pixel)
+              rlnSamplingRateZ (double) : Sampling rate in Z-direction of an image (in Angstrom/pixel)
+                   rlnSelected (int)    : Flag whether an entry in a metadatatable is selected (1) in the viewer or not (0)
+         rlnSgdFinalIterations (int)    : Number of final SGD iterations (at rlnSgdFinalResolution and with rlnSgdFinalSubsetSize)
+         rlnSgdFinalResolution (double) : Resolution (in A) to use during the final SGD iterations
+         rlnSgdFinalSubsetSize (int)    : Number of particles in a mini-batch (subset) during the final SGD iteration
+     rlnSgdInBetweenIterations (int)    : Number of SGD iteration in between the initial ones to the final ones (with linear interpolation of resolution and subset size)
+       rlnSgdInitialIterations (int)    : Number of initial SGD iterations (at rlnSgdInitialResolution and with rlnSgdInitialSubsetSize)
+       rlnSgdInitialResolution (double) : Resolution (in A) to use during the initial SGD iterations
+       rlnSgdInitialSubsetSize (int)    : Number of particles in a mini-batch (subset) during the initial SGD iterations
+              rlnSgdMaxSubsets (int)    : Stop SGD after doing this many subsets (possibly spanning more than 1 iteration)
+                rlnSgdMuFactor (double) : The mu-parameter that controls the momentum of the SGD gradients
+     rlnSgdSigma2FudgeHalflife (int)    : After processing this many particles the multiplicative factor for the noise variance will have halved
+      rlnSgdSigma2FudgeInitial (double) : The variance of the noise will initially be multiplied with this value (larger than 1)
+              rlnSgdSkipAnneal (bool)   : Option to switch off annealing of multiple references in SGD
+                rlnSgdStepsize (double) : Stepsize in SGD updates)
+              rlnSgdSubsetSize (int)    : The number of particles in the random subsets for SGD
+        rlnSgdWriteEverySubset (int)    : Every this many iterations the model is written to disk in SGD
+                rlnSigma2Noise (double) : Spherical average of the standard deviation in the noise (sigma)
+               rlnSigmaOffsets (double) : Standard deviation in the origin offsets (in Angstroms)
+         rlnSigmaPriorPsiAngle (double) : Standard deviation of the prior on the psi (i.e. third Euler) angle
+         rlnSigmaPriorRotAngle (double) : Standard deviation of the prior on the rot (i.e. first Euler) angle
+        rlnSigmaPriorTiltAngle (double) : Standard deviation of the prior on the tilt (i.e. second Euler) angle
+         rlnSignalToNoiseRatio (double) : Spectral signal-to-noise ratio for a reference
+              rlnSkewnessValue (double) : Skewness (3rd moment) for the pixel values in an image
+     rlnSmallestChangesClasses (int)    : Smallest changes thus far in the optimal class assignments (in numer of particles).
+     rlnSmallestChangesOffsets (double) : Smallest changes thus far in the optimal offset assignments (in pixels).
+rlnSmallestChangesOrientations (double) : Smallest changes thus far in the optimal orientation assignments (in degrees).
+           rlnSolventMask2Name (string) : Name of a secondary solvent mask (e.g. to flatten density inside an icosahedral virus)
+            rlnSolventMaskName (string) : Name of an image that contains a (possibly soft) mask for the solvent area (values=0 for solvent, values =1 for protein)
+                rlnSortedIndex (int)    : Index of a metadata entry after sorting (first sorted index is 0).
+              rlnSpectralIndex (int)    : Spectral index (i.e. distance in pixels to the origin in Fourier space) 
+rlnSpectralOrientabilityContribution (double) : Spectral SNR contribution to the orientability of individual particles
+        rlnSphericalAberration (double) : Spherical aberration (in millimeters)
+                    rlnSsnrMap (double) : Spectral signal-to-noise ratio as defined for MAP estimation (SSNR^MAP)
+     rlnStandardDeviationValue (double) : Standard deviation for the pixel values in an image
+     rlnStarFileMovieParticles (string) : Filename of a STAR file with movie-particles in it
+              rlnSymmetryGroup (string) : Symmetry group (e.g., C1, D7, I2, I5, etc.)
+            rlnTau2FudgeFactor (double) : Regularisation parameter with which estimates for the power in the references will be multiplied (T in original paper)
+            rlnTauSpectrumName (string) : Name of a STAR file that holds a tau2-spectrum
+             rlnTiltAngleLimit (double) : Values to which to limit the tilt angles (positive for keeping side views, negative for keeping top views)
+    rlnTransversalDisplacement (double) : Transversal displacement (in Angstroms)
+         rlnUnfilteredMapHalf1 (string) : Name of the unfiltered map from halfset 1
+         rlnUnfilteredMapHalf2 (string) : Name of the unfiltered map from halfset 2
+       rlnUseTooCoarseSampling (bool)   : Flag to indicate that the angular sampling on the sphere will be one step coarser than needed to speed up calculations
+                    rlnVoltage (double) : Voltage of the microscope (in kV)
+              rlnWidthMaskEdge (int)    : Width (in pixels) of the soft edge for spherical/circular masks to be used for solvent flattening
