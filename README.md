@@ -1,7 +1,8 @@
 # pyOrigamiEM
-DNA Origami TEM data analysis package
+DNA Origami assisted cryoEM data analysis package
+
+Some of the code is adapted from Daniel Asarnow's [pyem package](https://github.com/asarnow/pyem).
 
 ## Requirements:
 
-1. EMAN2
-2. numpy, scipy
+numpy, scipy, pandas
