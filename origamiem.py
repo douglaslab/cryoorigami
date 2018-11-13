@@ -10,6 +10,16 @@ import numpy as np
 import scipy
 
 
+class Relion:
+    def __init__(self):
+            self.name = None
+
+
+class CS:
+    def __init__(self):
+        self.name = None
+
+
 class Project:
     '''
         Project File
@@ -21,6 +31,14 @@ class Project:
 class Micrograph:
     '''
         Micrograph class
+    '''
+    def __init__(self):
+        self.name = None
+
+
+class Particle:
+    '''
+        Particle Class
     '''
     def __init__(self):
         self.name = None
