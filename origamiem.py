@@ -66,7 +66,27 @@ class Star(EMfile):
         Star class
     '''
     def __init__(self):
-        self.name = None
+        self._file_path    = None                         #Path to directory where this script stays 
+
+        self.name          = None
+        self.data_blocks   = []
+        self.metadata_file = 'relion_metadata_labels.dat' 
+
+    def _read_metadata_labels(self):
+        '''
+        Read the metadata labels
+        '''
+        self._file_path  = os.path.dirname(os.path.abspath(__file__))
+
+        f = read(self._file_path + '/'+ self.metadata_file)
+        
+
+    def read(file):
+        '''
+        Read Star file and create the data blocks
+        '''
+
+
 
 
 class CryoSparc(EMfile):
