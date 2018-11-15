@@ -1,2 +1,6 @@
 *.pyc
+*.star
+*.cs
+*.mrc
+*.mrcs
 .DS_Store
