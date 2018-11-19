@@ -1,8 +1,8 @@
 # pyOrigamiEM
 DNA Origami assisted cryoEM data analysis package
 
-Some of the code is adapted from Daniel Asarnow's [pyem package](https://github.com/asarnow/pyem).
+Some of the code is adapted from Daniel Asarnow's [pyem python package](https://github.com/asarnow/pyem).
 
-## Requirements:
+## Dependencies:
 
-numpy, scipy, pandas
+numpy, pandas

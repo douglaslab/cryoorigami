@@ -8,7 +8,6 @@
 import os
 import re
 import glob
-import sys
 import numpy as np
 import pandas as pd
 import utilities as util
@@ -20,31 +19,119 @@ class Relion:
     def __init__(self):
             self.name = None
 
+
 class Project:
     '''
         Project File
     '''
     def __init__(self, name='ProjectOrigami'):
-        self.name           = name
-        self.particle_star  = None
-        self.ref_class_star = None
-        self.class_ids      = None
+        self.name            = name
+        self.particle_star   = None
+        self.ref_class_star  = None
+        self.micrograph_star = None
+        self.class_ids       = None
 
         # Input files
-        self.particle_star_file  = None
-        self.ref_class_star_file = None
+        self.particle_star_file   = None
+        self.ref_class_star_file  = None
+        self.micrograph_star_file = None
 
         # Output files
         self.particle_out_file  = None
         self.ref_class_out_file = None
 
-    def read_class_refs(self, file):
+        # Micrograph pixel size
+        self.mic_apix           = None
+        self.particle_apix      = None
+
+        # Micrograph files
+        self.first_mic_file  = None
+        self.first_mic_mrc   = None
+
+        # Micrograph dimensions
+        self.mic_NX = 0
+        self.mic_NY = 0
+        self.mic_NZ = 0
+
+        # Additional data frames
+        self.particle_data_props = pd.DataFrame(columns=['insideFrame'])
+
+    def check_particle_pos(self):
+        '''
+        Check location of all particles
+        '''
+        num_ptcls = self.particle_star.get_numRows()
+        ptcl_list = np.arange(num_ptcls)
+        ptcl_pos_list = []
+
+        for ptcl in ptcl_list:
+            isInside = self.particle_star.is_particle_inside(ptcl, self.mic_apix, self.mic_NX, self.mic_NY)
+            ptcl_pos_list.append(isInside)
+
+        ptcl_pos_list = np.array(ptcl_pos_list)
+        self.particle_data_props['insideFrame'] = ptcl_pos_list
+
+    def delete_outside_ptcls(self):
+        '''
+        Delete particles outside the frame
+        '''
+        delete_ptcls = np.where(self.particle_data_props['insideFrame'] == False)[0]
+        self.particle_star.delete_ptcls(delete_ptcls)
+
+    def read_mic_header(self):
+        '''
+        Read the header from first micrograph
+        '''
+        if self.micrograph_star is not None:
+            if self.micrograph_star.has_label('rlnMicrographName'):
+                self.first_mic_file = self.micrograph_star.data_block.loc[0, 'rlnMicrographName']
+                self.first_mic_mrc  = MRC(self.first_mic_file)
+                self.set_mic_dimensions()
+
+    def set_mic_dimensions(self):
+        '''
+        Set micrograph dimensions
+        '''
+        self.mic_NX = self.first_mic_mrc.header['NX']
+        self.mic_NY = self.first_mic_mrc.header['NY']
+        self.mic_NZ = self.first_mic_mrc.header['NZ']
+
+    def set_mic_apix(self, apix=1.82):
+        '''
+        Set micrograph apix
+        '''
+        self.mic_apix = apix
+
+    def set_particle_apix(self, apix=1.82):
+        '''
+        Set particle apix
+        '''
+        self.particle_apix = apix
+
+    def read_mic_apix(self):
+        '''
+        Read and set micrograph apix
+        '''
+        self.micrograph_star.determine_star_apix()
+        self.set_mic_apix(self.micrograph_star.get_star_apix())
+
+    def read_particle_apix(self):
+        '''
+        Read and set micrograph apix
+        '''
+        self.particle_star.determine_star_apix()
+        self.set_particle_apix(self.particle_star.get_star_apix())
+
+    def read_class_refs(self, file, new_classids=False):
         '''
         Read class refs
         '''
         self.ref_class_star_file = os.path.abspath(file)
         self.ref_class_star = Star(file)
-        self.ref_class_star.num2className()
+
+        # Generate new classids from particle numbers in image names
+        if new_classids:
+            self.ref_class_star.num2className()
 
     def read_particles(self, file):
         '''
@@ -52,6 +139,13 @@ class Project:
         '''
         self.particle_star_file = os.path.abspath(file)
         self.particle_star = Star(file)
+
+    def read_micrographs(self, file):
+        '''
+        Read micrograph star file
+        '''
+        self.micrograph_star_file = os.path.abspath(file)
+        self.micrograph_star      = Star(file)
 
     def get_class_ids(self):
         '''
@@ -63,13 +157,25 @@ class Project:
         '''
         Recenter particles
         '''
-        self.particle_star.recenter2D()
+        self.particle_star.determine_star_apix()
+        self.particle_star.recenter2D(mic_apix=self.mic_apix)
+
+    def copy_from_ref(self, columns={}):
+        '''
+        Copy columns from reference star
+        '''
+        if self.particle_star.get_numRows() != self.ref_class_star.get_numRows():
+            print('Number of rows in the particle and reference star files dont match')
+            return 0
+
+        # Iterate over all columns
+        self.particle_star.copy_columns(self.ref_class_star, columns)
 
     def add_columns(self, column_params=None):
         '''
         Add new columns
         '''
-        if not column_params is None:
+        if column_params is not None:
             for label, value in column_params.items():
                 self.particle_star.set_column(label, value)
 
@@ -88,7 +194,7 @@ class Project:
         for i in range(ref_data_block.shape[0]):
             # Get class id
             class_id = ref_data_block['rlnClassNumber'][i]
-            
+
             # Get rotangle
             rot_angle = ref_data_block['rlnAnglePsi'][i]
 
@@ -107,14 +213,14 @@ class Project:
                                         ptcls=class_ptcls)
         return 1
 
-    def write_output_files(self):
+    def write_output_files(self, write_particle_star=True, write_ref_class_star=True):
         '''
         Write output files
         '''
-        if not self.particle_star is None:
+        if self.particle_star is not None and write_particle_star:
             self.particle_star.write(self.particle_out_file)
 
-        if not self.ref_class_star is None:
+        if self.ref_class_star is not None and write_ref_class_star:
             self.ref_class_star.write(self.ref_class_out_file)
 
     def set_output_directory(self, input_filename, output_directory=None):
@@ -148,16 +254,17 @@ class Project:
 
     def prepare_io_files(self):
         # Copy input file to output directory
-        if not self.particle_star_file is None:
+        if self.particle_star_file is not None:
             head, tail = os.path.split(self.particle_star_file)
             root, ext  = os.path.splitext(tail)
             copyfile(self.particle_star_file, self.output_directory+'/'+root+'_particle_input'+ext)
             self.particle_out_file = self.output_directory+'/'+root+'_particle_output'+ext
 
-        if not self.ref_class_star_file is None:
+        if self.ref_class_star_file is not None:
             head, tail = os.path.split(self.ref_class_star_file)
             copyfile(self.ref_class_star_file, self.output_directory+'/'+root+'_class_input'+ext)
             self.ref_class_out_file = self.output_directory+'/'+root+'_class_output'+ext
+
 
 class Micrograph:
     '''
@@ -175,12 +282,84 @@ class Particle:
         self.name = None
 
 
-class Mrc:
+class MRC:
     '''
         MRC  class
     '''
-    def __init__(self):
+    def __init__(self, file):
         self.name = None
+        self.header =  {'NX': 0,
+                        'NY': 0,
+                        'NZ': 0,
+                        'CELLAX': 0,
+                        'CELLAY': 0,
+                        'CELLAZ': 0}
+
+        self.read_header(file)
+
+    def read(self):
+        '''
+        Read MRC file
+        '''
+
+    def read_header(self, file):
+        '''
+         HEADER FORMAT
+        # 0      (0,4)      NX  number of columns (fastest changing in map)
+        # 1      (4,8)      NY  number of rows
+        # 2      (8,12)     NZ  number of sections (slowest changing in map)
+        # 3      (12,16)    MODE  data type:
+        #                       0   image: signed 8-bit bytes range -128 to 127
+        #                       1   image: 16-bit halfwords
+        #                       2   image: 32-bit reals
+        #                       3   transform: complex 16-bit integers
+        #                       4   transform: complex 32-bit reals
+        # 4      (16,20)    NXSTART number of first column in map
+        # 5      (20,24)    NYSTART number of first row in map
+        # 6      (24,28)    NZSTART number of first section in map
+        # 7      (28,32)    MX      number of intervals along X
+        # 8      (32,36)    MY      number of intervals along Y
+        # 9      (36,40)    MZ      number of intervals along Z
+        # 10-13  (40,52)    CELLA   cell dimensions in angstroms
+        # 13-16  (52,64)    CELLB   cell angles in degrees
+        # 16     (64,68)    MAPC    axis corresp to cols (1,2,3 for X,Y,Z)
+        # 17     (68,72)    MAPR    axis corresp to rows (1,2,3 for X,Y,Z)
+        # 18     (72,76)    MAPS    axis corresp to sections (1,2,3 for X,Y,Z)
+        # 19     (76,80)    DMIN    minimum density value
+        # 20     (80,84)    DMAX    maximum density value
+        # 21     (84,88)    DMEAN   mean density value
+        # 22     (88,92)    ISPG    space group number, 0 for images or 1 for volumes
+        # 23     (92,96)    NSYMBT  number of bytes in extended header
+        # 24-49  (96,196)   EXTRA   extra space used for anything
+        #           26  (104)   EXTTYP      extended header type("MRCO" for MRC)
+        #           27  (108)   NVERSION    MRC format version (20140)
+        # 49-52  (196,208)  ORIGIN  origin in X,Y,Z used for transforms
+        # 52     (208,212)  MAP     character string 'MAP ' to identify file type
+        # 53     (212,216)  MACHST  machine stamp
+        # 54     (216,220)  RMS     rms deviation of map from mean density
+        # 55     (220,224)  NLABL   number of labels being used
+        # 56-256 (224,1024) LABEL(80,10)    10 80-character text labels
+        '''
+
+        with open(file) as f:
+            # Go to 0 pointer
+            f.seek(0)
+
+            # Read header
+            header_int   = np.fromfile(f, dtype=np.int32, count=256)
+            header_float = header_int.view(np.float32)
+
+            # Read the micrograph and cell dimensions
+            [self.header['NX'], self.header['NY'], self.header['NZ'], self.header['MODE']] = header_int[:4]
+            [self.header['CELLAX'], self.header['CELLAY'], self.header['CELLAZ']] = header_float[10:13]
+            if self.header['CELLAX'] == self.header['CELLAY'] == self.header['CELLAZ'] == 0:
+                self.header['CELLAX'] = self.header['NX']
+                self.header['CELLAY'] = self.header['NY']
+                self.header['CELLAZ'] = self.header['NZ']
+
+            # Close file
+            f.close()
+            return self.header
 
 
 class EMfile:
@@ -196,30 +375,37 @@ class Star(EMfile):
         Star class
     '''
     def __init__(self, file=None):
-        self._file_path     = None                         #Path to directory where this script stays 
+        self._file_path     = None                        # Path to directory where this script stays
         self.star_file      = None
         self.name           = None
         self.data_block     = None
+        self.data_props     = None
         self.data_name      = None
         self.data_labels    = None
         self.data_formats   = None
         self.data_dtypes    = None
         self.data_skip_rows = None
-        self.metadata_file  = 'relion_metadata_labels.dat' 
+        self.metadata_file  = 'relion_metadata_labels.dat'
         self.PARAMETERS     = {}
-        self.str2type       = {'double': 'f4',
-                               'string':'U100',
-                               'int':'i4',
-                               'bool':'b'}
+        self.str2type       = {'double': float,
+                               'string': str,
+                               'int':    int,
+                               'bool':   bool}
+        self.str2nptype     = {'double': 'f4',
+                               'string': 'U100',
+                               'int': 'i4',
+                               'bool': 'b'}
 
         self.type2format    = {'double': "%13.6f",
                                'string': "%s",
                                'int':    "%12d",
                                'bool':   "%2d"}
 
-
         # Read metadata labels
         self._read_metadata_labels()
+
+        # Star pixel size
+        self.star_apix     = None
 
         # Read file
         self.read(file)
@@ -230,7 +416,7 @@ class Star(EMfile):
         '''
         self._file_path  = os.path.dirname(os.path.abspath(__file__))
 
-        f = open(self._file_path + '/'+ self.metadata_file,'r')
+        f = open(self._file_path + '/' + self.metadata_file, 'r')
         lines = f.readlines()
         f.close()
 
@@ -242,14 +428,15 @@ class Star(EMfile):
                 type_name   = m.group(2)
                 description = m.group(3)
                 self.PARAMETERS[param_name] = {'typename': type_name,
-                                               'type': self.str2type[type_name], 
+                                               'nptype': self.str2nptype[type_name],
+                                               'type': self.str2type[type_name],
                                                'description': description}
 
     def _read_header(self, file):
         '''
         Read star header file
         '''
-        f = open(file,'r')
+        f = open(file, 'r')
 
         # Assign star file
         self.star_file = file
@@ -287,9 +474,25 @@ class Star(EMfile):
         '''
         Prepare the data types from header
         '''
-        self.data_formats  = [self.PARAMETERS[label]['type'] for label in self.data_labels]
-        self.data_dtypes   = { 'names': self.data_labels,
-                               'formats': self.data_formats }
+        self.data_formats  = [self.PARAMETERS[label]['nptype'] for label in self.data_labels]
+        self.data_dtypes   = {'names': self.data_labels,
+                              'formats': self.data_formats}
+
+    def get_numRows(self):
+        '''
+        Get number of raws
+        '''
+        return self.data_block.shape[0]
+
+    def delete_ptcls(self, ptcls):
+        '''
+        Delete particles
+        '''
+        prev_numRows = self.data_block.shape[0]
+        self.data_block = self.data_block.drop(ptcls)
+        new_numRows  = self.data_block.shape[0]
+
+        print('Old row number: %d - New row number: %d - Deleted rows: %d' % (prev_numRows, new_numRows, len(ptcls)))
 
     def read(self, file):
         '''
@@ -298,8 +501,8 @@ class Star(EMfile):
         self._read_header(file)
         self._prepare_data_types()
         self.data_block = np.loadtxt(file,
-                                    skiprows = self.data_skip_rows,
-                                    dtype=self.data_dtypes)
+                                     skiprows=self.data_skip_rows,
+                                     dtype=self.data_dtypes)
 
         # Convert to data frame
         self.data_block = pd.DataFrame(self.data_block)
@@ -312,25 +515,24 @@ class Star(EMfile):
         Add new column to data block
         '''
         if label not in self.PARAMETERS:
-            print('%s is not a valid Star label.'%(label))
+            print('%s is not a valid Star label.' % (label))
             return None
         elif label in self.data_labels:
-            print('%s exists. Not creating a new column.'%(label))
+            print('%s exists. Not creating a new column.' % (label))
             return None
 
         # Create new column
-        new_data_column = np.empty([self.num_data_points,1], dtype=self.PARAMETERS[label]['type'])
+        new_data_column = np.empty([self.num_data_points, 1], dtype=self.PARAMETERS[label]['nptype'])
 
         # Append the data column
         self.data_block[label] = new_data_column
         self.data_labels.append(label)
 
         # Initialize the column
-        if self.PARAMETERS[label]['type'][0] == 'U':
+        if self.PARAMETERS[label]['nptype'][0] == 'U':
             self.data_block.loc[:, label] = ''
         else:
             self.data_block.loc[:, label] = 0
-            
 
         # Recreate data types
         self._prepare_data_types()
@@ -341,12 +543,12 @@ class Star(EMfile):
         '''
         Set a column value
         '''
-        if self.has_label(label) and not value is None:
+        if self.has_label(label) and value is not None:
             self.data_block.loc[:, label] = value
         else:
             success = self.add_column(label)
-            if success and not value is None:
-                self.data_block.loc[:, label] = value
+            if success and value is not None:
+                self.data_block.loc[:, label] = self.PARAMETERS[value]['type'](value)
 
     def copy(self, other=None):
         '''
@@ -356,6 +558,23 @@ class Star(EMfile):
         self.data_labels  = other.data_labels.copy()
         self.data_formats = other.data_formats.copy()
         self.data_dtypes  = other.data_dtypes.copy()
+
+    def copy_columns(self, other, columns={}):
+        '''
+        Copy columns from another star object
+        '''
+        # If the sizes don't match don't perform copy
+        if other.data_block.shape[0] != self.data_block.shape[0]:
+            return 0
+
+        # Iterate over all columns
+        for label, value in columns.items():
+            if other.has_label(label):
+                if self.has_label(label):
+                    self.data_block.loc[:, label] = other.data_block[label]
+                else:
+                    self.add_column(label)
+                    self.set_column(label, value)
 
     def has_label(self, label):
         '''
@@ -372,9 +591,30 @@ class Star(EMfile):
         '''
         return self.data_block
 
+    def is_particle_inside(self, ptcl, mic_apix, NX, NY):
+        '''
+        Is particle inside
+        '''
+        # Relative scale of pixel sizes
+        apix_scale = 1.0*self.star_apix/mic_apix
+        cor_offsetx = self.data_block['rlnOriginX'][ptcl]*apix_scale
+        int_offsetx = np.round(cor_offsetx)
+
+        cor_offsety = self.data_block['rlnOriginY'][ptcl]*apix_scale
+        int_offsety = np.round(cor_offsety)
+
+        new_coordx = self.data_block.loc[ptcl, 'rlnCoordinateX'] - int_offsetx
+        new_coordy = self.data_block.loc[ptcl, 'rlnCoordinateY'] - int_offsety
+
+        if(new_coordx < NX and new_coordx > 0 and
+           new_coordy < NY and new_coordy > 0):
+            return True
+        else:
+            return False
+
     def addOffset2D(self, t=[0, 0], ptcls=None):
         '''
-        Translate 
+        Translate
         '''
         if len(t) == 2:
             dx = float(t[0])
@@ -392,22 +632,70 @@ class Star(EMfile):
             self.data_block.loc[ptcls, 'rlnOriginX'] += dx
             self.data_block.loc[ptcls, 'rlnOriginY'] += dy
 
-    def recenter2D(self):
+    def set_star_apix(self, apix=None):
+        '''
+        Set star apix
+        '''
+        if type(apix) == float:
+            self.star_apix = apix
+        else:
+            self.star_apix = 1.0
+
+    def get_star_apix(self):
+        '''
+        Get star apix
+        '''
+        return self.star_apix
+
+    def determine_star_apix(self):
+        '''
+        Determine star apix
+        '''
+        if self.has_label('rlnDetectorPixelSize') and self.has_label('rlnMagnification'):
+            self.star_apix = 10000*self.data_block.loc[0, 'rlnDetectorPixelSize']/self.data_block.loc[0, 'rlnMagnification']
+        else:
+            print('Warning: No pixel size information in star file %s' % (self.star_file))
+            self.star_apix = 1.0
+
+    def recenter2D(self, mic_apix=1.82):
         '''
         Recenter particles
         '''
+
+        # Relative scale of pixel sizes
+        self.apix_scale = 1.0*self.star_apix/mic_apix
+
         if(self.has_label('rlnOriginX') and
            self.has_label('rlnOriginY')):
 
             # Center x-coordinate
-            remx, intoffsetx   = np.modf(self.data_block['rlnOriginX'])
-            self.data_block.loc[:, 'rlnOriginX']     = remx
-            self.data_block.loc[:,'rlnCoordinateX'] -= intoffsetx
+            cor_offsetx = self.data_block['rlnOriginX']*self.apix_scale
+            int_offsetx = np.round(cor_offsetx)
+            dif_offsetx = cor_offsetx - int_offsetx
+            self.data_block.loc[:, 'rlnOriginX']      = dif_offsetx/self.apix_scale
+            self.data_block.loc[:, 'rlnCoordinateX'] -= int_offsetx
 
             # Center y-coordinate
-            remy, intoffsety   = np.modf(self.data_block['rlnOriginY'])
-            self.data_block.loc[:, 'rlnOriginY']      = remy
-            self.data_block.loc[:, 'rlnCoordinateY'] -= intoffsety
+            cor_offsety = self.data_block['rlnOriginY']*self.apix_scale
+            int_offsety = np.round(cor_offsety)
+            dif_offsety = cor_offsety - int_offsety
+            self.data_block.loc[:, 'rlnOriginY']      = dif_offsety/self.apix_scale
+            self.data_block.loc[:, 'rlnCoordinateY'] -= int_offsety
+
+    def change_label(self, old_label, new_label):
+        '''
+        Change label name
+        '''
+        if self.has_label(old_label) and new_label in self.PARAMETERS:
+            self.data_block.rename(columns={old_label: new_label},
+                                   inplace=True)
+
+    def dublicate_column(self, label, new_label):
+        '''
+        Duplicate a column with a label
+        '''
+        if self.has_label(label) and new_label in self.PARAMETERS:
+            self.data_block.loc[:, new_label] = self.data_block[label]
 
     def rotate2D(self, rotangle=0, offset=[0, 0], ptcls=None):
         '''
@@ -428,21 +716,23 @@ class Star(EMfile):
         if ptcls is None:
             ptcls = np.arange(self.num_data_points)
 
-        # Iterate through each particle to get the corrected offset 
+        # Iterate through each particle to get the corrected offset
         for ptcl in ptcls:
-            oldangle = self.data_block['rlnAnglePsi'][ptcl]
-            rotM = util.euler2rot2D(float(-oldangle))
+            oldangle = self.data_block.loc[ptcl, 'rlnAnglePsi']
+            rotM = util.euler2rot2D(float(oldangle))
+
+            # Get the transpose
+            rotMT = rotM.T
 
             # Get the corrected offset
-            corrected_offset = np.array(offset).dot(rotM)
-            
+            corrected_offset = rotMT.dot(np.array(offset))
+
             # Update the offsets
             self.data_block.loc[ptcl, 'rlnOriginX'] += corrected_offset[0]
             self.data_block.loc[ptcl, 'rlnOriginY'] += corrected_offset[1]
 
-
         # Update psi angles
-        self.data_block.loc[ptcls, 'rlnAnglePsi'] += rotangle%360
+        self.data_block.loc[ptcls, 'rlnAnglePsi'] += rotangle % 360
 
     def num2className(self, ptcls=None):
         '''
@@ -493,7 +783,7 @@ class Star(EMfile):
             formatter.append(self.type2format[type_name])
 
         # Create write formatter
-        self.write_formatter = '  '.join(formatter) + '\n'
+        self.write_formatter = '  '.join(formatter)
 
     def write(self, out_fname):
         '''
@@ -507,17 +797,19 @@ class Star(EMfile):
         header = []
 
         # Write data block name
-        header.append("data_%s"%self.data_name)
+        header.append("data_%s" % self.data_name)
+        header.append("")
+        header.append("loop_")
 
-        #Write the data labels
+        # Write the data labels
         for label in self.data_block.columns:
-            header.append("_%s"%label)
+            header.append("_%s" % label)
 
         # Make header string
-        header='\n'.join(header)
+        header = '\n'.join(header)
 
         # Save file
-        np.savetxt(out_fname, self.data_block.values,fmt=self.write_formatter,header=header,comments='')
+        np.savetxt(out_fname, self.data_block.values, fmt=self.write_formatter, header=header, comments='')
 
 
 class CryoSparc(EMfile):

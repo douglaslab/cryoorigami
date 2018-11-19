@@ -8,12 +8,14 @@
 import yaml
 import numpy as np
 
+
 def write_config_file(fname, args_dict):
     '''
     Dump parameters into ymal config file
     '''
     with open(fname, 'w') as outfile:
         yaml.dump(args_dict, outfile, default_flow_style=False)
+
 
 def parse_star_parameters(parameter_input):
     '''
@@ -39,13 +41,14 @@ def parse_star_parameters(parameter_input):
 
     return parameter_dict
 
+
 def euler2rot2D(alpha):
     '''
     Eular angle to 2D rotation matrix
     '''
-    ca = np.cos(alpha)
-    sa = np.sin(alpha)
-    
-    r = np.array([[ ca, sa],
-                  [-sa, ca]])
+    ca = np.cos(alpha*np.pi/180)
+    sa = np.sin(alpha*np.pi/180)
+
+    r = np.array([[ca, -sa],
+                  [+sa, ca]])
     return r
