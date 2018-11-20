@@ -42,6 +42,13 @@ def parse_star_parameters(parameter_input):
     return parameter_dict
 
 
+def rad2deg(rad):
+    '''
+    Convert radian to eular degree
+    '''
+    return 180.0*rad/np.pi
+
+
 def euler2rot2D(alpha):
     '''
     Eular angle to 2D rotation matrix

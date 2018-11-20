@@ -53,6 +53,14 @@ class Project:
         self.mic_NY = 0
         self.mic_NZ = 0
 
+        # Cryosparc objects
+        self.particle_cs    = None
+
+        # Cryosparc files
+        self.blob_cs_file        = None
+        self.passthrough_cs_file = None
+        self.original_star_file  = None
+
         # Additional data frames
         self.particle_data_props = pd.DataFrame(columns=['insideFrame'])
 
@@ -213,7 +221,7 @@ class Project:
                                         ptcls=class_ptcls)
         return 1
 
-    def write_output_files(self, write_particle_star=True, write_ref_class_star=True):
+    def write_output_files(self, write_particle_star=True, write_ref_class_star=True, write_cs_star=True):
         '''
         Write output files
         '''
@@ -222,6 +230,10 @@ class Project:
 
         if self.ref_class_star is not None and write_ref_class_star:
             self.ref_class_star.write(self.ref_class_out_file)
+
+        print(self.particle_out_file)
+        if self.particle_cs is not None and write_cs_star:
+            self.particle_cs.star.write(self.particle_out_file)
 
     def set_output_directory(self, input_filename, output_directory=None):
         '''
@@ -252,7 +264,7 @@ class Project:
         # Make directory
         os.makedirs(self.output_directory, exist_ok=True)
 
-    def prepare_io_files(self):
+    def prepare_io_files_star(self):
         # Copy input file to output directory
         if self.particle_star_file is not None:
             head, tail = os.path.split(self.particle_star_file)
@@ -264,6 +276,54 @@ class Project:
             head, tail = os.path.split(self.ref_class_star_file)
             copyfile(self.ref_class_star_file, self.output_directory+'/'+root+'_class_input'+ext)
             self.ref_class_out_file = self.output_directory+'/'+root+'_class_output'+ext
+
+    def prepare_io_files_cs(self):
+        # Copy input files to output directory
+        if self.blob_cs_file is not None:
+            head, tail = os.path.split(self.blob_cs_file)
+            root, ext  = os.path.splitext(tail)
+            copyfile(self.blob_cs_file, self.output_directory+'/'+root+'_blob_input'+ext)
+            self.particle_out_file = self.output_directory+'/'+root+'_particle_output.star'
+
+        if self.passthrough_cs_file is not None:
+            head, tail = os.path.split(self.passthrough_cs_file)
+            root, ext  = os.path.splitext(tail)
+            copyfile(self.passthrough_cs_file, self.output_directory+'/'+root+'_passthrough_input'+ext)
+
+        if self.original_star_file is not None:
+            head, tail = os.path.split(self.original_star_file)
+            root, ext  = os.path.splitext(tail)
+            copyfile(self.original_star_file, self.output_directory+'/'+root+'_original_particle'+ext)
+
+    def set_cs_files(self, blob_cs_file=None, passthrough_cs_file=None, original_star_file=None):
+        '''
+        Set input cs files
+        '''
+        self.blob_cs_file        = blob_cs_file
+        self.passthrough_cs_file = passthrough_cs_file
+        self.original_star_file  = original_star_file
+
+    def read_cs_files(self):
+        '''
+        Read cs file
+        '''
+        self.particle_cs = CryoSparc()
+
+        if self.blob_cs_file is not None:
+            self.particle_cs.read_blob(self.blob_cs_file)
+
+        if self.passthrough_cs_file is not None:
+            self.particle_cs.read_passthrough(self.passthrough_cs_file)
+
+        if self.original_star_file is not None:
+            self.particle_cs.read_original_star(self.original_star_file)
+
+    def convert_cs2star(self):
+        '''
+        Convert to cs to star file
+        '''
+        self.particle_cs.convert2star()
+        self.particle_cs.copy_from_original()
 
 
 class Micrograph:
@@ -295,7 +355,8 @@ class MRC:
                         'CELLAY': 0,
                         'CELLAZ': 0}
 
-        self.read_header(file)
+        if file is not None:
+            self.read_header(file)
 
     def read(self):
         '''
@@ -408,7 +469,8 @@ class Star(EMfile):
         self.star_apix     = None
 
         # Read file
-        self.read(file)
+        if file is not None:
+            self.read(file)
 
     def _read_metadata_labels(self):
         '''
@@ -818,21 +880,136 @@ class CryoSparc(EMfile):
     '''
     def __init__(self):
         self.name = None
-        self.blob_data        = None
-        self.passthrough_data = None
-        self.cs2starmap       = {}
+        self.data_block_dict        = {}
+        self.data_block_blob        = None
+        self.data_block_passthrough = None
+        self.cs2star_blob           = {}
+        self.cs2star_passthrough    = {'location/micrograph_path': 'rlnMicrographName',
+                                       'ctf/amp_contrast': 'rlnAmplitudeContrast',
+                                       'ctf/accel_kv': 'rlnVoltage',
+                                       'ctf/cs_mm': 'rlnSphericalAberration',
+                                       'ctf/df1_A': 'rlnDefocusU',
+                                       'ctf/df2_A': 'rlnDefocusV',
+                                       'ctf/ctf_fit_to_A': "rlnCtfMaxResolution"
+                                       }
+
+        self.star                   = None
+        self.original_star          = None
 
     def read_blob(self, file):
         '''
         Read cryosparc blob file
         '''
+        data = np.load(file)
+        self.data_block_blob = data
 
     def read_passthrough(self, file):
         '''
         Read passthrough file
         '''
+        data = np.load(file)
+        self.data_block_passthrough = data
+
+    def has_label_blob(self, label):
+        '''
+        Check if label exists in blob data block
+        '''
+        if label in self.data_block_blob.dtype.names:
+            return True
+        else:
+            return False
+
+    def has_label_passthrough(self, label):
+        '''
+        Check if label exists in passthrough data block
+        '''
+        if label in self.data_block_passthrough.dtype.names:
+            return True
+        else:
+            return False
+
+    def read_original_star(self, fname):
+        '''
+        Read original star file
+        '''
+        self.original_star = Star(fname)
 
     def convert2star(self):
         '''
         Convert to star format
         '''
+        self.star            = Star()
+        self.data_block_dict = {}
+
+        # Get the parameters from blob file
+        if self.data_block_blob is not None:
+
+            # Do the  direct copies
+            for cs_label, rln_label in self.cs2star_passthrough.items():
+                if self.has_label_passthrough(cs_label):
+                    self.data_block_dict[rln_label] = np.array(self.data_block_passthrough[cs_label],
+                                                               dtype=self.star.PARAMETERS[rln_label]['nptype'])
+
+            # rlnImageName
+            new_data_column = []
+            if self.has_label_blob('blob/path') and self.has_label_blob('blob/idx'):
+                for i in range(self.data_block_blob.shape[0]):
+                    image_name = "%010d@%s" % (self.data_block_blob['blob/idx'][i], self.data_block_blob['blob/path'][i])
+                    new_data_column.append(image_name)
+
+                self.data_block_dict['rlnImageName'] = np.array(new_data_column,
+                                                                dtype=self.star.PARAMETERS['rlnImageName']['nptype'])
+
+            # rlnOriginX/Y
+            if self.has_label_passthrough('alignments2D/shift'):
+                self.data_block_dict['rlnOriginX'] = np.array(self.data_block_passthrough['alignments2D/shift'][:, 0],
+                                                              dtype=self.star.PARAMETERS['rlnOriginX']['nptype'])
+
+                self.data_block_dict['rlnOriginY'] = np.array(self.data_block_passthrough['alignments2D/shift'][:, 1],
+                                                              dtype=self.star.PARAMETERS['rlnOriginX']['nptype'])
+
+            # rlnCoordianteX/Y
+            if(self.has_label_passthrough('location/center_x_frac') and
+               self.has_label_passthrough('location/center_y_frac')):
+                coordinate_x = np.round(self.data_block_passthrough['location/micrograph_shape'][:, 1]*self.data_block_passthrough['location/center_x_frac'])
+                self.data_block_dict['rlnCoordinateX'] = np.array(coordinate_x, dtype=self.star.PARAMETERS['rlnCoordinateX']['nptype'])
+
+                coordinate_y = np.round(self.data_block_passthrough['location/micrograph_shape'][:, 0]*self.data_block_passthrough['location/center_y_frac'])
+                self.data_block_dict['rlnCoordinateY'] = np.array(coordinate_y, dtype=self.star.PARAMETERS['rlnCoordinateY']['nptype'])
+
+            # Defocus and phase-shift angles
+            if self.has_label_passthrough('ctf/df_angle_rad'):
+                self.data_block_dict['rlnDefocusAngle'] = np.array(util.rad2deg(self.data_block_passthrough['ctf/df_angle_rad']),
+                                                                   dtype=self.star.PARAMETERS['rlnDefocusAngle']['nptype'])
+
+            if self.has_label_passthrough('ctf/phase_shift_rad'):
+                self.data_block_dict['rlnPhaseShift'] = np.array(util.rad2deg(self.data_block_passthrough['ctf/phase_shift_rad']),
+                                                                 dtype=self.star.PARAMETERS['rlnPhaseShift']['nptype'])
+
+            # Create the data block for star
+            self.star.data_block = pd.DataFrame.from_dict(self.data_block_dict)
+
+    def copy_from_original(self):
+        '''
+        Copy from original star
+        '''
+
+        if self.original_star is not None:
+            if self.original_star.has_label('rlnDetectorPixelSize'):
+                self.star.data_block['rlnDetectorPixelSize'] = self.original_star.data_block['rlnDetectorPixelSize'][0]
+
+            if self.original_star.has_label('rlnMagnification'):
+                self.star.data_block['rlnMagnification'] = self.original_star.data_block['rlnMagnification'][0]
+
+            # Get micrographs path
+            if self.original_star.has_label('rlnMicrographName'):
+                original_mic_head, original_mic_tail = os.path.split(self.original_star.data_block['rlnMicrographName'][0])
+
+                new_mic_names = []
+                for i in range(self.star.data_block.shape[0]):
+                    mic_head, mic_tail = os.path.split(self.star.data_block['rlnMicrographName'][i])
+
+                    # Create the micrograph name
+                    new_mic_name = original_mic_head+'/'+mic_tail
+                    new_mic_names.append(new_mic_name)
+                self.star.data_block['rlnMicrographName'] = new_mic_names
