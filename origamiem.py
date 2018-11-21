@@ -187,7 +187,7 @@ class Project:
             for label, value in column_params.items():
                 self.particle_star.set_column(label, value)
 
-    def transform_particles(self):
+    def transform_particles(self, final_offset=[0, 0]):
         '''
         Transform particle star file based on the class star file
         '''
@@ -218,6 +218,7 @@ class Project:
             # Make the transformation
             self.particle_star.rotate2D(rotangle=rot_angle,
                                         offset=[offset_x, offset_y],
+                                        final_offset=final_offset,
                                         ptcls=class_ptcls)
         return 1
 
@@ -759,7 +760,7 @@ class Star(EMfile):
         if self.has_label(label) and new_label in self.PARAMETERS:
             self.data_block.loc[:, new_label] = self.data_block[label]
 
-    def rotate2D(self, rotangle=0, offset=[0, 0], ptcls=None):
+    def rotate2D(self, rotangle=0, offset=[0, 0], final_offset=[0, 0], ptcls=None):
         '''
         Rotate particles
         '''
@@ -779,6 +780,8 @@ class Star(EMfile):
             ptcls = np.arange(self.num_data_points)
 
         # Iterate through each particle to get the corrected offset
+        new_offsets = []
+
         for ptcl in ptcls:
             oldangle = self.data_block.loc[ptcl, 'rlnAnglePsi']
             rotM = util.euler2rot2D(float(oldangle))
@@ -789,9 +792,18 @@ class Star(EMfile):
             # Get the corrected offset
             corrected_offset = rotMT.dot(np.array(offset))
 
-            # Update the offsets
-            self.data_block.loc[ptcl, 'rlnOriginX'] += corrected_offset[0]
-            self.data_block.loc[ptcl, 'rlnOriginY'] += corrected_offset[1]
+            # Final offset
+            final_rotM  = util.euler2rot2D(float(oldangle+rotangle))
+            final_rotMT = final_rotM.T
+
+            final_corrected_offset = final_rotMT.dot(np.array(final_offset))
+
+            new_offsets.append(corrected_offset+final_corrected_offset)
+
+        # Update offsets (Needs to be investigated)
+        new_offsets = np.array(new_offsets)
+        self.data_block.loc[ptcls, 'rlnOriginX'] += new_offsets[:, 0]
+        self.data_block.loc[ptcls, 'rlnOriginY'] += new_offsets[:, 1]
 
         # Update psi angles
         self.data_block.loc[ptcls, 'rlnAnglePsi'] += rotangle % 360

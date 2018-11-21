@@ -23,8 +23,9 @@ def main():
                         action='store_true', help="Create new class ids for the reference file")
     parser.add_argument("-addcols",    "--addcolumns",
                         type=str, help="Add new columns with same value for all particles", default=None)
-    parser.add_argument("-recenter",   "--recenter",    action='store_true', help="Recenter particles")
-    parser.add_argument("-apix",     "--apix",  type=float,
+    parser.add_argument("-recenter",   "--recenter",  action='store_true', help="Recenter particles")
+    parser.add_argument("-offset",     "--offset",    nargs=2, type=float, default=[0, 0], help="Final offset")
+    parser.add_argument("-apix",       "--apix",  type=float,
                         help="Micrograph pixel size", default=1.82)
 
     args = parser.parse_args()
@@ -36,7 +37,8 @@ def main():
                  'addcolumns':  args.addcolumns,
                  'recenter':    args.recenter,
                  'newclassid':  args.newclassid,
-                 'apix':        args.apix
+                 'apix':        args.apix,
+                 'offset':      args.offset
                  }
 
     # Check if the input file exists
