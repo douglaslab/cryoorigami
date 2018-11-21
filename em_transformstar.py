@@ -76,7 +76,7 @@ def main():
     new_project.prepare_io_files_star()
 
     # Perform reference based particle star transformation
-    new_project.transform_particles()
+    new_project.transform_particles(final_offset=args_dict['offset'])
 
     # Add new columns
     new_project.add_columns(new_column_parameters)
