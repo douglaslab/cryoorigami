@@ -191,35 +191,45 @@ class Project:
         '''
         Transform particle star file based on the class star file
         '''
-        if self.particle_star is None or self.ref_class_star is None:
-            print('No transformation due to missing particle or reference data')
+        if self.particle_star is None:
+            print('No transformation due to missing particle data')
             return 0
 
-        # Ref data block
-        ref_data_block = self.ref_class_star.get_data_block()
+        if self.ref_class_star is not None:
+            # Ref data block
+            ref_data_block = self.ref_class_star.get_data_block()
 
-        # Iterate through every class
-        for i in range(ref_data_block.shape[0]):
-            # Get class id
-            class_id = ref_data_block['rlnClassNumber'][i]
+            # Iterate through every class
+            for i in range(ref_data_block.shape[0]):
+                # Get class id
+                class_id = ref_data_block['rlnClassNumber'][i]
 
-            # Get rotangle
-            rot_angle = ref_data_block['rlnAnglePsi'][i]
+                # Get rotangle
+                rot_angle = ref_data_block['rlnAnglePsi'][i]
 
-            # Get offsetx, offsety
-            offset_x = ref_data_block['rlnOriginX'][i]
-            offset_y = ref_data_block['rlnOriginY'][i]
+                # Get offsetx, offsety
+                offset_x = ref_data_block['rlnOriginX'][i]
+                offset_y = ref_data_block['rlnOriginY'][i]
 
-            # Get class rows
-            class_ptcls = self.particle_star.get_class_rows(class_id)
+                # Get class rows
+                class_ptcls = self.particle_star.get_class_rows(class_id)
 
-            print("Processing class {:d}. Number of particles {:d}".format(class_id, len(class_ptcls)))
+                print("Processing class {:d}. Number of particles {:d}".format(class_id, len(class_ptcls)))
 
+                # Make the transformation
+                self.particle_star.rotate2D(rotangle=rot_angle,
+                                            offset=[offset_x, offset_y],
+                                            final_offset=final_offset,
+                                            ptcls=class_ptcls)
+        else:
+            # Determine the particles
+            ptcls = np.arange(self.particle_star.data_block.shape[0])
             # Make the transformation
-            self.particle_star.rotate2D(rotangle=rot_angle,
-                                        offset=[offset_x, offset_y],
+            self.particle_star.rotate2D(rotangle=0.0,
+                                        offset=[0.0, 0.0],
                                         final_offset=final_offset,
-                                        ptcls=class_ptcls)
+                                        ptcls=ptcls)
+
         return 1
 
     def write_output_files(self, write_particle_star=True, write_ref_class_star=True, write_cs_star=True):
