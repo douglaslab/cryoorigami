@@ -617,11 +617,11 @@ class Star(EMfile):
         Set a column value
         '''
         if self.has_label(label) and value is not None:
-            self.data_block.loc[:, label] = value
+            self.data_block.loc[:, label] = self.PARAMETERS[label]['type'](value)
         else:
             success = self.add_column(label)
             if success and value is not None:
-                self.data_block.loc[:, label] = self.PARAMETERS[value]['type'](value)
+                self.data_block.loc[:, label] = self.PARAMETERS[label]['type'](value)
 
     def copy(self, other=None):
         '''

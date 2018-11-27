@@ -22,7 +22,7 @@ def parse_star_parameters(parameter_input):
     Parse  parameter input
     '''
     # Get the parameter groups
-    groups = parameter_input.split('.')
+    groups = parameter_input.split('_')
 
     # Get the functions and its parameters
     parameter_lists = [group.split(':') for group in groups]
