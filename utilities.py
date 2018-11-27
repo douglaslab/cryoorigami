@@ -42,6 +42,11 @@ def parse_star_parameters(parameter_input):
     return parameter_dict
 
 
+def normalize_minmax(data):
+
+    return (data - np.min(data)) / (np.max(data) - np.min(data))
+
+
 def rad2deg(rad):
     '''
     Convert radian to eular degree

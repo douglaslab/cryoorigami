@@ -48,6 +48,9 @@ class Project:
         self.first_mic_file  = None
         self.first_mic_mrc   = None
 
+        # MRC files
+        self.ref_class_mrc   = None
+
         # Micrograph dimensions
         self.mic_NX = 0
         self.mic_NY = 0
@@ -187,7 +190,7 @@ class Project:
             for label, value in column_params.items():
                 self.particle_star.set_column(label, value)
 
-    def transform_particles(self, final_offset=[0, 0]):
+    def transform_particles(self, final_offset=[0, 0], com_offset=False):
         '''
         Transform particle star file based on the class star file
         '''
@@ -205,11 +208,32 @@ class Project:
                 class_id = ref_data_block['rlnClassNumber'][i]
 
                 # Get rotangle
-                rot_angle = ref_data_block['rlnAnglePsi'][i]
+                if self.ref_class_star.has_label('rlnAnglePsi'):
+                    rot_angle = ref_data_block['rlnAnglePsi'][i]
+                else:
+                    rot_angle = 0.0
 
                 # Get offsetx, offsety
-                offset_x = ref_data_block['rlnOriginX'][i]
-                offset_y = ref_data_block['rlnOriginY'][i]
+                if self.ref_class_star.has_label('rlnOriginX') and self.ref_class_star.has_label('rlnOriginY'):
+                    offset_x = ref_data_block['rlnOriginX'][i]
+                    offset_y = ref_data_block['rlnOriginY'][i]
+                else:
+                    offset_x = 0.0
+                    offset_y = 0.0
+
+                # Get image name and number
+                if self.ref_class_star.has_label('rlnReferenceImage') and com_offset:
+                    image_num, image_file = ref_data_block['rlnReferenceImage'][i].split('@')
+
+                    if self.ref_class_mrc is None:
+                        self.ref_class_mrc = MRC(image_file)
+
+                    if self.ref_class_mrc is not None:
+                        final_offset = self.ref_class_mrc.determine_com(img_num=int(image_num)-1)
+
+                    # Check final offset value
+                    if final_offset is None:
+                        final_offset = [0.0, 0.0]
 
                 # Get class rows
                 class_ptcls = self.particle_star.get_class_rows(class_id)
@@ -242,7 +266,6 @@ class Project:
         if self.ref_class_star is not None and write_ref_class_star:
             self.ref_class_star.write(self.ref_class_out_file)
 
-        print(self.particle_out_file)
         if self.particle_cs is not None and write_cs_star:
             self.particle_cs.star.write(self.particle_out_file)
 
@@ -358,7 +381,8 @@ class MRC:
         MRC  class
     '''
     def __init__(self, file):
-        self.name = None
+        self.img   = None
+        self.name  = None
         self.header =  {'NX': 0,
                         'NY': 0,
                         'NZ': 0,
@@ -366,13 +390,79 @@ class MRC:
                         'CELLAY': 0,
                         'CELLAZ': 0}
 
-        if file is not None:
-            self.read_header(file)
+        self.mode2type = {0: np.dtype(np.int8),
+                          1: np.dtype(np.int16),
+                          2: np.dtype(np.float32),
+                          6: np.dtype(np.uint16)}
 
-    def read(self):
+        self.type2mode = {np.dtype(np.int8):    0,
+                          np.dtype(np.int16):   1,
+                          np.dtype(np.float32): 2,
+                          np.dtype(np.uint16):  6}
+
+        self.HEADER_LEN = int(1024)                     # In bytes.
+
+        if file is not None:
+            self.read(file)
+
+    def read(self, file, mrc_format='relion'):
         '''
         Read MRC file
         '''
+        if "relion" in mrc_format.lower() or "xmipp" in mrc_format.lower():
+            order = "C"
+        else:
+            order = "F"  # Read x, y, z -> data[i, j, k] == data[i][j][k]
+
+        # First read header
+        self.read_header(file)
+
+        # initlalize img data
+        self.img = None
+        with open(file) as f:
+            NX = self.header['NX']
+            NY = self.header['NY']
+            NZ = self.header['NZ']
+            mode = self.header['MODE']
+
+            f.seek(self.HEADER_LEN)  # seek to start of data
+            shape = (NX, NY, NZ)
+            if mode in self.mode2type:
+                dtype = self.mode2type[mode]
+            else:
+                raise IOError("Unknown MRC data type")
+            self.img = np.reshape(np.fromfile(f, dtype=dtype, count=NX * NY * NZ), shape, order=order)
+
+    def get_img(self, img_num=0):
+        '''
+        Get a single image
+        '''
+        if self.img is not None and img_num < self.img.shape[2]:
+            return self.img[:, :, img_num]
+        else:
+            return None
+
+    def determine_com(self, img_num=0):
+        '''
+        Determine center-of-mass at a given image number
+        '''
+        if self.img is not None and img_num < self.img.shape[2]:
+            # Get normalized image
+            current_img = self.img[:, :, img_num]
+
+            origin_x = int(0.5*self.img.shape[0])
+            origin_y = int(0.5*self.img.shape[1])
+            x, y = np.meshgrid(np.arange(self.img.shape[0], dtype=np.double),
+                               np.arange(self.img.shape[1], dtype=np.double))
+            com_x = np.sum(x*current_img)/np.sum(current_img)
+            com_y = np.sum(y*current_img)/np.sum(current_img)
+
+            com_x = np.average(x, axis=None, weights=current_img)
+            com_y = np.average(y, axis=None, weights=current_img)
+
+            return [com_x-origin_x, com_y-origin_y]
+        else:
+            return None
 
     def read_header(self, file):
         '''

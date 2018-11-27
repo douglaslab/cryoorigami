@@ -25,6 +25,7 @@ def main():
                         type=str, help="Add new columns with same value for all particles", default=None)
     parser.add_argument("-recenter",   "--recenter",  action='store_true', help="Recenter particles")
     parser.add_argument("-offset",     "--offset",    nargs=2, type=float, default=[0, 0], help="Final offset")
+    parser.add_argument("-offsetcom",  "--offsetcom", action='store_true', help="Set final offset from center-of-mass")
     parser.add_argument("-apix",       "--apix",  type=float,
                         help="Micrograph pixel size", default=1.82)
 
@@ -38,7 +39,8 @@ def main():
                  'recenter':    args.recenter,
                  'newclassid':  args.newclassid,
                  'apix':        args.apix,
-                 'offset':      args.offset
+                 'offset':      args.offset,
+                 'offsetcom':   args.offsetcom
                  }
 
     # Check if the input file exists
@@ -76,7 +78,7 @@ def main():
     new_project.prepare_io_files_star()
 
     # Perform reference based particle star transformation
-    new_project.transform_particles(final_offset=args_dict['offset'])
+    new_project.transform_particles(final_offset=args_dict['offset'], com_offset=args_dict['offsetcom'])
 
     # Add new columns
     new_project.add_columns(new_column_parameters)
