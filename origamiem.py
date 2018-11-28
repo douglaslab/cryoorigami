@@ -1079,6 +1079,37 @@ class CryoSparc(EMfile):
 
                 self.data_block_dict['rlnOriginY'] = np.array(self.data_block_passthrough['alignments2D/shift'][:, 1],
                                                               dtype=self.star.PARAMETERS['rlnOriginX']['nptype'])
+            if self.has_label_passthrough('alignments3D/shift'):
+                self.data_block_dict['rlnOriginX'] = np.array(self.data_block_passthrough['alignments3D/shift'][:, 0],
+                                                              dtype=self.star.PARAMETERS['rlnOriginX']['nptype'])
+
+                self.data_block_dict['rlnOriginY'] = np.array(self.data_block_passthrough['alignments3D/shift'][:, 1],
+                                                              dtype=self.star.PARAMETERS['rlnOriginX']['nptype'])
+            if self.has_label_blob('alignments3D/shift'):
+                self.data_block_dict['rlnOriginX'] = np.array(self.data_block_blob['alignments3D/shift'][:, 0],
+                                                              dtype=self.star.PARAMETERS['rlnOriginX']['nptype'])
+
+                self.data_block_dict['rlnOriginY'] = np.array(self.data_block_blob['alignments3D/shift'][:, 1],
+                                                              dtype=self.star.PARAMETERS['rlnOriginX']['nptype'])
+
+            # rlnAngleRot, rlnAngleTilt, rlnAnglePsi
+            if self.has_label_passthrough('alignments2D/pose'):
+                self.data_block_dict['rlnAnglePsi'] = np.array(util.rad2deg(self.data_block_passthrough['alignments2D/pose']),
+                                                               dtype=self.star.PARAMETERS['rlnAnglePsi']['nptype'])
+            if self.has_label_passthrough('alignments3D/pose'):
+                self.data_block_dict['rlnAngleRot'] = np.array(util.rad2deg(self.data_block_passthrough['alignments3D/pose'][:, 0]),
+                                                               dtype=self.star.PARAMETERS['rlnAngleRot']['nptype'])
+                self.data_block_dict['rlnAngleTilt'] = np.array(util.rad2deg(self.data_block_passthrough['alignments3D/pose'][:, 1]),
+                                                                dtype=self.star.PARAMETERS['rlnAngleTilt']['nptype'])
+                self.data_block_dict['rlnAnglePsi'] = np.array(util.rad2deg(self.data_block_passthrough['alignments3D/pose'][:, 2]),
+                                                               dtype=self.star.PARAMETERS['rlnAnglePsi']['nptype'])
+            if self.has_label_blob('alignments3D/pose'):
+                self.data_block_dict['rlnAngleRot'] = np.array(util.rad2deg(self.data_block_blob['alignments3D/pose'][:,  0]),
+                                                               dtype=self.star.PARAMETERS['rlnAngleRot']['nptype'])
+                self.data_block_dict['rlnAngleTilt'] = np.array(util.rad2deg(self.data_block_blob['alignments3D/pose'][:,  1]),
+                                                                dtype=self.star.PARAMETERS['rlnAngleTilt']['nptype'])
+                self.data_block_dict['rlnAnglePsi'] = np.array(util.rad2deg(self.data_block_blob['alignments3D/pose'][:, 2]),
+                                                               dtype=self.star.PARAMETERS['rlnAnglePsi']['nptype'])
 
             # rlnCoordianteX/Y
             if(self.has_label_passthrough('location/center_x_frac') and

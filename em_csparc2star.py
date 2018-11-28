@@ -36,7 +36,7 @@ def main():
         sys.exit('Input file does not exist!')
 
     # Check if the reference file exists
-    if args_dict['original'] is None and not os.path.isfile(args_dict['original']):
+    if args_dict['original'] is None or not os.path.isfile(args_dict['original']):
         parser.print_help()
         sys.exit('Original star file does not exist!')
 
