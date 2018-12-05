@@ -18,19 +18,14 @@ def main():
 
     parser.add_argument("-i",        "--input",       type=str, help="Particle star file")
     parser.add_argument("-o",        "--output",      type=str, help="Output directory", default=None)
-    parser.add_argument("-ref",      "--reference",   type=str, help="Reference class star file")
     parser.add_argument("-cols",     "--columns",     type=str, help="Columns to copy", nargs='*', default=None)
-    parser.add_argument("-prox",     "--proximity",   type=int, help="Use distance proximity to copy (Angstrom)",
-                        default=None)
 
     args = parser.parse_args()
 
     # Prepare args dict
     args_dict = {'input':       args.input,
                  'output':      args.output,
-                 'reference':   args.reference,
-                 'columns':     args.columns,
-                 'proximity':   args.proximity
+                 'columns':     args.columns
                  }
 
     # Check if the input file exists
@@ -38,27 +33,14 @@ def main():
         parser.print_help()
         sys.exit('Input file does not exist!')
 
-    # Check if the reference file exists
-    if args_dict['reference'] is None and not os.path.isfile(args_dict['reference']):
-        parser.print_help()
-        sys.exit('Reference file file does not exist!')
-
     # Get the new column parameters
     if args_dict['columns'] is not None:
         new_column_parameters = util.parse_star_parameters(args_dict['columns'])
     else:
         new_column_parameters = None
 
-    # Determine the proximity parameter
-    if args_dict['proximity'] is not None:
-        proximity_option = True
-        pixel_range      = args_dict['proximity']
-    else:
-        proximity_option = False
-        pixel_range      = 0
-
     # Create an EM project object
-    new_project = em.Project(name='ProjectCopy')
+    new_project = em.Project(name='ProjectCopyColumns')
     new_project.set_output_directory(args_dict['input'], args_dict['output'])
 
     # Write parameters to args filename
@@ -69,14 +51,11 @@ def main():
     new_project.read_particles(args_dict['input'])
     print('Read particle star file {}'.format(args_dict['input']))
 
-    new_project.read_class_refs(args_dict['reference'])
-    print('Read class reference file {}'.format(args_dict['reference']))
-
     # Prepare input and output files
     new_project.prepare_io_files_star()
 
     # Add new columns
-    new_project.copy_from_ref(new_column_parameters, proximity_option, pixel_range, pixel_range)
+    new_project.copy_columns(new_column_parameters)
 
     # Write output files
     new_project.write_output_files(write_ref_class_star=False)

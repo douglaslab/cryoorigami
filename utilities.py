@@ -21,11 +21,9 @@ def parse_star_parameters(parameter_input):
     '''
     Parse  parameter input
     '''
-    # Get the parameter groups
-    groups = parameter_input.split('_')
 
     # Get the functions and its parameters
-    parameter_lists = [group.split(':') for group in groups]
+    parameter_lists = [group.split(':') for group in parameter_input]
 
     # Create the parameters dictionary
     parameter_dict = {}
@@ -64,3 +62,12 @@ def euler2rot2D(alpha):
     r = np.array([[ca, -sa],
                   [+sa, ca]])
     return r
+
+
+def get_distances(single_coordinate, list_coordinate):
+    '''
+    Get distances between a single coordinate and a coordinate list
+    '''
+    distances = list_coordinate - single_coordinate
+
+    return np.sqrt(np.sum(distances**2, axis=1))

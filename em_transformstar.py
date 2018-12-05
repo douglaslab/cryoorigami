@@ -22,7 +22,7 @@ def main():
     parser.add_argument("-newclassid", "--newclassid",
                         action='store_true', help="Create new class ids for the reference file")
     parser.add_argument("-addcols",    "--addcolumns",
-                        type=str, help="Add new columns with same value for all particles", default=None)
+                        type=str, help="Add new columns with same value for all particles", nargs='*', default=None)
     parser.add_argument("-recenter",   "--recenter",  action='store_true', help="Recenter particles")
     parser.add_argument("-offset",     "--offset",    nargs=2, type=float, default=[0, 0], help="Final offset")
     parser.add_argument("-offsetcom",  "--offsetcom", action='store_true', help="Set final offset from center-of-mass")

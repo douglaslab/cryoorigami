@@ -43,6 +43,7 @@ class Project:
         # Micrograph pixel size
         self.mic_apix           = None
         self.particle_apix      = None
+        self.ref_apix           = None
 
         # Micrograph files
         self.first_mic_file  = None
@@ -119,6 +120,12 @@ class Project:
         '''
         self.particle_apix = apix
 
+    def set_ref_class_apix(self, apix=1.82):
+        '''
+        Set particle apix
+        '''
+        self.ref_class_apix = apix
+
     def read_mic_apix(self):
         '''
         Read and set micrograph apix
@@ -132,6 +139,13 @@ class Project:
         '''
         self.particle_star.determine_star_apix()
         self.set_particle_apix(self.particle_star.get_star_apix())
+
+    def read_ref_apix(self):
+        '''
+        Read ref apix
+        '''
+        self.ref_class_star.determine_star_apix()
+        self.set_ref_class_apix(self.ref_class_star.get_star_apix())
 
     def read_class_refs(self, file, new_classids=False):
         '''
@@ -171,16 +185,36 @@ class Project:
         self.particle_star.determine_star_apix()
         self.particle_star.recenter2D(mic_apix=self.mic_apix)
 
-    def copy_from_ref(self, columns={}):
+    def copy_from_ref(self, columns={}, proximity=True, pixel_range=50, pixel_step=50):
         '''
         Copy columns from reference star
         '''
-        if self.particle_star.get_numRows() != self.ref_class_star.get_numRows():
-            print('Number of rows in the particle and reference star files dont match')
-            return 0
+        # Set ptcl copy list
+        ptcl_copy_list = None
+
+        if proximity:
+            ptcl_copy_list = self.get_same_ptcls(pixel_range, pixel_step)
+        else:
+            if self.particle_star.get_numRows() != self.ref_class_star.get_numRows():
+                print('Number of rows in the particle and reference star files dont match')
+                return 0
 
         # Iterate over all columns
-        self.particle_star.copy_columns(self.ref_class_star, columns)
+        self.particle_star.copy_columns(self.ref_class_star, columns, ptcl_copy_list)
+
+    def get_same_ptcls(self, pixel_range=50, pixel_step=50):
+        '''
+        Get the same particle in the original and reference particle list
+        '''
+        return self.particle_star.get_same_ptcls(self.ref_class_star, pixel_range, pixel_step)
+
+    def copy_columns(self, column_params):
+        '''
+        Copy from one column to another new column in particle star file
+        '''
+        if column_params is not None:
+            for from_column, to_column in column_params.items():
+                self.particle_star.copy_column2column(from_column, to_column)
 
     def add_columns(self, column_params=None):
         '''
@@ -189,6 +223,14 @@ class Project:
         if column_params is not None:
             for label, value in column_params.items():
                 self.particle_star.set_column(label, value)
+
+    def delete_columns(self, column_params=None):
+        '''
+        Delete columns
+        '''
+        if column_params is not None:
+            for label, value in column_params.items():
+                self.particle_star.delete_column(label)
 
     def transform_particles(self, final_offset=[0, 0], com_offset=False):
         '''
@@ -373,7 +415,17 @@ class Particle:
         Particle Class
     '''
     def __init__(self):
-        self.name = None
+        self.name            = None
+        self.micrograph_name = None
+        self.image_name      = None
+        self.image_num       = None
+        self.coordinate_x    = None
+        self.coordinate_y    = None
+        self.origin_x        = None
+        self.origin_y        = None
+        self.center_x        = None
+        self.center_y        = None
+        self.apix            = None
 
 
 class MRC:
@@ -569,9 +621,49 @@ class Star(EMfile):
         # Star pixel size
         self.star_apix     = None
 
+        # Micrograph pixel size
+        self.mic_apix      = 1.82
+
         # Read file
         if file is not None:
             self.read(file)
+
+    def build_ptcl_map(self, pix_range=50, pix_step=50):
+        '''
+        Build ptcl map
+        '''
+        self.ptcl_map = {}
+
+        for ptcl in range(self.data_block.shape[0]):
+
+            coord_x  = self.data_block['rlnCoordinateX'][ptcl]
+            coord_y  = self.data_block['rlnCoordinateY'][ptcl]
+            mic_name = self.data_block['rlnMicrographName'][ptcl]
+
+            x_floor = np.floor(1.0*(coord_x-pix_range)/pix_step)*pix_step
+            x_ceil  = np.ceil(1.0*(coord_x+pix_range)/pix_step)*pix_step
+
+            y_floor = np.floor(1.0*(coord_y-pix_range)/pix_step)*pix_step
+            y_ceil  = np.ceil(1.0*(coord_y+pix_range)/pix_step)*pix_step
+
+            x_list   = np.arange(x_floor, x_ceil+1, pix_step, dtype=int)
+            y_list   = np.arange(y_floor, y_ceil+1, pix_step, dtype=int)
+
+            xv, yv   = np.meshgrid(x_list, y_list)
+            mic_list = [mic_name]*xv.size
+
+            xym = list(zip(mic_list, xv.flatten(), yv.flatten()))
+            ptcl_list = [ptcl]*len(xym)
+
+            new_map = dict(zip(xym, ptcl_list))
+
+            self.ptcl_map.update(new_map)
+
+    def set_micrograph_apix(self, apix=1.82):
+        '''
+        Set micrograph pixel size
+        '''
+        self.mic_apix = apix
 
     def _read_metadata_labels(self):
         '''
@@ -673,6 +765,10 @@ class Star(EMfile):
         # Assign number of data points
         self.num_data_points = self.data_block.shape[0]
 
+    def delete_column(self, label):
+        if self.has_label(label):
+            self.data_block = self.data_block.drop(columns=label)
+
     def add_column(self, label=None):
         '''
         Add new column to data block
@@ -722,22 +818,135 @@ class Star(EMfile):
         self.data_formats = other.data_formats.copy()
         self.data_dtypes  = other.data_dtypes.copy()
 
-    def copy_columns(self, other, columns={}):
+    def copy_columns(self, other, columns={}, ptcl_copy_list=None):
         '''
         Copy columns from another star object
         '''
+
         # If the sizes don't match don't perform copy
-        if other.data_block.shape[0] != self.data_block.shape[0]:
+        if ptcl_copy_list is None and other.data_block.shape[0] != self.data_block.shape[0]:
             return 0
+        elif ptcl_copy_list is None and other.data_block.shape[0] == self.data_block.shape[0]:
+            ptcl_list = np.arange(self.data_block.shape[0])
+            ptcl_copy_list = pd.DataFrame({'self': ptcl_list, 'other': ptcl_list})
 
         # Iterate over all columns
         for label, value in columns.items():
             if other.has_label(label):
-                if self.has_label(label):
-                    self.data_block.loc[:, label] = other.data_block[label]
+                if self.has_label(label) and other.has_label(label):
+                    self.data_block.loc[ptcl_copy_list['self'].tolist(), label] = other.data_block.loc[ptcl_copy_list['other'].tolist(), label].tolist()
                 else:
                     self.add_column(label)
                     self.set_column(label, value)
+
+        # Assign only the portion of the data frame
+        self.data_block = self.data_block.loc[ptcl_copy_list['self'].tolist(), :]
+
+    def copy_column2column(self, from_column, to_column):
+        '''
+        Copy from one column to another
+        '''
+        if not self.has_label(from_column):
+            return 0
+
+        if not self.has_label(to_column):
+            self.add_column(to_column)
+
+        # Copy from-column to to-column
+        self.data_block[to_column] = self.data_block[from_column]
+
+    def _has_coordinate(self):
+        '''
+        Has coordinate
+        '''
+        if(self.has_label('rlnMicrographName') and
+           self.has_label('rlnCoordinateX') and
+           self.has_label('rlnCoordinateY')):
+
+            return True
+        else:
+            return False
+
+    def _get_coordinates(self, ptcls):
+        '''
+        Get coordinate information for a particle list
+        '''
+        if self._has_coordinate():
+
+            # Get the coordinates
+            coordinate_x = self.data_block['rlnCoordinateX'][ptcls]*self.mic_apix
+            coordinate_y = self.data_block['rlnCoordinateY'][ptcls]*self.mic_apix
+
+            if self.has_label('rlnOriginX') and self.has_label('rlnOriginY'):
+                coordinate_x = coordinate_x - self.data_block['rlnOriginX'][ptcls]*self.star_apix
+                coordinate_y = coordinate_y - self.data_block['rlnOriginY'][ptcls]*self.star_apix
+
+            return np.hstack((np.vstack(coordinate_x.tolist()), np.vstack(coordinate_y.tolist())))
+        else:
+            return None
+
+    def _get_micrograph_name(self, ptcl):
+        '''
+        Get the micrograph name
+        '''
+        if self.has_label('rlnMicrographName'):
+            return self.data_block['rlnMicrographName'][ptcl]
+        else:
+            return None
+
+    def _get_ptcls_on_micrograph(self, micrograph_name=None):
+        '''
+        Get ptcl ids with a micrograph name
+        '''
+        ptcl_list = None
+        if self.has_label('rlnMicrographName') and micrograph_name is not None:
+            ptcl_list = self.data_block.index[self.data_block['rlnMicrographName'] == micrograph_name].tolist()
+
+            return ptcl_list
+
+    def get_ptcl_key(self, ptcl, pixel_step=10):
+        '''
+        Get ptcl key
+        '''
+        coordinate_x = self.data_block["rlnCoordinateX"][ptcl]
+        coordinate_y = self.data_block["rlnCoordinateY"][ptcl]
+
+        mic_name = self.data_block["rlnMicrographName"][ptcl]
+
+        int_x = int(np.floor(1.0*coordinate_x/pixel_step)*pixel_step)
+        int_y = int(np.floor(1.0*coordinate_y/pixel_step)*pixel_step)
+
+        return (mic_name, int_x, int_y)
+
+    def get_same_ptcls(self, other, pixel_range=50, pixel_step=50):
+        '''
+        Determine which particles in self are also in other
+        '''
+        if not self._has_coordinate():
+            return None
+
+        # Other list
+        copy_list = []
+
+        # Build ptcl map for the other star
+        other.build_ptcl_map(pixel_range, pixel_step)
+
+        for ptcl in range(self.data_block.shape[0]):
+
+            # Get ptcl key
+            ptcl_key = self.get_ptcl_key(ptcl, pixel_step)
+
+            # Check if the particle exists in other star file
+            if ptcl_key in other.ptcl_map.keys():
+                copy_list.append([ptcl, other.ptcl_map[ptcl_key]])
+            else:
+                print(ptcl_key, ' particle doesnt exist in reference star')
+
+        # Convert to numpy array
+        copy_list = np.array(copy_list)
+
+        # Convert to data frame
+        return pd.DataFrame({'self': copy_list[:, 0], 'other': copy_list[:, 1]})
 
     def has_label(self, label):
         '''
@@ -759,7 +968,7 @@ class Star(EMfile):
         Is particle inside
         '''
         # Relative scale of pixel sizes
-        apix_scale = 1.0*self.star_apix/mic_apix
+        apix_scale  = 1.0*self.star_apix/mic_apix
         cor_offsetx = self.data_block['rlnOriginX'][ptcl]*apix_scale
         int_offsetx = np.round(cor_offsetx)
 
