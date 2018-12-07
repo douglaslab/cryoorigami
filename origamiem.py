@@ -232,7 +232,7 @@ class Project:
             for label, value in column_params.items():
                 self.particle_star.delete_column(label)
 
-    def transform_particles(self, final_offset=[0, 0], com_offset=False):
+    def transform_particles(self, final_offset=[0, 0], com_offset=False, rotate_psi=0):
         '''
         Transform particle star file based on the class star file
         '''
@@ -295,6 +295,9 @@ class Project:
                                         offset=[0.0, 0.0],
                                         final_offset=final_offset,
                                         ptcls=ptcls)
+
+        # Rotate psi
+        self.particle_star.rotate_psi(rotangle=rotate_psi)
 
         return 1
 
@@ -1069,6 +1072,27 @@ class Star(EMfile):
         if self.has_label(label) and new_label in self.PARAMETERS:
             self.data_block.loc[:, new_label] = self.data_block[label]
 
+    def rotate_psi(self, rotangle=0):
+        '''
+        Rotate psi angle
+        '''
+        self.data_block.loc[:, 'rlnAnglePsi'] += rotangle
+
+        # Normalize psi
+        self.normalize_psi()
+
+    def normalize_psi(self):
+        '''
+        Normalize psi angle
+        '''
+        self.data_block.loc[:, 'rlnAnglePsi'] %= 360
+
+        # Find angles higher than 180
+        mask = self.data_block['rlnAnglePsi'] > 180
+
+        # Subtract 180 from angles higher than 180
+        self.data_block.loc[mask, 'rlnAnglePsi'] -= 360
+
     def rotate2D(self, rotangle=0, offset=[0, 0], final_offset=[0, 0], ptcls=None):
         '''
         Rotate particles
@@ -1115,7 +1139,10 @@ class Star(EMfile):
         self.data_block.loc[ptcls, 'rlnOriginY'] += new_offsets[:, 1]
 
         # Update psi angles
-        self.data_block.loc[ptcls, 'rlnAnglePsi'] += rotangle % 360
+        self.data_block.loc[ptcls, 'rlnAnglePsi'] += rotangle
+
+        # Normalize psi angle
+        self.normalize_psi()
 
     def num2className(self, ptcls=None):
         '''

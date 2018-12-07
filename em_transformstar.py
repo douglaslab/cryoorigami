@@ -28,6 +28,7 @@ def main():
     parser.add_argument("-offsetcom",  "--offsetcom", action='store_true', help="Set final offset from center-of-mass")
     parser.add_argument("-apix",       "--apix",  type=float,
                         help="Micrograph pixel size", default=1.82)
+    parser.add_argument("-rotatepsi",  "--rotatepsi",  type=float, help="Rotate psi by angle", default=0)
 
     args = parser.parse_args()
 
@@ -40,7 +41,8 @@ def main():
                  'newclassid':  args.newclassid,
                  'apix':        args.apix,
                  'offset':      args.offset,
-                 'offsetcom':   args.offsetcom
+                 'offsetcom':   args.offsetcom,
+                 'rotatepsi':   args.rotatepsi
                  }
 
     # Check if the input file exists
@@ -78,7 +80,7 @@ def main():
     new_project.prepare_io_files_star()
 
     # Perform reference based particle star transformation
-    new_project.transform_particles(final_offset=args_dict['offset'], com_offset=args_dict['offsetcom'])
+    new_project.transform_particles(final_offset=args_dict['offset'], com_offset=args_dict['offsetcom'], rotate_psi=args_dict['rotatepsi'])
 
     # Add new columns
     new_project.add_columns(new_column_parameters)
