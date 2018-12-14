@@ -16,10 +16,11 @@ def main():
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument("-i",    "--input",       type=str, help="Particle star file")
-    parser.add_argument("-pass", "--passthrough", type=str, help="Passthrough file from cryosparc", default=None)
-    parser.add_argument("-o",    "--output",      type=str, help="Output directory", default=None)
-    parser.add_argument("-orig", "--original",    type=str, help="Original star file", default=None)
+    parser.add_argument("-i",       "--input",       type=str, help="Particle star file")
+    parser.add_argument("-pass",    "--passthrough", type=str, help="Passthrough file from cryosparc", default=None)
+    parser.add_argument("-o",       "--output",      type=str, help="Output directory", default=None)
+    parser.add_argument("-orig",    "--original",    type=str, help="Original star file", default=None)
+    parser.add_argument("-micpath", "--micpath",     type=str, help="Micrographs path", default="Micrographs")
 
     args = parser.parse_args()
 
@@ -27,18 +28,14 @@ def main():
     args_dict = {'input':        args.input,
                  'passthrough':  args.passthrough,
                  'output':       args.output,
-                 'original':     args.original
+                 'original':     args.original,
+                 'micpath':      args.micpath
                  }
 
     # Check if the input file exists
     if args_dict['input'] is None or not os.path.isfile(args_dict['input']):
         parser.print_help()
         sys.exit('Input file does not exist!')
-
-    # Check if the reference file exists
-    if args_dict['original'] is None or not os.path.isfile(args_dict['original']):
-        parser.print_help()
-        sys.exit('Original star file does not exist!')
 
     # Create an EM project object
     new_project = em.Project(name='ProjectCSparc')
@@ -63,7 +60,7 @@ def main():
     new_project.convert_cs2star()
 
     # Write output files
-    new_project.write_output_files()
+    new_project.write_output_files(args_dict['micpath'])
 
 
 if __name__ == "__main__":

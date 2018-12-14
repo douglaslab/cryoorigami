@@ -397,12 +397,12 @@ class Project:
         if self.original_star_file is not None:
             self.particle_cs.read_original_star(self.original_star_file)
 
-    def convert_cs2star(self):
+    def convert_cs2star(self, mic_path='Micrographs'):
         '''
         Convert to cs to star file
         '''
         self.particle_cs.convert2star()
-        self.particle_cs.copy_from_original()
+        self.particle_cs.copy_from_original(mic_path)
 
 
 class Micrograph:
@@ -631,6 +631,30 @@ class Star(EMfile):
         if file is not None:
             self.read(file)
 
+    def create_micname_from_imagename(self, mic_path='Micrographs'):
+        '''
+        Create micrographname from imagename
+        '''
+        if self.has_label('rlnImageName') and not self.has_label('rlnMicrographName'):
+            
+            # Add micropraph name 
+            self.add_column('rlnMicrographName')
+            
+            # Create micrograph names
+            new_mic_name_list = []
+            for i in range(self.data_block.shape[0]):
+                # Parse imagename
+                image_head, image_tail = os.path.split(self.data_block['rlnImageName'][i])
+                file_head, file_ext    = os.path.splitext(image_tail)
+
+                # New micgropraph name
+                new_mic_name = mic_path+'/'+file_head+'.mrc'
+
+                # Add micropgraph names
+                new_mic_name_list.append(new_mic_name)
+
+            self.data_block.loc[:, 'rlnMicrographName'] = new_mic_name_list
+
     def build_ptcl_map(self, pix_range=50, pix_step=50):
         '''
         Build ptcl map
@@ -732,6 +756,8 @@ class Star(EMfile):
         '''
         Prepare the data types from header
         '''
+        if self.data_block is not None:
+            self.data_labels   = list(self.data_block.columns.values)
         self.data_formats  = [self.PARAMETERS[label]['nptype'] for label in self.data_labels]
         self.data_dtypes   = {'names': self.data_labels,
                               'formats': self.data_formats}
@@ -779,16 +805,15 @@ class Star(EMfile):
         if label not in self.PARAMETERS:
             print('%s is not a valid Star label.' % (label))
             return None
-        elif label in self.data_labels:
+        elif label in self.data_block.columns.values:
             print('%s exists. Not creating a new column.' % (label))
             return None
 
         # Create new column
-        new_data_column = np.empty([self.num_data_points, 1], dtype=self.PARAMETERS[label]['nptype'])
+        new_data_column = np.empty([self.data_block.shape[0], 1], dtype=self.PARAMETERS[label]['nptype'])
 
         # Append the data column
         self.data_block[label] = new_data_column
-        self.data_labels.append(label)
 
         # Initialize the column
         if self.PARAMETERS[label]['nptype'][0] == 'U':
@@ -1368,11 +1393,10 @@ class CryoSparc(EMfile):
             # Create the data block for star
             self.star.data_block = pd.DataFrame.from_dict(self.data_block_dict)
 
-    def copy_from_original(self):
+    def copy_from_original(self, mic_path='Micrographs'):
         '''
         Copy from original star
         '''
-
         if self.original_star is not None:
             if self.original_star.has_label('rlnDetectorPixelSize'):
                 self.star.data_block['rlnDetectorPixelSize'] = self.original_star.data_block['rlnDetectorPixelSize'][0]
@@ -1380,15 +1404,5 @@ class CryoSparc(EMfile):
             if self.original_star.has_label('rlnMagnification'):
                 self.star.data_block['rlnMagnification'] = self.original_star.data_block['rlnMagnification'][0]
 
-            # Get micrographs path
-            if self.original_star.has_label('rlnMicrographName'):
-                original_mic_head, original_mic_tail = os.path.split(self.original_star.data_block['rlnMicrographName'][0])
-
-                new_mic_names = []
-                for i in range(self.star.data_block.shape[0]):
-                    mic_head, mic_tail = os.path.split(self.star.data_block['rlnMicrographName'][i])
-
-                    # Create the micrograph name
-                    new_mic_name = original_mic_head+'/'+mic_tail
-                    new_mic_names.append(new_mic_name)
-                self.star.data_block['rlnMicrographName'] = new_mic_names
+        if mic_path is not None:
+            self.star.create_micname_from_imagename(mic_path)
