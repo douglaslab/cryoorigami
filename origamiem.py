@@ -635,7 +635,7 @@ class Star(EMfile):
         '''
         Create micrographname from imagename
         '''
-        if self.has_label('rlnImageName') and not self.has_label('rlnMicrographName'):
+        if self.has_label('rlnImageName'):
             
             # Add micropraph name 
             self.add_column('rlnMicrographName')
@@ -1340,6 +1340,12 @@ class CryoSparc(EMfile):
 
                 self.data_block_dict['rlnOriginY'] = np.array(self.data_block_passthrough['alignments2D/shift'][:, 1],
                                                               dtype=self.star.PARAMETERS['rlnOriginX']['nptype'])
+            if self.has_label_blob('alignments2D/shift'):
+                self.data_block_dict['rlnOriginX'] = np.array(self.data_block_blob['alignments2D/shift'][:, 0],
+                                                              dtype=self.star.PARAMETERS['rlnOriginX']['nptype'])
+
+                self.data_block_dict['rlnOriginY'] = np.array(self.data_block_blob['alignments2D/shift'][:, 1],
+                                                              dtype=self.star.PARAMETERS['rlnOriginX']['nptype'])
             if self.has_label_passthrough('alignments3D/shift'):
                 self.data_block_dict['rlnOriginX'] = np.array(self.data_block_passthrough['alignments3D/shift'][:, 0],
                                                               dtype=self.star.PARAMETERS['rlnOriginX']['nptype'])
@@ -1356,6 +1362,9 @@ class CryoSparc(EMfile):
             # rlnAngleRot, rlnAngleTilt, rlnAnglePsi
             if self.has_label_passthrough('alignments2D/pose'):
                 self.data_block_dict['rlnAnglePsi'] = np.array(util.rad2deg(self.data_block_passthrough['alignments2D/pose']),
+                                                               dtype=self.star.PARAMETERS['rlnAnglePsi']['nptype'])
+            if self.has_label_blob('alignments2D/pose'):
+                self.data_block_dict['rlnAnglePsi'] = np.array(util.rad2deg(self.data_block_blob['alignments2D/pose']),
                                                                dtype=self.star.PARAMETERS['rlnAnglePsi']['nptype'])
             if self.has_label_passthrough('alignments3D/pose'):
                 self.data_block_dict['rlnAngleRot'] = np.array(util.rad2deg(self.data_block_passthrough['alignments3D/pose'][:, 0]),
