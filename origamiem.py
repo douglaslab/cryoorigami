@@ -68,6 +68,12 @@ class Project:
         # Additional data frames
         self.particle_data_props = pd.DataFrame(columns=['insideFrame'])
 
+    def flipX_particles(self):
+        '''
+        Flip particles in star file
+        '''
+        self.particle_star.flipX()
+
     def check_particle_pos(self):
         '''
         Check location of all particles
@@ -630,6 +636,36 @@ class Star(EMfile):
         # Read file
         if file is not None:
             self.read(file)
+
+    def flipX(self):
+        '''
+        Modify the geometrical values for flip around X
+        '''
+
+        if self.has_label('rlnIsFlip'):
+            valid_rows = self.data_block['rlnIsFlip'] == 1
+        else:
+            valid_rows = np.arange(self.data_block.shape[0]) 
+
+        # Invert X
+        if self.has_label('rlnOriginX'):
+            self.data_block.loc[valid_rows,'rlnOriginX'] = -self.data_block.loc[valid_rows,'rlnOriginX']
+
+        # Update Psi
+        if self.has_label('rlnAnglePsi'):
+            self.data_block.loc[valid_rows,'rlnAnglePsi'] = -self.data_block.loc[valid_rows,'rlnAnglePsi']
+
+        # Update Psi-Prior
+        if self.has_label('rlnAnglePsiPrior'):
+            self.data_block.loc[valid_rows,'rlnAnglePsiPrior'] = -self.data_block.loc[valid_rows,'rlnAnglePsiPrior']
+
+        # Update Tilt
+        if self.has_label('rlnAngleTilt'):
+            self.data_block.loc[valid_rows,'rlnAngleTilt'] = 180.0 + self.data_block.loc[valid_rows,'rlnAngleTilt']
+
+        # Update Psi-Prior
+        if self.has_label('rlnAngleTiltPrior'):
+            self.data_block.loc[valid_rows,'rlnAngleTiltPrior'] = 180.0 + self.data_block.loc[valid_rows,'rlnAngleTiltPrior']
 
     def create_micname_from_imagename(self, mic_path='Micrographs'):
         '''

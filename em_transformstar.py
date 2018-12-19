@@ -29,6 +29,7 @@ def main():
     parser.add_argument("-apix",       "--apix",  type=float,
                         help="Micrograph pixel size", default=1.82)
     parser.add_argument("-rotatepsi",  "--rotatepsi",  type=float, help="Rotate psi by angle", default=0)
+    parser.add_argument("-flipX",      "--flipX", action='store_true', help='Modify star file for flip around X axis')
 
     args = parser.parse_args()
 
@@ -42,7 +43,8 @@ def main():
                  'apix':        args.apix,
                  'offset':      args.offset,
                  'offsetcom':   args.offsetcom,
-                 'rotatepsi':   args.rotatepsi
+                 'rotatepsi':   args.rotatepsi,
+                 'flipX':       args.flipX
                  }
 
     # Check if the input file exists
@@ -90,9 +92,11 @@ def main():
         new_project.read_particle_apix()
         new_project.recenter_particles()
 
+    if args_dict['flipX']:
+        new_project.flipX_particles()
+
     # Write output files
     new_project.write_output_files()
-
 
 if __name__ == "__main__":
     main()
