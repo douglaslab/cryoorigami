@@ -39,6 +39,7 @@ def main():
     else:
         new_column_parameters = None
 
+
     # Create an EM project object
     new_project = em.Project(name='ProjectAddColumns')
     new_project.set_output_directory(args_dict['input'], args_dict['output'])

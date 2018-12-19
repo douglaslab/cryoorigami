@@ -607,7 +607,7 @@ class Star(EMfile):
         self.str2type       = {'double': float,
                                'string': str,
                                'int':    int,
-                               'bool':   bool}
+                               'bool':   lambda x: bool(int(x))}
         self.str2nptype     = {'double': 'f4',
                                'string': 'U100',
                                'int': 'i4',
@@ -830,6 +830,8 @@ class Star(EMfile):
         '''
         Set a column value
         '''
+
+
         if self.has_label(label) and value is not None:
             self.data_block.loc[:, label] = self.PARAMETERS[label]['type'](value)
         else:
