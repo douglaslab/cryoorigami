@@ -645,7 +645,7 @@ class Star(EMfile):
         if self.has_label('rlnIsFlip'):
             valid_rows = self.data_block['rlnIsFlip'] == 1
         else:
-            valid_rows = np.arange(self.data_block.shape[0]) 
+            valid_rows = np.arange(self.data_block.shape[0])
 
         # Invert X
         if self.has_label('rlnOriginX'):
