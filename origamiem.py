@@ -68,6 +68,13 @@ class Project:
         # Additional data frames
         self.particle_data_props = pd.DataFrame(columns=['insideFrame'])
 
+
+    def rename_columns(self, column_params):
+        '''
+        Rename columns
+        '''
+        self.particle_star.rename_columns(column_params)
+
     def flipX_particles(self):
         '''
         Flip particles in star file
@@ -636,6 +643,14 @@ class Star(EMfile):
         # Read file
         if file is not None:
             self.read(file)
+
+    def rename_columns(self, column_params):
+        if column_params is not None:
+            for old_column, new_column in column_params.items():
+
+                # Check that the column name exists and the new name is a proper star varaible
+                if self.has_label(old_column) and new_column in self.PARAMETERS:
+                    self.data_block = self.data_block.rename(index=str, columns={old_column:new_column})
 
     def flipX(self):
         '''
