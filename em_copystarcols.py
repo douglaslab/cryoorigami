@@ -16,10 +16,10 @@ def main():
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument("--i",           "--input",       type=str, help="Particle star file")
-    parser.add_argument("--o",           "--output",      type=str, help="Output directory", default=None)
-    parser.add_argument("--cols",        "--columns",     type=str, help="Columns to copy", nargs='*', default=None)
-    parser.add_argument("--copy-priors", "--copypriors",  action='store_true', help="Copy offset and angle parameters to priors")
+    parser.add_argument("-i",           "--input",       type=str, help="Particle star file")
+    parser.add_argument("-o",           "--output",      type=str, help="Output directory", default=None)
+    parser.add_argument("-cols",        "--columns",     type=str, help="Columns to copy", nargs='*', default=None)
+    parser.add_argument("-copy-priors", "--copypriors",  action='store_true', help="Copy offset and angle parameters to priors")
 
     args = parser.parse_args()
 
