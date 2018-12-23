@@ -18,14 +18,12 @@ def main():
 
     parser.add_argument("--i",        "--input",       type=str, help="Particle star file")
     parser.add_argument("--o",        "--output",      type=str, help="Output directory", default=None)
-    parser.add_argument("--cols",     "--columns",     type=str, help="Columns to delete", nargs='*', default=None)
 
     args = parser.parse_args()
 
     # Prepare args dict
     args_dict = {'input':       args.input,
-                 'output':      args.output,
-                 'columns':     args.columns
+                 'output':      args.output
                  }
 
     # Check if the input file exists
@@ -33,14 +31,8 @@ def main():
         parser.print_help()
         sys.exit('Input file does not exist!')
 
-    # Get the new column parameters
-    if args_dict['columns'] is not None:
-        new_column_parameters = util.parse_star_parameters(args_dict['columns'])
-    else:
-        new_column_parameters = None
-
     # Create an EM project object
-    new_project = em.Project(name='ProjectDeleteColumns')
+    new_project = em.Project(name='ProjectSplitMirrors')
     new_project.set_output_directory(args_dict['input'], args_dict['output'])
 
     # Write parameters to args filename
@@ -52,13 +44,13 @@ def main():
     print('Read particle star file {}'.format(args_dict['input']))
 
     # Prepare input and output files
-    new_project.prepare_io_files_star()
+    new_project.prepare_mirror_files_star()
 
     # Add new columns
-    new_project.delete_columns(new_column_parameters)
+    new_project.split_mirrors()
 
     # Write output files
-    new_project.write_output_files(write_ref_class_star=False)
+    new_project.write_mirror_files()
 
 
 if __name__ == "__main__":

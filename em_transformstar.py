@@ -16,20 +16,20 @@ def main():
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument("-i",          "--input",       type=str, help="Particle star file")
-    parser.add_argument("-o",          "--output",      type=str, help="Output directory", default=None)
-    parser.add_argument("-ref",        "--reference",   type=str, help="Reference class star file", default=None)
-    parser.add_argument("-newclassid", "--newclassid",
+    parser.add_argument("--i",          "--input",       type=str, help="Particle star file")
+    parser.add_argument("--o",          "--output",      type=str, help="Output directory", default=None)
+    parser.add_argument("--ref",        "--reference",   type=str, help="Reference class star file", default=None)
+    parser.add_argument("--newclassid", "--newclassid",
                         action='store_true', help="Create new class ids for the reference file")
-    parser.add_argument("-addcols",    "--addcolumns",
+    parser.add_argument("--addcols",    "--addcolumns",
                         type=str, help="Add new columns with same value for all particles", nargs='*', default=None)
-    parser.add_argument("-recenter",   "--recenter",  action='store_true', help="Recenter particles")
-    parser.add_argument("-offset",     "--offset",    nargs=2, type=float, default=[0, 0], help="Final offset")
-    parser.add_argument("-offsetcom",  "--offsetcom", action='store_true', help="Set final offset from center-of-mass")
-    parser.add_argument("-apix",       "--apix",  type=float,
+    parser.add_argument("--recenter",   "--recenter",  action='store_true', help="Recenter particles")
+    parser.add_argument("--offset",     "--offset",    nargs=2, type=float, default=[0, 0], help="Final offset")
+    parser.add_argument("--offsetcom",  "--offsetcom", action='store_true', help="Set final offset from center-of-mass")
+    parser.add_argument("--apix",       "--apix",  type=float,
                         help="Micrograph pixel size", default=1.82)
-    parser.add_argument("-rotatepsi",  "--rotatepsi",  type=float, help="Rotate psi by angle", default=0)
-    parser.add_argument("-flipX",      "--flipX", action='store_true', help='Modify star file for flip around X axis')
+    parser.add_argument("--rotatepsi",  "--rotatepsi",  type=float, help="Rotate psi by angle", default=0)
+    parser.add_argument("--flipX",      "--flipX", action='store_true', help='Modify star file for flip around X axis')
 
     args = parser.parse_args()
 

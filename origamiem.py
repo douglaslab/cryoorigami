@@ -356,6 +356,35 @@ class Project:
         # Make directory
         os.makedirs(self.output_directory, exist_ok=True)
 
+
+    def write_mirror_files(self):
+        '''
+        Write output files
+        '''
+        if self.left_star is not None:
+            self.left_star.write(self.mirror_left_out_file)
+
+        if self.right_star is not None:
+            self.right_star.write(self.mirror_right_out_file)
+
+    def split_mirrors(self):
+        '''
+        Split mirrors
+        '''
+        
+        # If the particle star has the flip variable
+        if self.particle_star.has_label('rlnIsFlip'):
+            # Create left and right stars
+            self.left_star  = Star()
+            self.right_star = Star()
+
+            # Create masks
+            left_mask  = self.particle_star.data_block['rlnIsFlip'] == 0
+            right_mask = self.particle_star.data_block['rlnIsFlip'] == 1
+            
+            self.left_star.data_block  = self.particle_star.data_block.loc[left_mask, :]
+            self.right_star.data_block = self.particle_star.data_block.loc[right_mask, :]
+
     def prepare_io_files_star(self):
         # Copy input file to output directory
         if self.particle_star_file is not None:
@@ -368,6 +397,15 @@ class Project:
             head, tail = os.path.split(self.ref_class_star_file)
             copyfile(self.ref_class_star_file, self.output_directory+'/'+root+'_class_input'+ext)
             self.ref_class_out_file = self.output_directory+'/'+root+'_class_output'+ext
+
+    def prepare_mirror_files_star(self):
+        # Copy input file to output directory
+        if self.particle_star_file is not None:
+            head, tail = os.path.split(self.particle_star_file)
+            root, ext  = os.path.splitext(tail)
+            copyfile(self.particle_star_file, self.output_directory+'/'+root+'_particle_input'+ext)
+            self.mirror_left_out_file  = self.output_directory+'/'+root+'_particle_left'+ext
+            self.mirror_right_out_file = self.output_directory+'/'+root+'_particle_right'+ext
 
     def prepare_io_files_cs(self):
         # Copy input files to output directory

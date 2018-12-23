@@ -16,11 +16,11 @@ def main():
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument("-i",        "--input",       type=str, help="Particle star file")
-    parser.add_argument("-o",        "--output",      type=str, help="Output directory", default=None)
-    parser.add_argument("-ref",      "--reference",   type=str, help="Reference class star file")
-    parser.add_argument("-cols",     "--columns",     type=str, help="Columns to copy", nargs='*', default=None)
-    parser.add_argument("-prox",     "--proximity",   type=int, help="Use distance proximity to copy (Angstrom)",
+    parser.add_argument("--i",        "--input",       type=str, help="Particle star file")
+    parser.add_argument("--o",        "--output",      type=str, help="Output directory", default=None)
+    parser.add_argument("--ref",      "--reference",   type=str, help="Reference class star file")
+    parser.add_argument("--cols",     "--columns",     type=str, help="Columns to copy", nargs='*', default=None)
+    parser.add_argument("--prox",     "--proximity",   type=int, help="Use distance proximity to copy (Angstrom)",
                         default=None)
 
     args = parser.parse_args()

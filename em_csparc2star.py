@@ -16,11 +16,11 @@ def main():
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument("-i",       "--input",       type=str, help="Particle star file")
-    parser.add_argument("-pass",    "--passthrough", type=str, help="Passthrough file from cryosparc", default=None)
-    parser.add_argument("-o",       "--output",      type=str, help="Output directory", default=None)
-    parser.add_argument("-orig",    "--original",    type=str, help="Original star file", default=None)
-    parser.add_argument("-micpath", "--micpath",     type=str, help="Micrographs path", default="Micrographs")
+    parser.add_argument("--i",       "--input",       type=str, help="Particle star file")
+    parser.add_argument("--pass",    "--passthrough", type=str, help="Passthrough file from cryosparc", default=None)
+    parser.add_argument("--o",       "--output",      type=str, help="Output directory", default=None)
+    parser.add_argument("--orig",    "--original",    type=str, help="Original star file", default=None)
+    parser.add_argument("--micpath", "--micpath",     type=str, help="Micrographs path", default="Micrographs")
 
     args = parser.parse_args()
 
