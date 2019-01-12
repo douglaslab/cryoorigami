@@ -104,6 +104,18 @@ class Project:
         '''
         self.particle_radius_pix = int(self.particle_diameter_A//(2*self.particle_apix))
 
+    def rename_columns(self, column_params):
+        '''
+        Rename columns
+        '''
+        self.particle_star.rename_columns(column_params)
+
+    def flipX_particles(self):
+        '''
+        Flip particles in star file
+        '''
+        self.particle_star.flipX()
+
     def check_particle_pos(self):
         '''
         Check location of all particles
@@ -376,6 +388,34 @@ class Project:
         # Make directory
         os.makedirs(self.output_directory, exist_ok=True)
 
+    def write_mirror_files(self):
+        '''
+        Write output files
+        '''
+        if self.left_star is not None:
+            self.left_star.write(self.mirror_left_out_file)
+
+        if self.right_star is not None:
+            self.right_star.write(self.mirror_right_out_file)
+
+    def split_mirrors(self):
+        '''
+        Split mirrors
+        '''
+
+        # If the particle star has the flip variable
+        if self.particle_star.has_label('rlnIsFlip'):
+            # Create left and right stars
+            self.left_star  = Star()
+            self.right_star = Star()
+
+            # Create masks
+            left_mask  = self.particle_star.data_block['rlnIsFlip'] == 0
+            right_mask = self.particle_star.data_block['rlnIsFlip'] == 1
+
+            self.left_star.data_block  = self.particle_star.data_block.loc[left_mask, :]
+            self.right_star.data_block = self.particle_star.data_block.loc[right_mask, :]
+
     def prepare_io_files_star(self):
         # Copy input file to output directory
         if self.particle_star_file is not None:
@@ -388,6 +428,15 @@ class Project:
             head, tail = os.path.split(self.ref_class_star_file)
             copyfile(self.ref_class_star_file, self.output_directory+'/class2D_input'+ext)
             self.ref_class_out_file = self.output_directory+'/class2D_output'+ext
+
+    def prepare_mirror_files_star(self):
+        # Copy input file to output directory
+        if self.particle_star_file is not None:
+            head, tail = os.path.split(self.particle_star_file)
+            root, ext  = os.path.splitext(tail)
+            copyfile(self.particle_star_file, self.output_directory+'/'+root+'_particle_input'+ext)
+            self.mirror_left_out_file  = self.output_directory+'/'+root+'_particle_left'+ext
+            self.mirror_right_out_file = self.output_directory+'/'+root+'_particle_right'+ext
 
     def prepare_io_files_cs(self):
         # Copy input files to output directory
@@ -1043,7 +1092,7 @@ class Star(EMfile):
         self.str2type       = {'double': float,
                                'string': str,
                                'int':    int,
-                               'bool':   bool}
+                               'bool':   lambda x: bool(int(x))}
         self.str2nptype     = {'double': 'f4',
                                'string': 'U100',
                                'int': 'i4',
@@ -1067,12 +1116,50 @@ class Star(EMfile):
         if file is not None:
             self.read(file)
 
+    def rename_columns(self, column_params):
+        if column_params is not None:
+            for old_column, new_column in column_params.items():
+
+                # Check that the column name exists and the new name is a proper star varaible
+                if self.has_label(old_column) and new_column in self.PARAMETERS:
+                    self.data_block = self.data_block.rename(index=str, columns={old_column:new_column})
+
+    def flipX(self):
+        '''
+        Modify the geometrical values for flip around X
+        '''
+
+        if self.has_label('rlnIsFlip'):
+            valid_rows = self.data_block['rlnIsFlip'] == 1
+        else:
+            valid_rows = np.arange(self.data_block.shape[0])
+
+        # Invert X
+        if self.has_label('rlnOriginX'):
+            self.data_block.loc[valid_rows,'rlnOriginX'] = -self.data_block.loc[valid_rows,'rlnOriginX']
+
+        # Update Psi
+        if self.has_label('rlnAnglePsi'):
+            self.data_block.loc[valid_rows,'rlnAnglePsi'] = -self.data_block.loc[valid_rows,'rlnAnglePsi']
+
+        # Update Psi-Prior
+        if self.has_label('rlnAnglePsiPrior'):
+            self.data_block.loc[valid_rows,'rlnAnglePsiPrior'] = -self.data_block.loc[valid_rows,'rlnAnglePsiPrior']
+
+        # Update Tilt
+        if self.has_label('rlnAngleTilt'):
+            self.data_block.loc[valid_rows,'rlnAngleTilt'] = 180.0 + self.data_block.loc[valid_rows,'rlnAngleTilt']
+
+        # Update Psi-Prior
+        if self.has_label('rlnAngleTiltPrior'):
+            self.data_block.loc[valid_rows,'rlnAngleTiltPrior'] = 180.0 + self.data_block.loc[valid_rows,'rlnAngleTiltPrior']
+
     def create_micname_from_imagename(self, mic_path='Micrographs'):
         '''
         Create micrographname from imagename
         '''
-        if self.has_label('rlnImageName') and not self.has_label('rlnMicrographName'):
 
+        if self.has_label('rlnImageName'):
             # Add micropraph name
             self.add_column('rlnMicrographName')
 
@@ -1266,6 +1353,8 @@ class Star(EMfile):
         '''
         Set a column value
         '''
+
+
         if self.has_label(label) and value is not None:
             self.data_block.loc[:, label] = self.PARAMETERS[label]['type'](value)
         else:
@@ -1794,6 +1883,12 @@ class CryoSparc(EMfile):
 
                 self.data_block_dict['rlnOriginY'] = np.array(self.data_block_passthrough['alignments2D/shift'][:, 1],
                                                               dtype=self.star.PARAMETERS['rlnOriginX']['nptype'])
+            if self.has_label_blob('alignments2D/shift'):
+                self.data_block_dict['rlnOriginX'] = np.array(self.data_block_blob['alignments2D/shift'][:, 0],
+                                                              dtype=self.star.PARAMETERS['rlnOriginX']['nptype'])
+
+                self.data_block_dict['rlnOriginY'] = np.array(self.data_block_blob['alignments2D/shift'][:, 1],
+                                                              dtype=self.star.PARAMETERS['rlnOriginX']['nptype'])
             if self.has_label_passthrough('alignments3D/shift'):
                 self.data_block_dict['rlnOriginX'] = np.array(self.data_block_passthrough['alignments3D/shift'][:, 0],
                                                               dtype=self.star.PARAMETERS['rlnOriginX']['nptype'])
@@ -1810,6 +1905,9 @@ class CryoSparc(EMfile):
             # rlnAngleRot, rlnAngleTilt, rlnAnglePsi
             if self.has_label_passthrough('alignments2D/pose'):
                 self.data_block_dict['rlnAnglePsi'] = np.array(util.rad2deg(self.data_block_passthrough['alignments2D/pose']),
+                                                               dtype=self.star.PARAMETERS['rlnAnglePsi']['nptype'])
+            if self.has_label_blob('alignments2D/pose'):
+                self.data_block_dict['rlnAnglePsi'] = np.array(util.rad2deg(self.data_block_blob['alignments2D/pose']),
                                                                dtype=self.star.PARAMETERS['rlnAnglePsi']['nptype'])
             if self.has_label_passthrough('alignments3D/pose'):
                 self.data_block_dict['rlnAngleRot'] = np.array(util.rad2deg(self.data_block_passthrough['alignments3D/pose'][:, 0]),

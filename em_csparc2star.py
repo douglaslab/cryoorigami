@@ -57,10 +57,10 @@ def main():
     new_project.prepare_io_files_cs()
 
     # Conert cs to star
-    new_project.convert_cs2star()
+    new_project.convert_cs2star(args_dict['micpath'])
 
     # Write output files
-    new_project.write_output_files(args_dict['micpath'])
+    new_project.write_output_files()
 
 
 if __name__ == "__main__":

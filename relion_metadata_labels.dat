@@ -341,3 +341,9 @@ rlnSpectralOrientabilityContribution (double) : Spectral SNR contribution to the
        rlnUseTooCoarseSampling (bool)   : Flag to indicate that the angular sampling on the sphere will be one step coarser than needed to speed up calculations
                     rlnVoltage (double) : Voltage of the microscope (in kV)
               rlnWidthMaskEdge (int)    : Width (in pixels) of the soft edge for spherical/circular masks to be used for solvent flattening
+                  oriFlipClass (int)    : Origami Flip class (author: Tural Aksel)
+                  oriFlipState (bool)   : Origami Flip state (author: Tural Aksel)
+                  oriTiltClass (int)    : Origami Tilt class (author: Tural Aksel)
+                   oriRotClass (int)    : Origami Rotation class (author: Tural Aksel)
+                  oriTiltAngle (double) : Origami Tilt class angle (author: Tural Aksel)
+                   oriRotAngle (double) : Origami Rotation class angle (author: Tural Aksel)
