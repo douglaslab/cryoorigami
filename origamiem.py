@@ -66,9 +66,14 @@ class Project:
         self.first_mic_file  = None
         self.first_mic_mrc   = None
 
-        # MRC files
+        # MRC files and objects
+        self.particle_mrc        = None
         self.ref_class_mrc       = None
         self.consensus_class_mrc = None
+
+        self.particle_mrc_file        = None
+        self.ref_class_mrc_file       = None
+        self.consensus_class_mrc_file = None
 
         # Micrograph dimensions
         self.mic_NX = 0
@@ -85,13 +90,6 @@ class Project:
 
         # Additional data frames
         self.particle_data_props = pd.DataFrame(columns=['insideFrame'])
-
-        # Particle and class mrcs files
-        self.ref_class_mrc_file = None
-
-        # Particle and class mrc objects
-        self.particle_mrc       = None
-        self.ref_class_mrc      = None
 
         # Particles and class2D models
         self.particles = []
