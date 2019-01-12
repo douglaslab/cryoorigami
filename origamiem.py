@@ -11,6 +11,9 @@ import glob
 import numpy as np
 import pandas as pd
 import utilities as util
+import mrcfile
+import subprocess
+import sys
 
 from shutil import copyfile
 
@@ -24,17 +27,31 @@ class Project:
     '''
         Project File
     '''
-    def __init__(self, name='ProjectOrigami'):
+    def __init__(self, name='EMProject'):
         self.name            = name
         self.particle_star   = None
         self.ref_class_star  = None
         self.micrograph_star = None
         self.class_ids       = None
 
+        # Particle props
+        self.particle_diameter_A  = None
+        self.particle_radius_pix  = None
+
         # Input files
         self.particle_star_file   = None
         self.ref_class_star_file  = None
         self.micrograph_star_file = None
+
+        # Alignment references
+        self.ref_align_star_file  = None
+        self.ref_align_mrc_file   = None
+
+        # Alignment mask file
+        self.mask_align_mrc_file  = None
+
+        # Subtraction mask file
+        self.mask_sub_mrc_file    = None
 
         # Output files
         self.particle_out_file  = None
@@ -50,7 +67,8 @@ class Project:
         self.first_mic_mrc   = None
 
         # MRC files
-        self.ref_class_mrc   = None
+        self.ref_class_mrc       = None
+        self.consensus_class_mrc = None
 
         # Micrograph dimensions
         self.mic_NX = 0
@@ -67,6 +85,24 @@ class Project:
 
         # Additional data frames
         self.particle_data_props = pd.DataFrame(columns=['insideFrame'])
+
+        # Particle and class mrcs files
+        self.ref_class_mrc_file = None
+
+        # Particle and class mrc objects
+        self.particle_mrc       = None
+        self.ref_class_mrc      = None
+
+        # Particles and class2D models
+        self.particles = []
+        self.class2Ds  = []
+        self.class3Ds  = []
+
+    def set_particle_radius(self):
+        '''
+        Set particle radius from particle diameter in Angstrom
+        '''
+        self.particle_radius_pix = int(self.particle_diameter_A//(2*self.particle_apix))
 
     def check_particle_pos(self):
         '''
@@ -113,6 +149,12 @@ class Project:
         Set micrograph apix
         '''
         self.mic_apix = apix
+
+    def set_particle_diameter(self, diameter):
+        '''
+        Set particle diameter in Angstroms
+        '''
+        self.particle_diameter_A = diameter
 
     def set_particle_apix(self, apix=1.82):
         '''
@@ -240,6 +282,9 @@ class Project:
             print('No transformation due to missing particle data')
             return 0
 
+        if self.consensus_class_mrc is not None:
+            final_offset = self.consensus_class_mrc.determine_com(img_num=0)
+
         if self.ref_class_star is not None:
             # Ref data block
             ref_data_block = self.ref_class_star.get_data_block()
@@ -262,20 +307,6 @@ class Project:
                 else:
                     offset_x = 0.0
                     offset_y = 0.0
-
-                # Get image name and number
-                if self.ref_class_star.has_label('rlnReferenceImage') and com_offset:
-                    image_num, image_file = ref_data_block['rlnReferenceImage'][i].split('@')
-
-                    if self.ref_class_mrc is None:
-                        self.ref_class_mrc = MRC(image_file)
-
-                    if self.ref_class_mrc is not None:
-                        final_offset = self.ref_class_mrc.determine_com(img_num=int(image_num)-1)
-
-                    # Check final offset value
-                    if final_offset is None:
-                        final_offset = [0.0, 0.0]
 
                 # Get class rows
                 class_ptcls = self.particle_star.get_class_rows(class_id)
@@ -314,7 +345,7 @@ class Project:
         if self.particle_cs is not None and write_cs_star:
             self.particle_cs.star.write(self.particle_out_file)
 
-    def set_output_directory(self, input_filename, output_directory=None):
+    def set_output_directory(self, input_filename, output_directory=None, project_root=None):
         '''
         Set output directory
         '''
@@ -326,6 +357,8 @@ class Project:
         if output_directory:
             self.output_directory = output_directory
         else:
+            if project_root is not None and os.path.isdir(project_root):
+                head = project_root
             # List existing output directories
             potential_directories = list(filter(lambda x: os.path.isdir(x),
                                          glob.glob(head+'/'+self.name+'_em_[0-9][0-9][0-9]')))
@@ -348,31 +381,31 @@ class Project:
         if self.particle_star_file is not None:
             head, tail = os.path.split(self.particle_star_file)
             root, ext  = os.path.splitext(tail)
-            copyfile(self.particle_star_file, self.output_directory+'/'+root+'_particle_input'+ext)
-            self.particle_out_file = self.output_directory+'/'+root+'_particle_output'+ext
+            copyfile(self.particle_star_file, self.output_directory+'/particle_input'+ext)
+            self.particle_out_file = self.output_directory+'/particle_output'+ext
 
         if self.ref_class_star_file is not None:
             head, tail = os.path.split(self.ref_class_star_file)
-            copyfile(self.ref_class_star_file, self.output_directory+'/'+root+'_class_input'+ext)
-            self.ref_class_out_file = self.output_directory+'/'+root+'_class_output'+ext
+            copyfile(self.ref_class_star_file, self.output_directory+'/class2D_input'+ext)
+            self.ref_class_out_file = self.output_directory+'/class2D_output'+ext
 
     def prepare_io_files_cs(self):
         # Copy input files to output directory
         if self.blob_cs_file is not None:
             head, tail = os.path.split(self.blob_cs_file)
             root, ext  = os.path.splitext(tail)
-            copyfile(self.blob_cs_file, self.output_directory+'/'+root+'_blob_input'+ext)
-            self.particle_out_file = self.output_directory+'/'+root+'_particle_output.star'
+            copyfile(self.blob_cs_file, self.output_directory+'/blob_input'+ext)
+            self.particle_out_file = self.output_directory+'/particle_output.star'
 
         if self.passthrough_cs_file is not None:
             head, tail = os.path.split(self.passthrough_cs_file)
             root, ext  = os.path.splitext(tail)
-            copyfile(self.passthrough_cs_file, self.output_directory+'/'+root+'_passthrough_input'+ext)
+            copyfile(self.passthrough_cs_file, self.output_directory+'/passthrough_input'+ext)
 
         if self.original_star_file is not None:
             head, tail = os.path.split(self.original_star_file)
             root, ext  = os.path.splitext(tail)
-            copyfile(self.original_star_file, self.output_directory+'/'+root+'_original_particle'+ext)
+            copyfile(self.original_star_file, self.output_directory+'/original_particle'+ext)
 
     def set_cs_files(self, blob_cs_file=None, passthrough_cs_file=None, original_star_file=None):
         '''
@@ -404,6 +437,276 @@ class Project:
         self.particle_cs.convert2star()
         self.particle_cs.copy_from_original(mic_path)
 
+    def read_particle_mrc(self, particle_id=0):
+        '''
+        Read particle mrc
+        '''
+        if self.particle_star is not None:
+            particle_data_block = self.particle_star.get_data_block()
+
+            # Get only single particle data
+            if particle_id < particle_data_block.shape[0]:
+
+                # Get particle image num and filename
+                image_name = particle_data_block.loc[particle_id, "rlnImageName"]
+                image_num, image_file = image_name.split('@')
+
+                # Corrected image number
+                cor_image_num             = int(image_num) - 1
+                self.particle_mrc         = MRC(image_file, cor_image_num)
+                self.particle_mrc.project = self
+
+                # Set star information for the particle
+                if self.particle_apix is None:
+                    self.particle_apix = self.particle_star.determine_star_apix()
+
+                # Set particle apix
+                self.particle_mrc.set_apix(self.particle_apix)
+
+            else:
+                self.particle_mrc = None
+
+    def read_ref_class_mrc(self, class_number=1):
+        '''
+        Read class mrc
+        '''
+        if self.ref_class_mrc_file is not None:
+            # Get corrected image number
+            cor_image_num = class_number - 1
+
+            # Get Mrc
+            self.ref_class_mrc = MRC(self.ref_class_mrc_file, cor_image_num)
+
+        elif self.ref_class_star is not None:
+            ref_class_data_block = self.ref_class_star.get_data_block()
+
+            # Class mask
+            class_mask = ref_class_data_block["rlnClassNumber"] == class_number
+
+            if np.sum(class_mask) > 0:
+
+                # Get class image num and filename
+                image_name = ref_class_data_block.loc[class_mask, "rlnReferenceImage"]
+                image_num, image_file = image_name.split('@')
+
+                # Corrected image number
+                cor_image_num      = int(image_num) - 1
+                self.ref_class_mrc = MRC(image_file, cor_image_num)
+            else:
+                self.ref_class_mrc = None
+
+        else:
+            self.particle_mrc = None
+
+
+class ProjectSubtract2D(Project):
+    '''
+    Particle subtraction project
+    '''
+    def __init__(self, name='EMParticleSubtract2D'):
+        super().__init__(name)
+
+
+class ProjectAlign2D(Project):
+    '''
+    Class Align2D Project Class
+    '''
+    def __init__(self, name='EMClassAlign2D'):
+        super().__init__(name)
+
+        # Alignment references
+        self.ref_align_star_file  = None
+        self.ref_align_mrc_file   = None
+
+        # Alignment mask file
+        self.mask_align_mrc_file  = None
+
+        # Temporary class star and mrc files
+        self.ref_class_tmp_star_file      = None
+        self.ref_class_tmp_star_norm_out  = None
+        self.ref_class_tmp_star_norm_file = None
+
+        # Alignment outfile
+        self.ref_class_tmp_star_align_file = None
+
+        self.ref_class_tmp_mrc_file       = None
+
+        # Relion output string
+        self.relion_output_str    = None
+
+        # Relion code
+        self.relion_refine_exe    = 'relion_refine'
+        self.relion_refine_args   = []
+
+        self.relion_norm_exe      = 'relion_preprocess'
+        self.relion_norm_args     = []
+
+        # Particle props
+        self.particle_diameter_A  = None
+        self.particle_radius_pix  = None
+
+    def set_relion_refine_exe(self):
+        '''
+        Set relion exe
+        '''
+        relion_process = subprocess.run(['which', 'relion_refine'], stdout=subprocess.PIPE, universal_newlines=True)
+        self.relion_refine_exe = relion_process.stdout.strip()
+
+    def set_relion_norm_exe(self):
+        '''
+        Set relion exe
+        '''
+        relion_process = subprocess.run(['which', 'relion_preprocess'], stdout=subprocess.PIPE, universal_newlines=True)
+        self.relion_norm_exe = relion_process.stdout.strip()
+
+    def set_alignment_mask(self, mask_file):
+        '''
+        Set alignment mask
+        '''
+        self.mask_align_mrc_file  = mask_file
+
+    def set_alignment_ref(self, ref_file):
+        '''
+        Set alignment reference
+        '''
+        self.ref_align_mrc_file   = ref_file
+
+    def prepare_project(self):
+        '''
+        Prepare project
+        '''
+        self.set_particle_radius()
+        self.create_tmp_files_star()
+        self.prepare_tmp_input()
+        self.write_tmp_files()
+        self.set_relion_output_str()
+        self.set_relion_refine_exe()
+        self.set_relion_norm_exe()
+
+    def normalize_class_refs(self):
+        '''
+        Normalize class references
+        '''
+        self.relion_norm_args = [self.relion_norm_exe,
+                                 '--norm',
+                                 '--operate_on',  self.ref_class_tmp_star_file,
+                                 '--operate_out', self.ref_class_tmp_star_norm_out,
+                                 '--bg_radius',   str(self.particle_radius_pix),
+                                 ]
+        self.relion_norm_subprocess = subprocess.run(self.relion_norm_args,
+                                                     stdout=subprocess.PIPE,
+                                                     universal_newlines=True)
+
+    def set_relion_output_str(self):
+        '''
+        Set relion output str
+        '''
+        self.relion_output_str = self.output_directory+'/run'
+
+    def prepare_tmp_input(self):
+        '''
+        Prepare the class reference star file for alignment of class averages
+        '''
+        if self.ref_class_star is not None:
+            self.ref_class_star.change_label('rlnReferenceImage', 'rlnImageName')
+
+    def create_tmp_files_star(self):
+        # Copy input file to output directory
+        if self.ref_class_star_file is not None:
+            head, tail = os.path.split(self.ref_class_star_file)
+            root, ext  = os.path.splitext(tail)
+            self.ref_class_tmp_star_file      = self.output_directory+'/'+root+'_class_tmp'+ext
+
+            # Set normalization files
+            self.ref_class_tmp_star_norm_out  = os.path.relpath(os.path.abspath(self.output_directory+'/'+root+'_class_tmp_norm'))
+            self.ref_class_tmp_star_norm_file = os.path.relpath(os.path.abspath(self.output_directory+'/'+root+'_class_tmp_norm'+ext))
+
+    def set_refine2D_files(self):
+        '''
+        Set Refine 2D files
+        '''
+        self.refine2D_it0_star_file = self.output_directory + '/' + 'run_it000_data.star'
+        self.refine2D_it1_star_file = self.output_directory + '/' + 'run_it001_data.star'
+
+    def read_refine2D_files(self):
+        '''
+        Read Refine 2D files
+        '''
+        self.refine2D_it0_star = Star(self.refine2D_it0_star_file)
+        self.refine2D_it1_star = Star(self.refine2D_it1_star_file)
+
+    def prepare_refine2D(self):
+        # Set refine 2D files
+        self.set_refine2D_files()
+
+        # Read the files
+        self.read_refine2D_files()
+
+        # Copy rlnClassNumber from start file to final file
+        self.refine2D_it1_star.copy_columns(self.refine2D_it0_star, {'rlnClassNumber': None})
+
+        # Assign to class reference star
+        self.ref_class_star = self.refine2D_it1_star
+
+    def write_tmp_files(self):
+        '''
+        Write tmp files
+        '''
+        self.ref_class_star.write(self.ref_class_tmp_star_file)
+
+    def set_relion_refine_args(self, offset_range=50, offset_step=1, psi_step=1, gpu=0):
+        self.relion_refine_args = [self.relion_refine_exe,
+                                   '--i', self.ref_class_tmp_star_norm_file,
+                                   '--o', self.relion_output_str,
+                                   '--dont_combine_weights_via_disc',
+                                   '--flatten_solvent',
+                                   '--zero_mask',
+                                   '--oversampling', '1',
+                                   '--norm',
+                                   '--scale',
+                                   '--offset_step',  str(offset_step),
+                                   '--offset_range', str(offset_range),
+                                   '--psi_step',     str(psi_step),
+                                   '--j', '1',
+                                   '--pool', '3',
+                                   '--pad', '2',
+                                   '--iter', '1',
+                                   '--tau2_fudge', '2',
+                                   '--particle_diameter', str(self.particle_diameter_A),
+                                   '--K', '1',
+                                   '--gpu', str(gpu),
+                                   '--angpix', str(self.particle_apix),
+                                   '--firstiter_cc']
+
+        if self.ref_align_mrc_file is not None:
+            self.relion_refine_args += ['--ref', self.ref_align_mrc_file]
+
+        if self.mask_align_mrc_file is not None:
+            self.relion_refine_args += ['--solvent_mask', self.mask_align_mrc_file]
+
+    def run_refine2D(self):
+        '''
+        Run relion_refine to align classes
+        '''
+
+        if len(self.relion_refine_exe) > 0:
+            self.relion_refine_subprocess = subprocess.run(self.relion_refine_args,
+                                                           stdout=subprocess.PIPE,
+                                                           universal_newlines=True)
+        else:
+            sys.exit('Relion refine doesnt exist')
+
+
+class SubtractProject(Project):
+    '''
+    Class Align Project Class
+    '''
+    def __init__(self, name='EMClassSubtract'):
+        super().__init__(name)
+
+        # Temporary class star files
+        self.ref_class_tmp_file = None
+
 
 class Micrograph:
     '''
@@ -413,37 +716,48 @@ class Micrograph:
         self.name = None
 
 
+class Class2D:
+    '''
+    2D class model
+    '''
+    def __init__(self):
+        self.name = None
+        self.star = None
+        self.idx  = None
+
+
 class Particle:
     '''
         Particle Class
     '''
     def __init__(self):
-        self.name            = None
-        self.micrograph_name = None
-        self.image_name      = None
-        self.image_num       = None
-        self.coordinate_x    = None
-        self.coordinate_y    = None
-        self.origin_x        = None
-        self.origin_y        = None
-        self.center_x        = None
-        self.center_y        = None
-        self.apix            = None
+        self.name = None
+        self.star = None
+        self.idx  = None
 
 
 class MRC:
     '''
         MRC  class
     '''
-    def __init__(self, file):
-        self.img   = None
-        self.name  = None
-        self.header =  {'NX': 0,
-                        'NY': 0,
-                        'NZ': 0,
-                        'CELLAX': 0,
-                        'CELLAY': 0,
-                        'CELLAZ': 0}
+    def __init__(self, file=None, image_num=None, shape=None):
+        self.name       = None
+        self.mrc_data   = None
+        self.project    = None
+        self.header     = None
+        self.img3D      = None
+        self.img2D      = None
+        self.img2D_fft  = None
+        self.ctf        = None
+        self.ctf_params = None
+        self.ctf_s      = None
+        self.ctf_sx     = None
+        self.ctf_sy     = None
+        self.ctf_a      = None
+        self.ctf_r      = None
+        self.star_data  = None
+        self.star       = None
+        self.apix       = None
 
         self.mode2type = {0: np.dtype(np.int8),
                           1: np.dtype(np.int16),
@@ -458,62 +772,190 @@ class MRC:
         self.HEADER_LEN = int(1024)                     # In bytes.
 
         if file is not None:
-            self.read(file)
+            if os.path.isfile(file):
+                self.read(file, image_num)
+            else:
+                self.create(file, shape)
 
-    def read(self, file, mrc_format='relion'):
+    def eval_ctf_grid(self):
+        '''
+        Create ctf grid
+        '''
+        if self.img2D is not None and self.apix is not None:
+            self.ctf_s, self.ctf_sx, self.ctf_sy, self.ctf_a, self.ctf_r = util.ctf_freqs(self.img2D.shape, self.apix)
+
+    def get_ctf_params(self):
+        '''
+        Get ctf parameters from star file
+        '''
+        rlnDefocusU = self.star['rlnDefocusU']
+        rlnDefocusV = self.star['rlnDefocusV']
+        ptcl[star.Relion.DEFOCUSU], ptcl[star.Relion.DEFOCUSV], ptcl[star.Relion.DEFOCUSANGLE],
+        ptcl[star.Relion.PHASESHIFT], ptcl[star.Relion.VOLTAGE], ptcl[star.Relion.AC], ptcl[star.Relion.CS],
+
+    def set_apix(self, apix):
+        '''
+        Set pixel size
+        '''
+        self.apix = apix
+
+    def set_star(self, star):
+        '''
+        Set star for the mrc file
+        '''
+        self.star = star
+
+    def set_star_data(self, star_data):
+        '''
+        Set star data
+        '''
+        self.star_data = star_data
+
+    def eval_ctf(self, image_num=None):
+        '''
+        Evaluate ctf for only 2D images
+        '''
+
+        if len(self.img.shape) == 3 and image_num < self.img.shape[0]:
+            self.ctf = util.eval_ctf(self.star)
+
+    def create(self, file, shape=None):
+        '''
+        Create file
+        '''
+        if shape is not None:
+            self.mrc_data = mrcfile.new_mmap(file, shape, mode=2)
+
+    def close(self):
+        '''
+        Close file
+        '''
+        self.mrc_data.close()
+
+    def flush(self):
+        '''
+        Flush data to file
+        '''
+        self.mrc_data.flush()
+
+    def read(self, file, image_num=None):
         '''
         Read MRC file
         '''
-        if "relion" in mrc_format.lower() or "xmipp" in mrc_format.lower():
-            order = "C"
-        else:
-            order = "F"  # Read x, y, z -> data[i, j, k] == data[i][j][k]
 
-        # First read header
-        self.read_header(file)
+        with mrcfile.mmap(file, mode='r+') as self.mrc_data:
+            self.header   = self.mrc_data.header
+            self.img3D    = self.mrc_data.data
 
-        # initlalize img data
-        self.img = None
-        with open(file) as f:
-            NX = self.header['NX']
-            NY = self.header['NY']
-            NZ = self.header['NZ']
-            mode = self.header['MODE']
+            # If image is 2D
+            if len(self.img3D.shape) == 2:
+                self.img2D = self.img3D
 
-            f.seek(self.HEADER_LEN)  # seek to start of data
-            shape = (NX, NY, NZ)
-            if mode in self.mode2type:
-                dtype = self.mode2type[mode]
-            else:
-                raise IOError("Unknown MRC data type")
-            self.img = np.reshape(np.fromfile(f, dtype=dtype, count=NX * NY * NZ), shape, order=order)
+            # If image is 3D with a single image
+            if len(self.img3D.shape) == 3 and self.img3D.shape[0] == 1:
+                self.img2D = self.img3D[0]
+
+            # If image num is defined and it is 3D data
+            if image_num is not None and image_num < self.img3D.shape[0] and len(self.img3D.shape) == 3:
+                self.img2D = self.img3D[image_num]
+
+    def copy_img(self, other):
+        '''
+        Deep copy of the other image
+        '''
+
+        # Set mrc data
+        self.mrc_data.set_data(other.img)
+
+        # Set the img
+        self.img3D = self.mrc_data.data
+
+    def set_img(self, img):
+        '''
+        Set image data
+        '''
+        self.mrc_data.set_data(img)
+
+    def write_img(self, fname, apix=1, origin=None, fast=False):
+        """
+        Write a MRC file. Fortran axes order is assumed.
+        :param fname: Destination path.
+        :param apix: Pixel size in Å for MRC header.
+        :param origin: Coordinate of origin voxel.
+        :param fast: Skip computing density statistics in header. Default is False.
+        """
+
+        # Create an mrc data file
+        self.mrc_data = mrcfile.new(fname, overwrite=True)
+
+        # Set mrc data
+        self.mrc_data.set_data(self.img3D)
+
+        # Update header stats and header
+        self.mrc_data.update_header_from_data()
+
+        # Set origin
+        if origin is not None:
+            self.mrc_data.header['origin'] = origin
+
+        # Update stats in no fast mode
+        if not fast:
+            self.mrc_data.update_header_stats()
+
+        # Set pixel size
+        self.mrc_data.voxel_size = apix
+
+        # Close the file
+        self.mrc_data.close()
+
+    def write_imgs(self, fname, idx):
+        with mrcfile.mmap(fname, mode='w+') as mrc:
+            # Mrc data shape
+            mrc_nz, mrc_ny, mrc_nx = mrc.data.shape
+
+            # Img shape
+            img_nz, img_ny, img_nx = self.img3D.shape
+
+            # Check the two data
+            if img_ny == mrc_ny and img_nx == mrc_nx and mrc_nz >= idx+img_nz:
+                mrc.data[idx:idx+img_nz] = self.img3D
+
+    def read_imgs(self, fname, idx, num=1):
+        with mrcfile.mmap(fname, mode='w+') as mrc:
+            # Mrc data shape
+            mrc_nz, mrc_ny, mrc_nx = mrc.data.shape
+
+            # Check the two data
+            if mrc_nz >= idx+num:
+                self.img3D = mrc.data[idx:idx+num]
 
     def get_img(self, img_num=0):
         '''
         Get a single image
         '''
-        if self.img is not None and img_num < self.img.shape[2]:
-            return self.img[:, :, img_num]
+        if self.img3D is not None and img_num < self.img3D.shape[0]:
+            return self.img3D[img_num]
         else:
             return None
 
-    def determine_com(self, img_num=0):
+    def determine_com(self, img_num=0, threshold_val=0):
         '''
         Determine center-of-mass at a given image number
         '''
-        if self.img is not None and img_num < self.img.shape[2]:
+        if self.img3D is not None and img_num < self.img3D.shape[0]:
             # Get normalized image
-            current_img = self.img[:, :, img_num]
+            self.img2D = self.img3D[img_num]
 
-            origin_x = int(0.5*self.img.shape[0])
-            origin_y = int(0.5*self.img.shape[1])
-            x, y = np.meshgrid(np.arange(self.img.shape[0], dtype=np.double),
-                               np.arange(self.img.shape[1], dtype=np.double))
-            com_x = np.sum(x*current_img)/np.sum(current_img)
-            com_y = np.sum(y*current_img)/np.sum(current_img)
+        if self.img2D is not None:
+            # Create a mask
+            mask = (self.img2D > threshold_val).view('float32')
+            origin_x = int(0.5*self.img2D.shape[1])
+            origin_y = int(0.5*self.img2D.shape[0])
+            x, y = np.meshgrid(np.arange(self.img2D.shape[1], dtype=np.double),
+                               np.arange(self.img2D.shape[0], dtype=np.double))
 
-            com_x = np.average(x, axis=None, weights=current_img)
-            com_y = np.average(y, axis=None, weights=current_img)
+            com_x = np.sum(x*mask*self.img2D)/np.sum(mask*self.img2D)
+            com_y = np.sum(y*mask*self.img2D)/np.sum(mask*self.img2D)
 
             return [com_x-origin_x, com_y-origin_y]
         else:
@@ -558,25 +1000,19 @@ class MRC:
         # 56-256 (224,1024) LABEL(80,10)    10 80-character text labels
         '''
 
-        with open(file) as f:
-            # Go to 0 pointer
-            f.seek(0)
+        with mrcfile.open(file, header_only=True) as self.mrc_data:
+            self.header   = self.mrc_data.header
+        return self.header
 
-            # Read header
-            header_int   = np.fromfile(f, dtype=np.int32, count=256)
-            header_float = header_int.view(np.float32)
+    def rotate(self, angle):
+        '''
+        Rotate the image by eular-angle
+        '''
 
-            # Read the micrograph and cell dimensions
-            [self.header['NX'], self.header['NY'], self.header['NZ'], self.header['MODE']] = header_int[:4]
-            [self.header['CELLAX'], self.header['CELLAY'], self.header['CELLAZ']] = header_float[10:13]
-            if self.header['CELLAX'] == self.header['CELLAY'] == self.header['CELLAZ'] == 0:
-                self.header['CELLAX'] = self.header['NX']
-                self.header['CELLAY'] = self.header['NY']
-                self.header['CELLAZ'] = self.header['NZ']
-
-            # Close file
-            f.close()
-            return self.header
+    def shift(self, trans):
+        '''
+        Translate the image by translation vector
+        '''
 
 
 class EMfile:
@@ -636,10 +1072,10 @@ class Star(EMfile):
         Create micrographname from imagename
         '''
         if self.has_label('rlnImageName') and not self.has_label('rlnMicrographName'):
-            
-            # Add micropraph name 
+
+            # Add micropraph name
             self.add_column('rlnMicrographName')
-            
+
             # Create micrograph names
             new_mic_name_list = []
             for i in range(self.data_block.shape[0]):
@@ -913,6 +1349,22 @@ class Star(EMfile):
         else:
             return None
 
+    def set_comment(self, ptcl, comment=''):
+        '''
+        Set comment
+        '''
+        if self.has_label('rlnComment'):
+            self.data_block.loc[ptcl, 'rlnComment'] = comment
+
+    def get_comment(self, ptcl):
+        '''
+        Read the comment
+        '''
+        if self.has_label('rlnComment'):
+            return self.data_block['rlnComment'][ptcl]
+        else:
+            return None
+
     def _get_micrograph_name(self, ptcl):
         '''
         Get the micrograph name
@@ -1056,6 +1508,8 @@ class Star(EMfile):
         else:
             print('Warning: No pixel size information in star file %s' % (self.star_file))
             self.star_apix = 1.0
+
+        return self.star_apix
 
     def recenter2D(self, mic_apix=1.82):
         '''
@@ -1365,9 +1819,9 @@ class CryoSparc(EMfile):
                 self.data_block_dict['rlnAnglePsi'] = np.array(util.rad2deg(self.data_block_passthrough['alignments3D/pose'][:, 2]),
                                                                dtype=self.star.PARAMETERS['rlnAnglePsi']['nptype'])
             if self.has_label_blob('alignments3D/pose'):
-                self.data_block_dict['rlnAngleRot'] = np.array(util.rad2deg(self.data_block_blob['alignments3D/pose'][:,  0]),
+                self.data_block_dict['rlnAngleRot'] = np.array(util.rad2deg(self.data_block_blob['alignments3D/pose'][:, 0]),
                                                                dtype=self.star.PARAMETERS['rlnAngleRot']['nptype'])
-                self.data_block_dict['rlnAngleTilt'] = np.array(util.rad2deg(self.data_block_blob['alignments3D/pose'][:,  1]),
+                self.data_block_dict['rlnAngleTilt'] = np.array(util.rad2deg(self.data_block_blob['alignments3D/pose'][:, 1]),
                                                                 dtype=self.star.PARAMETERS['rlnAngleTilt']['nptype'])
                 self.data_block_dict['rlnAnglePsi'] = np.array(util.rad2deg(self.data_block_blob['alignments3D/pose'][:, 2]),
                                                                dtype=self.star.PARAMETERS['rlnAnglePsi']['nptype'])
