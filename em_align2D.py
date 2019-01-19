@@ -93,6 +93,9 @@ def main():
     # Write output files
     new_project.write_output_files()
 
+    # Make transformed class stacks
+    new_project.create_transformed_class_stacks()
+
 
 if __name__ == "__main__":
     main()

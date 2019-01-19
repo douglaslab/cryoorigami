@@ -14,6 +14,7 @@ import utilities as util
 import mrcfile
 import subprocess
 import sys
+import scipy.ndimage
 
 from shutil import copyfile
 
@@ -42,16 +43,6 @@ class Project:
         self.particle_star_file   = None
         self.ref_class_star_file  = None
         self.micrograph_star_file = None
-
-        # Alignment references
-        self.ref_align_star_file  = None
-        self.ref_align_mrc_file   = None
-
-        # Alignment mask file
-        self.mask_align_mrc_file  = None
-
-        # Subtraction mask file
-        self.mask_sub_mrc_file    = None
 
         # Output files
         self.particle_out_file  = None
@@ -91,6 +82,25 @@ class Project:
         # Additional data frames
         self.particle_data_props = pd.DataFrame(columns=['insideFrame'])
 
+        # Alignment references
+        self.ref_align_star_file  = None
+        self.ref_align_mrc_file   = None
+
+        # Alignment mask file
+        self.mask_align_mrc_file    = None
+        self.mask_subtract_mrc_file = None
+
+        # First particle and class mrc files
+        self.first_particle_mrc     = None
+        self.first_ref_class_mrc    = None
+
+        # Relion code
+        self.relion_refine_exe    = 'relion_refine'
+        self.relion_refine_args   = []
+
+        self.relion_norm_exe      = 'relion_preprocess'
+        self.relion_norm_args     = []
+
         # Particles and class2D models
         self.particles = []
         self.class2Ds  = []
@@ -100,7 +110,8 @@ class Project:
         '''
         Set particle radius from particle diameter in Angstrom
         '''
-        self.particle_radius_pix = int(self.particle_diameter_A//(2*self.particle_apix))
+        if self.particle_diameter_A is not None and self.particle_apix is not None:
+            self.particle_radius_pix = int(self.particle_diameter_A//(2*self.particle_apix))
 
     def rename_columns(self, column_params):
         '''
@@ -545,52 +556,11 @@ class Project:
         else:
             self.particle_mrc = None
 
-
-class ProjectSubtract2D(Project):
-    '''
-    Particle subtraction project
-    '''
-    def __init__(self, name='EMParticleSubtract2D'):
-        super().__init__(name)
-
-
-class ProjectAlign2D(Project):
-    '''
-    Class Align2D Project Class
-    '''
-    def __init__(self, name='EMClassAlign2D'):
-        super().__init__(name)
-
-        # Alignment references
-        self.ref_align_star_file  = None
-        self.ref_align_mrc_file   = None
-
-        # Alignment mask file
-        self.mask_align_mrc_file  = None
-
-        # Temporary class star and mrc files
-        self.ref_class_tmp_star_file      = None
-        self.ref_class_tmp_star_norm_out  = None
-        self.ref_class_tmp_star_norm_file = None
-
-        # Alignment outfile
-        self.ref_class_tmp_star_align_file = None
-
-        self.ref_class_tmp_mrc_file       = None
-
-        # Relion output string
-        self.relion_output_str    = None
-
-        # Relion code
-        self.relion_refine_exe    = 'relion_refine'
-        self.relion_refine_args   = []
-
-        self.relion_norm_exe      = 'relion_preprocess'
-        self.relion_norm_args     = []
-
-        # Particle props
-        self.particle_diameter_A  = None
-        self.particle_radius_pix  = None
+    def set_relion_output_str(self, name='run'):
+        '''
+        Set relion output str
+        '''
+        self.relion_output_str = self.output_directory+'/'+name
 
     def set_relion_refine_exe(self):
         '''
@@ -606,17 +576,399 @@ class ProjectAlign2D(Project):
         relion_process = subprocess.run(['which', 'relion_preprocess'], stdout=subprocess.PIPE, universal_newlines=True)
         self.relion_norm_exe = relion_process.stdout.strip()
 
+    def set_relion_stack_create_exe(self):
+        relion_process = subprocess.run(['which', 'relion_stack_create'], stdout=subprocess.PIPE, universal_newlines=True)
+        self.relion_stack_create_exe = relion_process.stdout.strip()
+
+    def set_structure_mask(self, mask_file):
+        '''
+        Set structure mask
+        '''
+        self.mask_structure_mrc_file = mask_file
+
     def set_alignment_mask(self, mask_file):
         '''
         Set alignment mask
         '''
-        self.mask_align_mrc_file  = mask_file
+        self.mask_align_mrc_file    = mask_file
 
     def set_alignment_ref(self, ref_file):
         '''
         Set alignment reference
         '''
-        self.ref_align_mrc_file   = ref_file
+        self.ref_align_mrc_file     = ref_file
+
+    def set_subtraction_mask(self, mask_file):
+        '''
+        Set subtraction mask
+        '''
+        self.mask_subtract_mrc_file = mask_file
+
+    def read_first_particle_mrc(self):
+        '''
+        Read first particle mrc
+        '''
+        if self.particle_star is not None:
+            # Get first particle image to determine shape parameters
+            image_num, image_name = self.particle_star.get_image_num_name(0)
+
+            # Read image
+            self.first_particle_mrc = MRC(image_name, int(image_num)-1)
+
+
+class ProjectSubtract2D(Project):
+    '''
+    Particle subtraction project
+    '''
+    def __init__(self, name='EMParticleSubtract2D'):
+        super().__init__(name)
+
+        # Mask files and objects
+        self.mask_align_mrc_file     = None
+        self.mask_structure_mrc_file = None
+        self.mask_subtract_mrc_file  = None
+
+        self.mask_align_mrc     = None
+        self.mask_structure_mrc = None
+        self.mask_subtract_mrc  = None
+
+        # Alignment references
+        self.ref_align_star_file  = None
+        self.ref_align_mrc_file   = None
+
+        # Output files and objects
+        self.subtracted_star      = None
+        self.subtracted_star_file = None
+
+        self.subtracted_mrc       = None
+        self.subtracted_mrc_file  = None
+
+        # Particle props
+        self.particle_diameter_A  = None
+        self.particle_radius_pix  = None
+
+        # Circular and threshold masks
+        self.circular_mask        = None
+        self.threshold_mask       = None
+
+        # Intensity statistics and masks
+        self.background_mask     = None
+        self.structure_mask      = None
+
+        self.background_mean = None
+        self.background_std  = None
+
+        self.structure_mean  = None
+        self.structure_std   = None
+
+    def _subtract_class(self, class_mrc, ptcl_mrc, ptcl_star, norm=['frc']):
+        '''
+        Subtract class
+        '''
+        self._inv_transform_imgs(class_mrc, ptcl_star)
+        self._ctf_correct_class_img(class_mrc)
+        self._intensity_norm_class_img(class_mrc, ptcl_mrc)
+        self._calc_class_ptcl_frc(class_mrc, ptcl_mrc)
+        self._subtract_class_from_ptcl(class_mrc, ptcl_mrc, norm)
+
+    def _inv_transform_imgs(self, class_mrc, ptcl_star):
+        '''
+        Inverse transform imgs and masks
+        '''
+        # Inverse transform the masks
+        self.mask_align_mrc.inv_transform_ptcl_img2D(ptcl_star)
+        self.mask_structure_mrc.inv_transform_ptcl_img2D(ptcl_star)
+        self.mask_subtract_mrc.inv_transform_ptcl_img2D(ptcl_star)
+
+        # Inverse transform class img2D
+        class_mrc.inv_transform_ptcl_img2D(ptcl_star)
+
+        # Set background mask
+        self.background_mask = self.mask_align_mrc.get_img2D() - self.mask_structure_mrc.get_img2D()
+
+        # Set structure mask
+        self.structure_mask = self.mask_structure_mrc.get_img2D()
+
+        # Set subtraction mask
+        self.subtract_mask = self.mask_subtract_mrc.get_img2D()
+
+    def _ctf_correct_class_img(self, class_mrc):
+        '''
+        Compare class to ptcl and adjust intensities
+        '''
+        # Take class FFT
+        class_mrc.fft_img2D()
+
+        # CTF correct
+        class_mrc.correct_fft_ctf()
+
+        # Take inverse FFT
+        class_mrc.ifft_img2D()
+
+        # Copy ifft to img2D
+        class_mrc.copy_to_img2D(class_mrc.img2D_ifft)
+
+    def _intensity_norm_class_img(self, class_mrc, ptcl_mrc):
+        '''
+        Intensity normalize class img2D
+        '''
+        # Calculate background mean, std intensity
+        self.background_mean, self.background_std = ptcl_mrc.calc_mean_std_intensity(mask=self.background_mask)
+
+        # Calculate structure mean, std intensity
+        self.structure_mean, self.structure_std = ptcl_mrc.calc_mean_std_intensity(mask=self.structure_mask)
+
+        # Calculate subtract mean, std intensity
+        self.subtract_mean, self.subtract_std = ptcl_mrc.calc_mean_std_intensity(mask=self.subtract_mask)
+
+        # Set background intensity to particle background mean intensity
+        class_mrc.normalize_bg_area_intensity(self.background_mask, self.background_mean, self.subtract_mask, self.subtract_mean)
+
+        # Store the original class mrc
+        class_mrc.subtract_ctf(class_mrc.img2D_ctf)
+
+    def _calc_class_ptcl_frc(self, class_mrc, ptcl_mrc):
+        '''
+        Calculate class-ptcl frc
+        '''
+        # Take ptcl FFT
+        ptcl_mrc.fft_img2D(self.structure_mask)
+
+        # Take class FFT
+        class_mrc.fft_img2D(self.structure_mask)
+
+        # CTF correct class img
+        class_mrc.correct_fft_ctf()
+
+        # Calculate FRC
+        class_mrc.calc_frc(ptcl_mrc)
+
+    def _subtract_class_from_ptcl(self, class_mrc, ptcl_mrc, norm=['frc']):
+        '''
+        Subtract class from
+        '''
+
+        # Take class FFT
+        class_mrc.fft_img2D(self.mask_subtract_mrc.get_img2D())
+
+        # CTF correct class image
+        class_mrc.correct_fft_ctf()
+
+        if 'frc' in norm:
+            class_mrc.normalize_frc()
+
+        # Take inverse FFT
+        class_mrc.ifft_img2D()
+
+        # Copy ifft to img2D
+        class_mrc.copy_to_img2D(class_mrc.img2D_ifft)
+
+        # Subtract the class image from ptcl image
+        ptcl_mrc.subtract_from_img2D(data=class_mrc.get_img2D())
+
+    def create_threshold_mask(self, class_mrc, threshold=0.05):
+        '''
+        Create threshold mask
+        '''
+        if self.threshold_mask is None:
+            self.threshold_mask = class_mrc.make_threshold_mask(threshold=threshold)
+
+    def add_noise(self, max_ptcl=None):
+        '''
+        Replace the subtraction mask with random noise
+        '''
+
+    def subtract_class_mrc(self, norms=['frc'], threshold_val=0.05, max_ptcl=None):
+        '''
+        Subtract class mrc file
+        '''
+
+        # Replace ReferenceImage with ImageName
+        self.ref_class_star.rename_column('rlnReferenceImage', 'rlnImageName')
+
+        # Get class data
+        class_data_block = self.ref_class_star.get_data_block()
+
+        # Get particle data
+        particle_data_block = self.particle_star.get_data_block()
+
+        # Particle counter
+        particle_counter = 0
+
+        # Iterate over each class
+        for class_index, class_row in class_data_block.iterrows():
+            class_image_num, class_image_name = self.ref_class_star.get_image_num_name(class_index)
+
+            # Read image
+            class_mrc = MRC(class_image_name, int(class_image_num)-1)
+
+            # Store to original
+            class_mrc.store_to_original()
+
+            # Prepare for CTF
+            class_mrc.eval_ctf_grid(self.particle_apix)
+
+            # Get class numbers for the current class
+            current_class_number = class_row['rlnClassNumber']
+            class_mask           = particle_data_block['rlnClassNumber'] == current_class_number
+            particle_data        = particle_data_block.loc[class_mask, :]
+
+            # Make threshold mask
+            self.threshold_mask = class_mrc.make_threshold_mask(threshold=threshold_val)
+            if self.mask_structure_mrc_file is None:
+                self.mask_structure_mrc = MRC()
+                self.mask_structure_mrc.set_img2D(self.threshold_mask)
+                self.mask_structure_mrc.store_from_original()
+
+            for ptcl_index, ptcl_row in particle_data.iterrows():
+                # Update particle counter
+                particle_counter += 1
+
+                # If exceed max number of particles, quit
+                if max_ptcl is not None and particle_counter > max_ptcl:
+                    break
+
+                # Set the originals
+                class_mrc.store_from_original()
+                self.mask_align_mrc.store_from_original()
+                self.mask_subtract_mrc.store_from_original()
+                self.mask_structure_mrc.store_from_original()
+
+                # Read particle data
+                particle_image_num, particle_image_name = self.particle_star.get_image_num_name(ptcl_index)
+
+                print('Particle %d/%d %.2f Subtracting %08d@%s' % (particle_counter,
+                                                                   particle_data_block.shape[0],
+                                                                   1.0*particle_counter/particle_data_block.shape[0],
+                                                                   particle_image_num, particle_image_name))
+                # Get particle image
+                particle_mrc = MRC(particle_image_name, particle_image_num-1)
+
+                # Determine CTF
+                class_mrc.eval_ptcl_ctf(ptcl_row, bf=0, lp=2*self.particle_apix)
+
+                # Compare class to ptcl
+                self._subtract_class(class_mrc, particle_mrc, ptcl_row, norm=norms)
+
+                # Append image
+                particle_mrc.transform_ptcl_img2D(ptcl_row)
+                self.subtracted_mrc.append_img(particle_mrc.img2D, ptcl_index)
+
+                # Create new imagename
+                new_image_name = '%08d@%s' % (ptcl_index, self.subtracted_mrc_file)
+                self.subtracted_star.data_block.loc[ptcl_index, 'rlnImageName'] = new_image_name
+
+        # Close the output files and write
+        self.subtracted_star.write(self.subtracted_star_file)
+        self.subtracted_mrc.close()
+
+    def prepare_output_files(self):
+        '''
+        Create output files
+        '''
+
+        self.subtracted_star_file = os.path.relpath(os.path.abspath(self.output_directory+'/subtracted.star'))
+        self.subtracted_mrc_file  = os.path.relpath(os.path.abspath(self.output_directory+'/subtracted.mrcs'))
+
+    def read_masks(self):
+        '''
+        Read masks
+        '''
+        # 1. Alignment mask - ideally a circular mask
+        if self.mask_align_mrc_file is not None:
+            self.mask_align_mrc = MRC(self.mask_align_mrc_file)
+            self.mask_align_mrc.convert_to_binary_mask()
+        else:
+            self.mask_align_mrc = MRC()
+            self.mask_align_mrc.set_img2D(self.circular_mask)
+
+        # 2. Structure mask - mask that defines the boundaries of structure
+        if self.mask_structure_mrc_file is not None:
+            self.mask_structure_mrc = MRC(self.mask_structure_mrc_file)
+            self.mask_structure_mrc.convert_to_binary_mask()
+
+        # 3. Subtract mask - mask used for subtraction
+        if self.mask_subtract_mrc_file is not None:
+            self.mask_subtract_mrc = MRC(self.mask_subtract_mrc_file)
+            self.mask_subtract_mrc.convert_to_binary_mask()
+
+        # Store the originals of masks
+        self.mask_align_mrc.store_to_original()
+        self.mask_subtract_mrc.store_to_original()
+
+    def prepare_project(self):
+        '''
+        Prepare project
+        '''
+        self.set_particle_radius()
+        self.prepare_output_files()
+        self.prepare_meta_objects()
+        self.read_masks()
+
+    def create_output_subtract_star(self):
+        '''
+        Create output star file
+        '''
+        self.subtracted_star = Star()
+        self.subtracted_star.copy(self.particle_star)
+
+    def create_output_subtract_mrc(self):
+        '''
+        Create output subtract mrc object and file
+        '''
+        # Create MRCS output file
+        if self.subtracted_mrc is None:
+            # Determine shape parameters
+            num_particles = self.particle_star.data_block.shape[0]
+            NY, NX        = self.first_particle_mrc.img2D.shape
+
+            # Create output MRC file
+            self.subtracted_mrc = MRC(file=self.subtracted_mrc_file, shape=(num_particles, NY, NX))
+
+    def create_circular_mask(self):
+        '''
+        Create circular mask
+        '''
+        if self.particle_radius_pix is None:
+            self.particle_radius_pix = int(np.min(self.first_particle_mrc.img2D.shape)//2)
+
+        # Create circular mask
+        if self.circular_mask is None:
+            self.circular_mask = util.circular_mask(self.first_particle_mrc.img2D.shape,
+                                                    center=None,
+                                                    radius=self.particle_radius_pix)
+
+    def prepare_meta_objects(self):
+        '''
+        Prepare meta objects using reference class avarages
+        '''
+        self.read_first_particle_mrc()
+        self.create_output_subtract_mrc()
+        self.create_output_subtract_star()
+        self.create_circular_mask()
+
+
+class ProjectAlign2D(Project):
+    '''
+    Class Align2D Project Class
+    '''
+    def __init__(self, name='EMClassAlign2D'):
+        super().__init__(name)
+
+        # Temporary class star and mrc files
+        self.ref_class_tmp_star_file      = None
+        self.ref_class_tmp_star_norm_out  = None
+        self.ref_class_tmp_star_norm_file = None
+
+        # Alignment outfile
+        self.ref_class_tmp_star_align_file = None
+        self.ref_class_tmp_mrc_file        = None
+
+        # Final aligned outfiles
+        self.ref_class_final_out           = None
+
+        # Relion output string
+        self.relion_output_str    = None
 
     def prepare_project(self):
         '''
@@ -629,6 +981,20 @@ class ProjectAlign2D(Project):
         self.set_relion_output_str()
         self.set_relion_refine_exe()
         self.set_relion_norm_exe()
+        self.set_relion_stack_create_exe()
+
+    def create_transformed_class_stacks(self):
+        '''
+        Create transformed class2D stacks
+        '''
+        self.relion_output_str        = os.path.relpath(os.path.abspath(self.output_directory+'/Class2D_output_transformed'))
+        self.relion_stack_create_args = [self.relion_stack_create_exe,
+                                         '--apply_transformation',
+                                         '--i', self.ref_class_out_file,
+                                         '--o', self.relion_output_str]
+        self.relion_stack_create_subprocess = subprocess.run(self.relion_stack_create_args,
+                                                             stdout=subprocess.PIPE,
+                                                             universal_newlines=True)
 
     def normalize_class_refs(self):
         '''
@@ -644,18 +1010,13 @@ class ProjectAlign2D(Project):
                                                      stdout=subprocess.PIPE,
                                                      universal_newlines=True)
 
-    def set_relion_output_str(self):
-        '''
-        Set relion output str
-        '''
-        self.relion_output_str = self.output_directory+'/run'
-
     def prepare_tmp_input(self):
         '''
         Prepare the class reference star file for alignment of class averages
         '''
         if self.ref_class_star is not None:
             self.ref_class_star.change_label('rlnReferenceImage', 'rlnImageName')
+            self.ref_class_star.replace_with_unmasked_classes()
 
     def create_tmp_files_star(self):
         # Copy input file to output directory
@@ -744,17 +1105,6 @@ class ProjectAlign2D(Project):
             sys.exit('Relion refine doesnt exist')
 
 
-class SubtractProject(Project):
-    '''
-    Class Align Project Class
-    '''
-    def __init__(self, name='EMClassSubtract'):
-        super().__init__(name)
-
-        # Temporary class star files
-        self.ref_class_tmp_file = None
-
-
 class Micrograph:
     '''
         Micrograph class
@@ -788,24 +1138,46 @@ class MRC:
         MRC  class
     '''
     def __init__(self, file=None, image_num=None, shape=None):
-        self.name       = None
-        self.mrc_data   = None
-        self.project    = None
-        self.header     = None
-        self.img3D      = None
-        self.img2D      = None
-        self.img2D_fft  = None
-        self.ctf        = None
-        self.ctf_params = None
-        self.ctf_s      = None
-        self.ctf_sx     = None
-        self.ctf_sy     = None
-        self.ctf_a      = None
-        self.ctf_r      = None
-        self.star_data  = None
-        self.star       = None
-        self.apix       = None
+        self.name             = None
+        self.mrc_data         = None
+        self.project          = None
+        self.header           = None
+        self.img3D            = None
+        self.img2D_original   = None
 
+        self.img2D            = None
+        self.img2D_ref        = None
+        self.img2D_sub        = None
+
+        self.img2D_ref_fft    = None
+        self.img2D_sub_fft    = None
+
+        self.img2D_ref_ifft   = None
+        self.img2D_sub_ifft   = None
+
+        self.img2D_pshift     = None
+        self.img2D_ctf        = None
+
+        self.img2D_subtracted = None
+
+        # CTF grid parameters
+        self.ctf_s            = None
+        self.ctf_sx           = None
+        self.ctf_sy           = None
+        self.ctf_a            = None
+        self.ctf_r            = None
+        self.star_data        = None
+        self.star             = None
+        self.apix             = None
+
+        # FRC parameters
+        self.frc2D            = None
+
+        # Masks
+        self.mask_align      = None
+        self.mask_subtract   = None
+        self.mask_circular   = None
+        self.mask_threshold  = None
         self.mode2type = {0: np.dtype(np.int8),
                           1: np.dtype(np.int16),
                           2: np.dtype(np.float32),
@@ -824,21 +1196,349 @@ class MRC:
             else:
                 self.create(file, shape)
 
-    def eval_ctf_grid(self):
+    def normalize_bg_area_intensity(self, mask_bg, new_val_bg, mask_area, new_val_area):
         '''
-        Create ctf grid
+        Normalize the intensity - background and an area of interest
         '''
-        if self.img2D is not None and self.apix is not None:
-            self.ctf_s, self.ctf_sx, self.ctf_sy, self.ctf_a, self.ctf_r = util.ctf_freqs(self.img2D.shape, self.apix)
+        # Get the background intensity
+        background_intensity = np.mean(self.img2D[mask_bg > 0])
 
-    def get_ctf_params(self):
+        # Subtract background intensity
+        self.img2D -= background_intensity
+
+        # Get the area intensity
+        area_intensity = np.mean(self.img2D[mask_area > 0])
+
+        # Normalize the area intensity
+        self.img2D    *= (new_val_area-new_val_bg)/area_intensity
+
+        # Finally add the new background intenstiy
+        self.img2D    += new_val_bg
+
+    def set_background_intensity(self, mask, new_val=0):
         '''
-        Get ctf parameters from star file
+        Set background inetensity
         '''
-        rlnDefocusU = self.star['rlnDefocusU']
-        rlnDefocusV = self.star['rlnDefocusV']
-        ptcl[star.Relion.DEFOCUSU], ptcl[star.Relion.DEFOCUSV], ptcl[star.Relion.DEFOCUSANGLE],
-        ptcl[star.Relion.PHASESHIFT], ptcl[star.Relion.VOLTAGE], ptcl[star.Relion.AC], ptcl[star.Relion.CS],
+
+        background_intensity = np.mean(self.img2D[mask > 0])
+
+        # Subtract background intensity
+        self.img2D -= background_intensity
+
+        # Set new intensity
+        self.img2D += new_val
+
+    def set_area_intensity(self, mask, new_val=1.0):
+        '''
+        Set area intensity
+        '''
+        area_intensity = np.mean(self.img2D[mask > 0])
+        self.img2D    *= new_val/area_intensity
+
+    def convert_to_binary_mask(self):
+        '''
+        Convert img2D to binary mask
+        '''
+        mask = np.zeros(self.img2D.shape, dtype='float32')
+        mask[self.img2D > 0] = 1
+        self.img2D = np.copy(mask)
+
+    def set_norm_intensity_params(self, mean, std):
+        '''
+        Set norm intensity params
+        '''
+        self.norm_mean = mean
+        self.norm_std  = std
+
+    def apply_mask(self, mask):
+        '''
+        Apply mask
+        '''
+        if mask.shape == self.img2D.shape:
+            self.img2D = self.img2D*mask
+
+    def make_circular_mask(self):
+        '''
+        Make circular Mask
+        '''
+        self.mask_circular = util.circular_mask(self.img2D.shape)
+        return self.mask_circular
+
+    def make_threshold_mask(self, threshold=0.05):
+        ''''
+        Make threshold mask
+        '''
+        self.mask_threshold = util.threshold_mask(self.img2D, threshold)
+        return self.mask_threshold
+
+    def eval_ctf_grid(self, apix=1.0):
+        '''
+        Create ctf freq grids
+        '''
+        if self.img2D is not None:
+            assert self.img2D.shape[0] == self.img2D.shape[1]
+
+            # Get the pixel size information
+            if self.apix is not None:
+                apix = self.apix
+
+            xfreq   = np.fft.fftfreq(self.img2D.shape[1], apix)
+            yfreq   = np.fft.fftfreq(self.img2D.shape[0], apix)
+
+            self.ctf_sx, self.ctf_sy  = np.meshgrid(xfreq, yfreq)
+            self.ctf_s                = np.sqrt(self.ctf_sx**2 + self.ctf_sy**2)
+
+            # Determine angle grids
+            self.ctf_a = np.arctan2(self.ctf_sy, self.ctf_sx)
+
+            # Determine r
+            spacing = 1.0/(self.img2D.shape[0]*apix)
+            self.ctf_r  = np.round(self.ctf_s/spacing)*spacing
+
+    def rotate_img2D(self, angle):
+        '''
+        Rotate img2D by an eularangle
+        '''
+        self.img2D = scipy.ndimage.rotate(self.img2D, angle=-angle, axes=(0, 1), reshape=False)
+
+    def shift_img2D(self, shiftX, shiftY):
+        '''
+        Shift img2D by a vector
+        '''
+        self.img2D = scipy.ndimage.shift(self.img2D, shift=[shiftY, shiftX])
+
+    def inv_rotate_ptcl_img2D(self, ptcl_star):
+        '''
+        Inverse rotation based on ptcl data
+        '''
+        psi = ptcl_star['rlnAnglePsi']
+        self.rotate_img2D(-psi)
+
+    def inv_shift_ptcl_img2D(self, ptcl_star):
+        '''
+        Inverse shift based on ptcl data
+        '''
+        originX = ptcl_star['rlnOriginX']
+        originY = ptcl_star['rlnOriginY']
+
+        self.shift_img2D(-originX, -originY)
+
+    def inv_transform_ptcl_img2D(self, ptcl_star):
+        '''
+        Inverse ptcl transform
+        '''
+
+        self.inv_rotate_ptcl_img2D(ptcl_star)
+        self.inv_shift_ptcl_img2D(ptcl_star)
+
+    def transform_ptcl_img2D(self, ptcl_star):
+        self.shift_ptcl_img2D(ptcl_star)
+        self.rotate_ptcl_img2D(ptcl_star)
+
+    def rotate_ptcl_img2D(self, ptcl_star):
+        '''
+        Rotation based on ptcl data
+        '''
+        psi = ptcl_star['rlnAnglePsi']
+        self.rotate_img2D(psi)
+
+    def shift_ptcl_img2D(self, ptcl_star):
+        '''
+        Shift based on ptcl data
+        '''
+        originX = ptcl_star['rlnOriginX']
+        originY = ptcl_star['rlnOriginY']
+
+        self.shift_img2D(originX, originY)
+
+    def eval_ptcl_ctf(self, ptcl_star, bf=0, lp=0.0):
+        '''
+        Determine ctf from particle data
+        '''
+        defU       = ptcl_star['rlnDefocusU']
+        defV       = ptcl_star['rlnDefocusV']
+        defA       = ptcl_star['rlnDefocusAngle']
+        phaseShift = ptcl_star['rlnPhaseShift']
+        kV         = ptcl_star['rlnVoltage']
+        ac         = ptcl_star['rlnAmplitudeContrast']
+        cs         = ptcl_star['rlnSphericalAberration']
+
+        return self._eval_ctf(defU, defV, defA, phaseShift, kV, ac, cs, bf, lp)
+
+    def subtract_ctf(self, ctf):
+        '''
+        Subtract ctf from img2D
+        '''
+        self.fft_img2D()
+        self.img2D_fft = self.img2D_fft/ctf
+        self.ifft_img2D()
+        self.copy_to_img2D(self.img2D_ifft)
+
+    def correct_fft_ctf(self):
+        '''
+        Correct ctf
+        '''
+        if self.img2D_ctf is not None:
+            self.img2D_fft *= self.img2D_ctf
+
+    def correct_fft_pshift(self):
+        '''
+        Correct fft with pshift
+        '''
+        if self.img2D_pshift is not None:
+            self.img2D_fft *= self.img2D_pshift
+
+    def eval_ptcl_fft_pshift(self, ptcl_star):
+        '''
+        Determine fft-pshift
+        '''
+        originX = ptcl_star['rlnOriginX']
+        originY = ptcl_star['rlnOriginY']
+
+        return self._eval_fft_pshift(originX, originY)
+
+    def _eval_fft_pshift(self, originx, originy):
+        '''
+        Evaluate pshift
+        '''
+
+        self.img2D_pshift = np.exp(-2 * np.pi * 1j * (-originx * self.ctf_sx + -originy * self.ctf_sy))
+        return self.img2D_pshift
+
+    def _eval_ctf(self, defU, defV, defA=0, phaseShift=0, kv=300, ac=0.1, cs=2.0, bf=0, lp=0):
+        '''
+        :param defU: 1st prinicipal underfocus distance (Å).
+        :param defV: 2nd principal underfocus distance (Å).
+        :param defA: Angle of astigmatism (deg) from x-axis to azimuth.
+        :param phaseShift: Phase shift (deg).
+        :param kv:  Microscope acceleration potential (kV).
+        :param ac:  Amplitude contrast in [0, 1.0].
+        :param cs:  Spherical aberration (mm).
+        :param bf:  B-factor, divided by 4 in exponential, lowpass positive.
+        :param lp:  Hard low-pass filter (Å), should usually be Nyquist.
+        '''
+
+        # parameter unit conversions
+        defA = np.deg2rad(defA)
+        kv = kv * 1e3
+        cs = cs * 1e7
+        lamb = 12.2643247 / np.sqrt(kv * (1. + kv * 0.978466e-6))
+        def_avg = -(defU + defV) * 0.5
+        def_dev = -(defU - defV) * 0.5
+
+        # k paramaters
+        k1 = np.pi / 2. * 2 * lamb
+        k2 = np.pi / 2. * cs * lamb**3
+        k3 = np.sqrt(1 - ac**2)
+        k4 = bf / 4.                # B-factor, follows RELION convention.
+        k5 = np.deg2rad(phaseShift)  # Phase shift.
+
+        # Hard low-pass filter
+        if lp != 0:
+            s = self.ctf_s*(self.ctf_s <= (1. / lp))
+        else:
+            s = self.ctf_s
+
+        s2 = s**2
+        s4 = s2**2
+        dZ = def_avg + def_dev * (np.cos(2 * (self.ctf_a - defA)))
+        gamma = (k1 * dZ * s2) + (k2 * s4) - k5
+
+        # Determine ctf
+        self.img2D_ctf = -(k3 * np.sin(gamma) - ac*np.cos(gamma))
+
+        # Enforce envelope
+        if bf != 0:
+            self.img2D_ctf *= np.exp(-k4 * s2)
+        return self.img2D_ctf
+
+    def calc_frc(self, other):
+        '''
+        Compute frc between two ft
+        '''
+        self.frc2D = np.zeros(self.img2D_fft.shape, dtype=np.float32)
+        rbins = np.sort(np.unique(self.ctf_r))
+        self.frc1D = np.zeros(len(rbins), dtype=np.float32)
+        for i in range(len(rbins)):
+            mask = self.ctf_r == rbins[i]
+            corr  = np.sum(self.img2D_fft[mask]*np.conj(other.img2D_fft[mask]))
+            norm1 = np.sqrt(np.sum(np.abs(self.img2D_fft[mask])**2))
+            norm2 = np.sqrt(np.sum(np.abs(other.img2D_fft[mask])**2))
+
+            self.frc1D[i]    = np.real(corr)/(norm1*norm2)
+            self.frc2D[mask] = self.frc1D[i]
+
+    def normalize_frc(self):
+        '''
+        Normalize frc
+        '''
+
+        if self.frc2D is not None:
+            self.img2D_fft *= self.frc2D
+
+    def calc_mean_std_intensity(self, mask=None):
+        '''
+        Calculate mean and std intensity
+        '''
+        if mask is not None and mask.shape == self.img2D.shape:
+            self.mean_intensity = np.mean(self.img2D[mask > 0])
+            self.std_intensity  = np.std(self.img2D[mask > 0])
+        else:
+            self.mean_intensity = np.mean(self.img2D)
+            self.std_intensity  = np.std(self.img2D)
+
+        return self.mean_intensity, self.std_intensity
+
+    def normalize_intensity(self, mask=None, new_mean=0, new_std=None):
+        '''
+        Normalize intensity to match a new gauss-distribution
+        '''
+        self.calc_mean_std_intensity(mask)
+
+        # Adjust the mean and std-values value
+        # Zero mean value
+        self.img2D -= self.mean_intensity
+
+        # Adjust stdev
+        if new_std is not None:
+            self.img2D *= new_std/self.std_intensity
+
+        # Bring mean value to new mean-value
+        self.img2D += new_mean
+
+    def get_img2D(self):
+        '''
+        Get img2D
+        '''
+        return self.img2D
+
+    def fft_img2D(self, mask=None):
+        '''
+        FFT img2D
+        '''
+        if mask is not None and mask.shape == self.img2D.shape:
+            self.img2D_fft = np.fft.fft2(mask*self.img2D)
+        else:
+            self.img2D_fft = np.fft.fft2(self.img2D)
+
+    def ifft_img2D(self):
+        '''
+        Inverse FFT 2D
+        '''
+        self.img2D_ifft = np.real(np.fft.ifft2(self.img2D_fft))
+        return self.img2D_ifft
+
+    def set_img2D_fft(self, data):
+        '''
+        Set img2D_fft
+        '''
+        self.img2D_fft = np.copy(data)
+
+    def set_img2D(self, data):
+        '''
+        Set img2D
+        '''
+        self.img2D = np.copy(data)
 
     def set_apix(self, apix):
         '''
@@ -858,20 +1558,19 @@ class MRC:
         '''
         self.star_data = star_data
 
-    def eval_ctf(self, image_num=None):
-        '''
-        Evaluate ctf for only 2D images
-        '''
-
-        if len(self.img.shape) == 3 and image_num < self.img.shape[0]:
-            self.ctf = util.eval_ctf(self.star)
-
     def create(self, file, shape=None):
         '''
         Create file
         '''
         if shape is not None:
-            self.mrc_data = mrcfile.new_mmap(file, shape, mode=2)
+            self.mrc_data = mrcfile.new_mmap(file, shape, mrc_mode=2)
+
+    def append_img(self, data, img_counter):
+        '''
+        Append img
+        '''
+        if self.mrc_data is not None:
+            self.mrc_data.data[img_counter] = data
 
     def close(self):
         '''
@@ -890,21 +1589,58 @@ class MRC:
         Read MRC file
         '''
 
-        with mrcfile.mmap(file, mode='r+') as self.mrc_data:
+        with mrcfile.mmap(file, mode='r') as self.mrc_data:
             self.header   = self.mrc_data.header
             self.img3D    = self.mrc_data.data
 
             # If image is 2D
             if len(self.img3D.shape) == 2:
-                self.img2D = self.img3D
+                self.img2D = np.copy(self.img3D)
 
             # If image is 3D with a single image
             if len(self.img3D.shape) == 3 and self.img3D.shape[0] == 1:
-                self.img2D = self.img3D[0]
+                self.img2D = np.copy(self.img3D[0])
 
             # If image num is defined and it is 3D data
             if image_num is not None and image_num < self.img3D.shape[0] and len(self.img3D.shape) == 3:
-                self.img2D = self.img3D[image_num]
+                self.img2D = np.copy(self.img3D[image_num])
+
+            # Store an original copy of img2D
+            self.img2D_original = np.copy(self.img2D)
+
+    def store_from_original(self):
+        '''
+        Store from original
+        '''
+        self.img2D     = np.copy(self.img2D_original)
+
+    def store_to_original(self):
+        '''
+        Store to original
+        '''
+        self.img2D_original = np.copy(self.img2D)
+
+    def copy_to_original(self, data):
+        '''
+        Copy to original
+        '''
+        self.img2D_original = np.copy(data)
+
+    def copy_to_img2D(self, data):
+        '''
+        Copy to img2D
+        '''
+        if data.shape == self.img2D.shape:
+            self.img2D = np.copy(data)
+
+    def subtract_from_img2D(self, data, mask=None):
+        '''
+        Subtract from img2D
+        '''
+        if mask is not None and data.shape == self.img2D.shape and mask.shape == self.img2D.shape:
+            self.img2D -= data*mask
+        else:
+            self.img2D -= data
 
     def copy_img(self, other):
         '''
@@ -995,7 +1731,7 @@ class MRC:
 
         if self.img2D is not None:
             # Create a mask
-            mask = (self.img2D > threshold_val).view('float32')
+            mask = np.array(self.img2D > threshold_val, dtype='float32')
             origin_x = int(0.5*self.img2D.shape[1])
             origin_y = int(0.5*self.img2D.shape[0])
             x, y = np.meshgrid(np.arange(self.img2D.shape[1], dtype=np.double),
@@ -1051,16 +1787,6 @@ class MRC:
             self.header   = self.mrc_data.header
         return self.header
 
-    def rotate(self, angle):
-        '''
-        Rotate the image by eular-angle
-        '''
-
-    def shift(self, trans):
-        '''
-        Translate the image by translation vector
-        '''
-
 
 class EMfile:
     '''
@@ -1113,6 +1839,29 @@ class Star(EMfile):
         # Read file
         if file is not None:
             self.read(file)
+
+    def replace_with_unmasked_classes(self):
+        '''
+        Replace with unmasked class averages
+        '''
+        for ptcl_index, ptcl_row in self.data_block.iterrows():
+            image_num, image_name = ptcl_row['rlnImageName'].split('@')
+            head, tail = os.path.split(image_name)
+
+            # Construct new image name
+            new_image_name = head + '/run_unmasked_classes.mrcs'
+
+            # Replace the image name
+            self.data_block.loc[ptcl_index, 'rlnImageName'] = image_num+'@'+new_image_name
+
+    def get_image_num_name(self, ptcl):
+        '''
+        Get ptcl image num and name
+        '''
+        if ptcl < self.data_block.shape[0] and self.has_label('rlnImageName'):
+            image_num, image_name = self.data_block.loc[ptcl, 'rlnImageName'].split('@')
+
+        return int(image_num), image_name
 
     def rename_columns(self, column_params):
         if column_params is not None:
@@ -1351,7 +2100,6 @@ class Star(EMfile):
         '''
         Set a column value
         '''
-
 
         if self.has_label(label) and value is not None:
             self.data_block.loc[:, label] = self.PARAMETERS[label]['type'](value)
@@ -1627,9 +2375,15 @@ class Star(EMfile):
         '''
         Change label name
         '''
-        if self.has_label(old_label) and new_label in self.PARAMETERS:
+        if self.has_label(old_label) and new_label in self.PARAMETERS and not self.has_label(new_label):
             self.data_block.rename(columns={old_label: new_label},
                                    inplace=True)
+
+    def rename_column(self, old_label, new_label):
+        '''
+        Rename column
+        '''
+        self.change_label(old_label, new_label)
 
     def dublicate_column(self, label, new_label):
         '''

@@ -16,25 +16,28 @@ def main():
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument("-i",        "--input",         type=str, help="Particle star file")
-    parser.add_argument("-o",        "--output",        type=str, help="Output directory", default=None)
-    parser.add_argument("-ref",      "--reference",     type=str, help="Reference class star file")
-    parser.add_argument("-diamater", "--diameter",      type=int, help="Particle diameter in Angstroms", default=None)
-    parser.add_argument("-cmask",    "--classmask",     type=str, help="Mask used for 2D classification", default=None)
-    parser.add_argument("-smask",    "--submask",       type=str, help="Mask used for subtraction", default=None)
-    parser.add_argument("-norm",     "--normalization", type=str, help="Normalization procedure to use for subtraction",
-                        choices=['frc', 'minmax'], default='frc')
+    parser.add_argument("-i",            "--input",         type=str,   help="Particle star file")
+    parser.add_argument("-refclass",     "--refclass",      type=str,   help="Class star file")
+    parser.add_argument("-o",            "--output",        type=str,   help="Output directory", default=None)
+    parser.add_argument("-diameter",     "--diameter",      type=float, help="Particle diameter in Angstroms", default=None)
+    parser.add_argument("-maskalign",    "--maskalign",     type=str,   help="Mask used for 2D classification", default=None)
+    parser.add_argument("-masksub",      "--masksub",       type=str,   help="Mask used for the subtraction", default=None)
+    parser.add_argument("-maskstruct",   "--maskstruct",    type=str,   help="Maks that defines the boundaries of structure", default=None)
+    parser.add_argument("-norm",         "--norm",          type=str,   help="Normalization procedure", choices=['frc'], default='')
+    parser.add_argument("-maxptcl",      "--maxptcl",       type=int,   help="Maximum number of particles to write", default=None)
 
     args = parser.parse_args()
 
     # Prepare args dict
     args_dict = {'input':         args.input,
+                 'refclass':      args.refclass,
                  'output':        args.output,
-                 'reference':     args.reference,
                  'diameter':      args.diameter,
-                 'classmask':     args.classmask,
-                 'submask':       args.submask,
-                 'normalization': args.normalization
+                 'maskalign':     args.maskalign,
+                 'masksub':       args.masksub,
+                 'maskstruct':    args.maskstruct,
+                 'norm':          args.norm,
+                 'maxptcl':       args.maxptcl
                  }
 
     # Check if the input file exists
@@ -42,14 +45,14 @@ def main():
         parser.print_help()
         sys.exit('Input file does not exist!')
 
-    # Check if the reference file exists
-    # if args_dict['reference'] is None and not os.path.isfile(args_dict['reference']):
-    #    parser.print_help()
-    #    sys.exit('Reference file file does not exist!')
+    # Check if the class reference file exists
+    if args_dict['refclass'] is None and not os.path.isfile(args_dict['refclass']):
+        parser.print_help()
+        sys.exit('Class Reference file file does not exist!')
 
     # Create an EM project object
-    new_project = em.Project(name='ProjectSubtract2D')
-    new_project.set_output_directory(args_dict['input'], args_dict['output'])
+    new_project = em.ProjectSubtract2D()
+    new_project.set_output_directory(args_dict['input'], args_dict['output'], project_root='.')
 
     # Write parameters to args filename
     args_filename = new_project.output_directory+'/args.yaml'
@@ -58,19 +61,37 @@ def main():
     # Read particles
     new_project.read_particles(args_dict['input'])
     print('Read particle star file {}'.format(args_dict['input']))
-    '''
-    new_project.read_class_refs(args_dict['reference'])
-    print('Read class reference file {}'.format(args_dict['reference']))
+
+    new_project.read_class_refs(args_dict['refclass'])
+    print('Read class reference file {}'.format(args_dict['refclass']))
 
     # Prepare input and output files
     new_project.prepare_io_files_star()
-    '''
-    new_project.read_particle_mrc()
-    # Add new columns
-    # new_project.subtract2D(args_dict['diameter'], args_dict['classmask'], args_dict['submask'], args_dict['normalization'])
+
+    # Determine pixel size from particle star file
+    new_project.read_particle_apix()
+
+    # Set particle diameter
+    new_project.set_particle_diameter(args_dict['diameter'])
+
+    # Set alignment mask
+    new_project.set_alignment_mask(args_dict['maskalign'])
+
+    # Set subtraction mask
+    new_project.set_subtraction_mask(args_dict['masksub'])
+
+    # Set alignment reference
+    new_project.set_structure_mask(args_dict['maskstruct'])
+
+    # Prepare project files
+    new_project.prepare_project()
+
+    # Subtract class mrc from particle mrc
+    new_project.subtract_class_mrc(norms=[args_dict['norm']], max_ptcl=args_dict['maxptcl'])
 
     # Write output files
-    # new_project.write_output_files(write_ref_class_star=False)
+    new_project.write_output_files()
+
 
 if __name__ == "__main__":
     main()
