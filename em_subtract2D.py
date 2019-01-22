@@ -23,7 +23,7 @@ def main():
     parser.add_argument("-maskalign",    "--maskalign",     type=str,   help="Mask used for 2D classification", default=None)
     parser.add_argument("-masksub",      "--masksub",       type=str,   help="Mask used for the subtraction", default=None)
     parser.add_argument("-maskstruct",   "--maskstruct",    type=str,   help="Maks that defines the boundaries of structure", default=None)
-    parser.add_argument("-norm",         "--norm",          type=str,   help="Normalization procedure", choices=['frc'], default='')
+    parser.add_argument("-batch",        "--batch",         type=int,   help="Particle batch size", default=1000)
     parser.add_argument("-maxptcl",      "--maxptcl",       type=int,   help="Maximum number of particles to write", default=None)
 
     args = parser.parse_args()
@@ -36,7 +36,7 @@ def main():
                  'maskalign':     args.maskalign,
                  'masksub':       args.masksub,
                  'maskstruct':    args.maskstruct,
-                 'norm':          args.norm,
+                 'batch':         args.batch,
                  'maxptcl':       args.maxptcl
                  }
 
@@ -87,7 +87,7 @@ def main():
     new_project.prepare_project()
 
     # Subtract class mrc from particle mrc
-    new_project.subtract_class_mrc(norms=[args_dict['norm']], max_ptcl=args_dict['maxptcl'])
+    new_project.subtract_class_mrc(max_ptcl=args_dict['maxptcl'], batch_size=args_dict['batch'])
 
     # Write output files
     new_project.write_output_files()

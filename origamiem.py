@@ -15,6 +15,8 @@ import mrcfile
 import subprocess
 import sys
 import scipy.ndimage
+import parallelem
+import multiprocessing
 
 from shutil import copyfile
 
@@ -623,6 +625,9 @@ class ProjectSubtract2D(Project):
     def __init__(self, name='EMParticleSubtract2D'):
         super().__init__(name)
 
+        # Instantenous class mrc
+        self.class_mrc = None
+
         # Mask files and objects
         self.mask_align_mrc_file     = None
         self.mask_structure_mrc_file = None
@@ -661,36 +666,31 @@ class ProjectSubtract2D(Project):
         self.structure_mean  = None
         self.structure_std   = None
 
-    def _subtract_class(self, class_mrc, ptcl_mrc, ptcl_star, norm=['frc']):
+        # Subtraction results
+        self.subtraction_results = []
+
+    def _subtract_class(self, class_mrc, ptcl_mrc, ptcl_star, mask_align_mrc, mask_structure_mrc, mask_subtract_mrc, norm=['']):
         '''
         Subtract class
         '''
-        self._inv_transform_imgs(class_mrc, ptcl_star)
+        self._inv_transform_imgs(class_mrc, ptcl_star, mask_align_mrc, mask_structure_mrc, mask_subtract_mrc)
         self._ctf_correct_class_img(class_mrc)
-        self._intensity_norm_class_img(class_mrc, ptcl_mrc)
-        self._calc_class_ptcl_frc(class_mrc, ptcl_mrc)
-        self._subtract_class_from_ptcl(class_mrc, ptcl_mrc, norm)
+        self._intensity_norm_class_img(class_mrc, ptcl_mrc, mask_align_mrc, mask_structure_mrc, mask_subtract_mrc)
+        if 'frc' in norm:
+            self._calc_class_ptcl_frc(class_mrc, ptcl_mrc, mask_structure_mrc)
+        self._subtract_class_from_ptcl(class_mrc, ptcl_mrc, mask_subtract_mrc, norm)
 
-    def _inv_transform_imgs(self, class_mrc, ptcl_star):
+    def _inv_transform_imgs(self, class_mrc, ptcl_star, mask_align_mrc, mask_structure_mrc, mask_subtract_mrc):
         '''
         Inverse transform imgs and masks
         '''
         # Inverse transform the masks
-        self.mask_align_mrc.inv_transform_ptcl_img2D(ptcl_star)
-        self.mask_structure_mrc.inv_transform_ptcl_img2D(ptcl_star)
-        self.mask_subtract_mrc.inv_transform_ptcl_img2D(ptcl_star)
+        mask_align_mrc.inv_transform_ptcl_img2D(ptcl_star)
+        mask_structure_mrc.inv_transform_ptcl_img2D(ptcl_star)
+        mask_subtract_mrc.inv_transform_ptcl_img2D(ptcl_star)
 
         # Inverse transform class img2D
         class_mrc.inv_transform_ptcl_img2D(ptcl_star)
-
-        # Set background mask
-        self.background_mask = self.mask_align_mrc.get_img2D() - self.mask_structure_mrc.get_img2D()
-
-        # Set structure mask
-        self.structure_mask = self.mask_structure_mrc.get_img2D()
-
-        # Set subtraction mask
-        self.subtract_mask = self.mask_subtract_mrc.get_img2D()
 
     def _ctf_correct_class_img(self, class_mrc):
         '''
@@ -708,34 +708,44 @@ class ProjectSubtract2D(Project):
         # Copy ifft to img2D
         class_mrc.copy_to_img2D(class_mrc.img2D_ifft)
 
-    def _intensity_norm_class_img(self, class_mrc, ptcl_mrc):
+    def _intensity_norm_class_img(self, class_mrc, ptcl_mrc, mask_align_mrc, mask_structure_mrc, mask_subtract_mrc):
         '''
         Intensity normalize class img2D
         '''
+
+        # Set background mask
+        background_mask = mask_align_mrc.get_img2D() - mask_structure_mrc.get_img2D()
+
+        # Set structure mask
+        structure_mask  = mask_structure_mrc.get_img2D()
+
+        # Set subtraction mask
+        subtract_mask   = mask_subtract_mrc.get_img2D()
+
         # Calculate background mean, std intensity
-        self.background_mean, self.background_std = ptcl_mrc.calc_mean_std_intensity(mask=self.background_mask)
+        background_mean, background_std = ptcl_mrc.calc_mean_std_intensity(mask=background_mask)
 
         # Calculate structure mean, std intensity
-        self.structure_mean, self.structure_std = ptcl_mrc.calc_mean_std_intensity(mask=self.structure_mask)
+        structure_mean, structure_std = ptcl_mrc.calc_mean_std_intensity(mask=structure_mask)
 
         # Calculate subtract mean, std intensity
-        self.subtract_mean, self.subtract_std = ptcl_mrc.calc_mean_std_intensity(mask=self.subtract_mask)
+        subtract_mean, subtract_std = ptcl_mrc.calc_mean_std_intensity(mask=subtract_mask)
 
         # Set background intensity to particle background mean intensity
-        class_mrc.normalize_bg_area_intensity(self.background_mask, self.background_mean, self.subtract_mask, self.subtract_mean)
+        class_mrc.normalize_bg_area_intensity(background_mask, background_mean, subtract_mask, subtract_mean)
 
         # Store the original class mrc
         class_mrc.subtract_ctf(class_mrc.img2D_ctf)
 
-    def _calc_class_ptcl_frc(self, class_mrc, ptcl_mrc):
+    def _calc_class_ptcl_frc(self, class_mrc, ptcl_mrc, mask_structure_mrc):
         '''
         Calculate class-ptcl frc
         '''
         # Take ptcl FFT
-        ptcl_mrc.fft_img2D(self.structure_mask)
+        ptcl_mrc.fft_img2D(mask_structure_mrc.get_img2D())
 
         # Take class FFT
-        class_mrc.fft_img2D(self.structure_mask)
+        class_mrc.fft_img2D(mask_structure_mrc.get_img2D())
 
         # CTF correct class img
         class_mrc.correct_fft_ctf()
@@ -743,13 +753,13 @@ class ProjectSubtract2D(Project):
         # Calculate FRC
         class_mrc.calc_frc(ptcl_mrc)
 
-    def _subtract_class_from_ptcl(self, class_mrc, ptcl_mrc, norm=['frc']):
+    def _subtract_class_from_ptcl(self, class_mrc, ptcl_mrc, mask_subtract_mrc, norm=['']):
         '''
         Subtract class from
         '''
 
         # Take class FFT
-        class_mrc.fft_img2D(self.mask_subtract_mrc.get_img2D())
+        class_mrc.fft_img2D(mask_subtract_mrc.get_img2D())
 
         # CTF correct class image
         class_mrc.correct_fft_ctf()
@@ -766,6 +776,33 @@ class ProjectSubtract2D(Project):
         # Subtract the class image from ptcl image
         ptcl_mrc.subtract_from_img2D(data=class_mrc.get_img2D())
 
+    def write_results(self):
+        '''
+        Write results
+        '''
+        while len(self.subtraction_results) > 0:
+            ptcl_result, ptcl_index = self.subtraction_results.pop(0)
+            ptcl_img2D = ptcl_result.get()
+            # Append image
+            self.subtracted_mrc.append_img(ptcl_img2D, ptcl_index)
+
+            # Create new imagename
+            new_image_name = '%07d@%s' % (ptcl_index+1, self.subtracted_mrc_file)
+            self.subtracted_star.data_block.loc[ptcl_index, 'rlnImageName'] = new_image_name
+
+    def duplicate_imgs(self):
+        '''
+        Duplicate images for parallel processing
+        '''
+        ctf_a                = self.class_mrc.ctf_a.copy()
+        ctf_s                = self.class_mrc.ctf_s.copy()
+        class_img2D          = self.class_mrc.get_img2D().copy()
+        mask_align_img2D     = self.mask_align_mrc.get_img2D().copy()
+        mask_structure_img2D = self.mask_structure_mrc.get_img2D().copy()
+        mask_subtract_img2D  = self.mask_subtract_mrc.get_img2D().copy()
+
+        return ctf_a, ctf_s, class_img2D, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D
+
     def create_threshold_mask(self, class_mrc, threshold=0.05):
         '''
         Create threshold mask
@@ -773,12 +810,49 @@ class ProjectSubtract2D(Project):
         if self.threshold_mask is None:
             self.threshold_mask = class_mrc.make_threshold_mask(threshold=threshold)
 
-    def add_noise(self, max_ptcl=None):
+    def process_subtract(self, ptcl_counter, ptcl_index, norms=['']):
         '''
-        Replace the subtraction mask with random noise
+        Subtraction process for multiprocessing
         '''
+        # Get particle star
+        ptcl_star = self.particle_star.data_block.loc[ptcl_index, :]
 
-    def subtract_class_mrc(self, norms=['frc'], threshold_val=0.05, max_ptcl=None):
+        # Copy the temp mrc files
+        class_mrc          = self.class_mrc.copy()
+        mask_align_mrc     = self.mask_align_mrc.copy()
+        mask_subtract_mrc  = self.mask_subtract_mrc.copy()
+        mask_structure_mrc = self.mask_structure_mrc.copy()
+
+        # Read particle data
+        particle_image_num, particle_image_name = ptcl_star['rlnImageName'].split('@')
+
+        # Get particle image
+        particle_mrc = MRC(particle_image_name, int(particle_image_num)-1)
+
+        # Determine CTF
+        class_mrc.eval_ptcl_ctf(ptcl_star, bf=0, lp=2*self.particle_apix)
+
+        # Compare class to ptcl
+        self._subtract_class(class_mrc, particle_mrc, ptcl_star, mask_align_mrc, mask_structure_mrc, mask_subtract_mrc, norm=norms)
+
+        # Append image
+        self.subtracted_mrc.append_img(particle_mrc.img2D, ptcl_index)
+
+        # Create new imagename
+        new_image_name = '%07d@%s' % (ptcl_index, self.subtracted_mrc_file)
+        self.subtracted_star.data_block.loc[ptcl_index, 'rlnImageName'] = new_image_name
+
+    def read_ptcl_mrc(self, ptcl_star):
+
+        # Read particle data
+        particle_image_num, particle_image_name = ptcl_star['rlnImageName'].split('@')
+
+        # Get particle image
+        particle_mrc = MRC(particle_image_name, int(particle_image_num)-1)
+
+        return particle_mrc
+
+    def subtract_class_mrc(self, threshold_val=0.05, max_ptcl=None, batch_size=100):
         '''
         Subtract class mrc file
         '''
@@ -795,26 +869,33 @@ class ProjectSubtract2D(Project):
         # Particle counter
         particle_counter = 0
 
+        # Create a pool
+        mp_pool = multiprocessing.Pool()
+
+        # Results container
+        self.subtraction_results = []
+
         # Iterate over each class
         for class_index, class_row in class_data_block.iterrows():
             class_image_num, class_image_name = self.ref_class_star.get_image_num_name(class_index)
 
             # Read image
-            class_mrc = MRC(class_image_name, int(class_image_num)-1)
+            self.class_mrc = MRC(class_image_name, int(class_image_num)-1)
 
             # Store to original
-            class_mrc.store_to_original()
+            self.class_mrc.store_to_original()
 
             # Prepare for CTF
-            class_mrc.eval_ctf_grid(self.particle_apix)
+            self.class_mrc.eval_ctf_grid(self.particle_apix)
 
             # Get class numbers for the current class
             current_class_number = class_row['rlnClassNumber']
             class_mask           = particle_data_block['rlnClassNumber'] == current_class_number
             particle_data        = particle_data_block.loc[class_mask, :]
+            num_ptcls            = particle_data_block.shape[0]
 
             # Make threshold mask
-            self.threshold_mask = class_mrc.make_threshold_mask(threshold=threshold_val)
+            self.threshold_mask = self.class_mrc.make_threshold_mask(threshold=threshold_val)
             if self.mask_structure_mrc_file is None:
                 self.mask_structure_mrc = MRC()
                 self.mask_structure_mrc.set_img2D(self.threshold_mask)
@@ -828,35 +909,36 @@ class ProjectSubtract2D(Project):
                 if max_ptcl is not None and particle_counter > max_ptcl:
                     break
 
-                # Set the originals
-                class_mrc.store_from_original()
-                self.mask_align_mrc.store_from_original()
-                self.mask_subtract_mrc.store_from_original()
-                self.mask_structure_mrc.store_from_original()
+                print('Subtracting Particle %d/%d %d/100' % (particle_counter,
+                                                             num_ptcls,
+                                                             100.0*particle_counter/num_ptcls))
 
-                # Read particle data
-                particle_image_num, particle_image_name = self.particle_star.get_image_num_name(ptcl_index)
+                # Copy masks and images
+                (ctf_a,
+                 ctf_s,
+                 class_img2D,
+                 mask_align_img2D,
+                 mask_structure_img2D,
+                 mask_subtract_img2D) = self.duplicate_imgs()
 
-                print('Particle %d/%d %.2f Subtracting %08d@%s' % (particle_counter,
-                                                                   particle_data_block.shape[0],
-                                                                   1.0*particle_counter/particle_data_block.shape[0],
-                                                                   particle_image_num, particle_image_name))
-                # Get particle image
-                particle_mrc = MRC(particle_image_name, particle_image_num-1)
+                # Create a new process
+                worker_result = mp_pool.apply_async(parallelem.subtract_class, args=(class_img2D,
+                                                                                     ctf_a,
+                                                                                     ctf_s,
+                                                                                     ptcl_row,
+                                                                                     mask_align_img2D,
+                                                                                     mask_structure_img2D,
+                                                                                     mask_subtract_img2D,
+                                                                                     self.particle_apix,))
 
-                # Determine CTF
-                class_mrc.eval_ptcl_ctf(ptcl_row, bf=0, lp=2*self.particle_apix)
+                self.subtraction_results.append([worker_result, ptcl_index])
 
-                # Compare class to ptcl
-                self._subtract_class(class_mrc, particle_mrc, ptcl_row, norm=norms)
+                # Write results
+                if len(self.subtraction_results) == batch_size:
+                    self.write_results()
 
-                # Append image
-                particle_mrc.transform_ptcl_img2D(ptcl_row)
-                self.subtracted_mrc.append_img(particle_mrc.img2D, ptcl_index)
-
-                # Create new imagename
-                new_image_name = '%08d@%s' % (ptcl_index, self.subtracted_mrc_file)
-                self.subtracted_star.data_block.loc[ptcl_index, 'rlnImageName'] = new_image_name
+        # Complete writing the remainings
+        self.write_results()
 
         # Close the output files and write
         self.subtracted_star.write(self.subtracted_star_file)
@@ -872,7 +954,7 @@ class ProjectSubtract2D(Project):
 
     def read_masks(self):
         '''
-        Read masks
+        Read masks    def subtract_class_mrc()                :855
         '''
         # 1. Alignment mask - ideally a circular mask
         if self.mask_align_mrc_file is not None:
@@ -1146,19 +1228,11 @@ class MRC:
         self.img2D_original   = None
 
         self.img2D            = None
-        self.img2D_ref        = None
-        self.img2D_sub        = None
-
-        self.img2D_ref_fft    = None
-        self.img2D_sub_fft    = None
-
-        self.img2D_ref_ifft   = None
-        self.img2D_sub_ifft   = None
+        self.img2D_fft        = None
+        self.img2D_ifft       = None
 
         self.img2D_pshift     = None
         self.img2D_ctf        = None
-
-        self.img2D_subtracted = None
 
         # CTF grid parameters
         self.ctf_s            = None
@@ -1195,6 +1269,21 @@ class MRC:
                 self.read(file, image_num)
             else:
                 self.create(file, shape)
+
+    def copy(self):
+        '''
+        Copy contents of other mrc to current one
+        '''
+        other = MRC()
+        other.img2D_original = np.copy(self.img2D_original)
+        other.img2D          = np.copy(self.img2D_original)
+        other.ctf_s          = np.copy(self.ctf_s)
+        other.ctf_sx         = np.copy(self.ctf_sx)
+        other.ctf_sy         = np.copy(self.ctf_sy)
+        other.ctf_a          = np.copy(self.ctf_a)
+        other.ctf_r          = np.copy(self.ctf_r)
+
+        return other
 
     def normalize_bg_area_intensity(self, mask_bg, new_val_bg, mask_area, new_val_area):
         '''

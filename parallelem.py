@@ -1,0 +1,340 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# @Date    : 2019-01-21 08:17:52
+# @Author  : Your Name (you@example.org)
+# @Link    : http://example.org
+# @Version : $Id$
+
+import mrcfile
+import numpy as np
+import scipy.ndimage
+
+
+def read_ptcl_mrc(ptcl_star):
+    '''
+    Particle mrc data
+    '''
+
+    # Read particle data
+    particle_image_num, particle_image_name = ptcl_star['rlnImageName'].split('@')
+
+    with mrcfile.mmap(particle_image_name, mode='r') as mrc_data:
+        img2D    =  mrc_data.data[int(particle_image_num)-1]
+
+    return img2D
+
+
+def write_img2D(img2D, ptcl_mrc, ptcl_index):
+    '''
+    Write img2D
+    '''
+    ptcl_mrc.data[ptcl_index] = img2D
+
+
+def fft_img2D(img2D, mask=None):
+    '''
+    Take fft of image
+    '''
+    if mask is not None and mask.shape == img2D.shape:
+            img2D_fft = np.fft.fft2(mask*img2D)
+    else:
+            img2D_fft = np.fft.fft2(img2D)
+
+    return img2D_fft
+
+
+def ifft_img2D(fft2D):
+    '''
+    Take ifft of a fft
+    '''
+    return np.real(np.fft.ifft2(fft2D))
+
+
+def rotate_img2D(img2D, angle):
+        '''
+        Rotate img2D by an eularangle
+        '''
+        return scipy.ndimage.rotate(img2D, angle=-angle, axes=(0, 1), reshape=False)
+
+
+def shift_img2D(img2D, shiftX, shiftY):
+    '''
+    Shift img2D by a vector
+    '''
+    return scipy.ndimage.shift(img2D, shift=[shiftY, shiftX])
+
+
+def inv_rotate_ptcl_img2D(img2D, ptcl_star):
+    '''
+    Inverse rotation based on ptcl data
+    '''
+    psi = ptcl_star['rlnAnglePsi']
+    return rotate_img2D(img2D, -psi)
+
+
+def inv_shift_ptcl_img2D(img2D, ptcl_star):
+    '''
+    Inverse shift based on ptcl data
+    '''
+    originX = ptcl_star['rlnOriginX']
+    originY = ptcl_star['rlnOriginY']
+
+    return shift_img2D(img2D, -originX, -originY)
+
+
+def inv_transform_ptcl_img2D(img2D, ptcl_star):
+    '''
+    Inverse ptcl transform
+    '''
+
+    img2D_tr = inv_rotate_ptcl_img2D(img2D, ptcl_star)
+    return inv_shift_ptcl_img2D(img2D_tr, ptcl_star)
+
+
+def transform_ptcl_img2D(img2D, ptcl_star):
+    img2D_tr = shift_ptcl_img2D(img2D, ptcl_star)
+    return rotate_ptcl_img2D(img2D_tr, ptcl_star)
+
+
+def rotate_ptcl_img2D(img2D, ptcl_star):
+    '''
+    Rotation based on ptcl data
+    '''
+    psi = ptcl_star['rlnAnglePsi']
+    return rotate_img2D(img2D, psi)
+
+
+def shift_ptcl_img2D(img2D, ptcl_star):
+    '''
+    Shift based on ptcl data
+    '''
+    originX = ptcl_star['rlnOriginX']
+    originY = ptcl_star['rlnOriginY']
+
+    return shift_img2D(img2D, originX, originY)
+
+
+def eval_ptcl_ctf(ctf_s, ctf_a, ptcl_star, bf=0, lp=0.0):
+    '''
+    Determine ctf from particle data
+    '''
+    defU       = ptcl_star['rlnDefocusU']
+    defV       = ptcl_star['rlnDefocusV']
+    defA       = ptcl_star['rlnDefocusAngle']
+    phaseShift = ptcl_star['rlnPhaseShift']
+    kV         = ptcl_star['rlnVoltage']
+    ac         = ptcl_star['rlnAmplitudeContrast']
+    cs         = ptcl_star['rlnSphericalAberration']
+
+    return eval_ctf(ctf_s, ctf_a, defU, defV, defA, phaseShift, kV, ac, cs, bf, lp)
+
+
+def subtract_ctf(img2D, ctf):
+    '''
+    Subtract ctf from img2D
+    '''
+    fft2D  = fft_img2D(img2D)
+    fft2D  = fft2D/ctf
+    ifft2D = ifft_img2D(fft2D)
+    return ifft2D
+
+
+def correct_fft_ctf(fft2D, ctf):
+    '''
+    Correct ctf
+    '''
+    return fft2D*ctf
+
+
+def eval_ctf(ctf_s, ctf_a, defU, defV, defA=0, phaseShift=0, kv=300, ac=0.1, cs=2.0, bf=0, lp=0):
+    '''
+    :param defU: 1st prinicipal underfocus distance (Å).
+    :param defV: 2nd principal underfocus distance (Å).
+    :param defA: Angle of astigmatism (deg) from x-axis to azimuth.
+    :param phaseShift: Phase shift (deg).
+    :param kv:  Microscope acceleration potential (kV).
+    :param ac:  Amplitude contrast in [0, 1.0].
+    :param cs:  Spherical aberration (mm).
+    :param bf:  B-factor, divided by 4 in exponential, lowpass positive.
+    :param lp:  Hard low-pass filter (Å), should usually be Nyquist.
+    '''
+
+    # parameter unit conversions
+    defA = np.deg2rad(defA)
+    kv = kv * 1e3
+    cs = cs * 1e7
+    lamb = 12.2643247 / np.sqrt(kv * (1. + kv * 0.978466e-6))
+    def_avg = -(defU + defV) * 0.5
+    def_dev = -(defU - defV) * 0.5
+
+    # k paramaters
+    k1 = np.pi / 2. * 2 * lamb
+    k2 = np.pi / 2. * cs * lamb**3
+    k3 = np.sqrt(1 - ac**2)
+    k4 = bf / 4.                # B-factor, follows RELION convention.
+    k5 = np.deg2rad(phaseShift)  # Phase shift.
+
+    # Hard low-pass filter
+    if lp != 0:
+        s = ctf_s*(ctf_s <= (1. / lp))
+    else:
+        s = ctf_s
+
+    s2 = s**2
+    s4 = s2**2
+    dZ = def_avg + def_dev * (np.cos(2 * (ctf_a - defA)))
+    gamma = (k1 * dZ * s2) + (k2 * s4) - k5
+
+    # Determine ctf
+    img2D_ctf = -(k3 * np.sin(gamma) - ac*np.cos(gamma))
+
+    # Enforce envelope
+    if bf != 0:
+        img2D_ctf *= np.exp(-k4 * s2)
+
+    return img2D_ctf
+
+
+def calc_mean_std_intensity(img2D, mask):
+    '''
+    Calculate mean and std intensity
+    '''
+    if mask is not None and mask.shape == img2D.shape:
+        mean_intensity = np.mean(img2D[mask > 0])
+        std_intensity  = np.std(img2D[mask > 0])
+    else:
+        mean_intensity = np.mean(img2D)
+        std_intensity  = np.std(img2D)
+
+    return mean_intensity, std_intensity
+
+
+def normalize_intensity(img2D, mask=None, new_mean=0, new_std=None):
+    '''
+    Normalize intensity to match a new gauss-distribution
+    '''
+    mean_intensity, std_intensity = calc_mean_std_intensity(img2D, mask)
+
+    # Adjust the mean and std-values value
+    # Zero mean value
+    img2D -= mean_intensity
+
+    # Adjust stdev
+    if new_std is not None:
+        img2D *= new_std/std_intensity
+
+    # Bring mean value to new mean-value
+    img2D += new_mean
+
+    return img2D
+
+
+def normalize_bg_area_intensity(img2D, mask_bg, new_val_bg, mask_area, new_val_area):
+    '''
+    Normalize the intensity - background and an area of interest
+    '''
+    # Get the background intensity
+    background_intensity = np.mean(img2D[mask_bg > 0])
+
+    # Subtract background intensity
+    img2D -= background_intensity
+
+    # Get the area intensity
+    area_intensity = np.mean(img2D[mask_area > 0])
+
+    # Normalize the area intensity
+    img2D    *= (new_val_area-new_val_bg)/area_intensity
+
+    # Finally add the new background intenstiy
+    img2D    += new_val_bg
+
+    return img2D
+
+
+def subtract_class(class_img2D, ctf_a, ctf_s, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D, apix):
+    '''
+    Subtract class
+    '''
+    ptcl_img2D  = read_ptcl_mrc(ptcl_star)
+    class_ctf   = eval_ptcl_ctf(ctf_s, ctf_a, ptcl_star, bf=0, lp=2*apix)
+    class_img2D, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D = inv_transform_imgs(class_img2D, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D)
+    class_img2D = ctf_correct_class_img(class_img2D, class_ctf)
+    class_img2D = intensity_norm_class_img(class_img2D, class_ctf, ptcl_img2D, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D)
+    ptcl_img2D  = subtract_class_from_ptcl(class_img2D, class_ctf, ptcl_img2D, mask_subtract_img2D)
+
+    return ptcl_img2D
+
+
+def inv_transform_imgs(class_img2D, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D):
+    '''
+    Inverse transform imgs and masks
+    '''
+    # Inverse transform the masks
+    mask_align_img2D = inv_transform_ptcl_img2D(mask_align_img2D, ptcl_star)
+    mask_structure_img2D = inv_transform_ptcl_img2D(mask_structure_img2D, ptcl_star)
+    mask_subtract_img2D = inv_transform_ptcl_img2D(mask_subtract_img2D, ptcl_star)
+
+    # Inverse transform class img2D
+    class_img2D = inv_transform_ptcl_img2D(class_img2D, ptcl_star)
+
+    return class_img2D, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D
+
+
+def ctf_correct_class_img(class_img2D, class_ctf):
+    '''
+    Compare class to ptcl and adjust intensities
+    '''
+    # Take class FFT
+    class_fft2D = fft_img2D(class_img2D)
+
+    # CTF correct
+    class_fft2D = correct_fft_ctf(class_fft2D, class_ctf)
+
+    # Take inverse FFT
+    class_img2D = ifft_img2D(class_fft2D)
+
+    return class_img2D
+
+
+def intensity_norm_class_img(class_img2D, class_ctf, ptcl_img2D, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D):
+    '''
+    Intensity normalize class img2D
+    '''
+
+    # Set background mask
+    mask_background_img2D = mask_align_img2D - mask_structure_img2D
+
+    # Calculate background mean, std intensity
+    background_mean, background_std = calc_mean_std_intensity(ptcl_img2D, mask_background_img2D)
+
+    # Calculate structure mean, std intensity
+    structure_mean, structure_std = calc_mean_std_intensity(ptcl_img2D, mask_structure_img2D)
+
+    # Calculate subtract mean, std intensity
+    subtract_mean, subtract_std = calc_mean_std_intensity(ptcl_img2D, mask_subtract_img2D)
+
+    # Set background intensity to particle background mean intensity
+    class_img2D = normalize_bg_area_intensity(class_img2D, mask_background_img2D, background_mean, mask_subtract_img2D, subtract_mean)
+
+    # Store the original class mrc
+    class_img2D = subtract_ctf(class_img2D, class_ctf)
+
+    return class_img2D
+
+
+def subtract_class_from_ptcl(class_img2D, class_ctf, ptcl_img2D, mask_subtract_img2D):
+    '''
+    Subtract class from
+    '''
+
+    # Take class FFT
+    class_fft2D = fft_img2D(class_img2D, mask_subtract_img2D)
+
+    # CTF correct class image
+    class_fft2D = correct_fft_ctf(class_fft2D, class_ctf)
+
+    # Take inverse FFT
+    class_img2D = ifft_img2D(class_fft2D)
+
+    # Subtract the class image from ptcl image
+    return ptcl_img2D - class_img2D
