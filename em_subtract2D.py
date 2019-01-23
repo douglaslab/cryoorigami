@@ -23,7 +23,7 @@ def main():
     parser.add_argument("-maskalign",    "--maskalign",     type=str,   help="Mask used for 2D classification", default=None)
     parser.add_argument("-masksub",      "--masksub",       type=str,   help="Mask used for the subtraction", default=None)
     parser.add_argument("-maskstruct",   "--maskstruct",    type=str,   help="Maks that defines the boundaries of structure", default=None)
-    parser.add_argument("-batch",        "--batch",         type=int,   help="Particle batch size", default=1000)
+    parser.add_argument("-batch",        "--batch",         type=int,   help="Particle batch size", default=100)
     parser.add_argument("-maxptcl",      "--maxptcl",       type=int,   help="Maximum number of particles to write", default=None)
     parser.add_argument("-method",       "--method",        type=str,   help="Particle subtraction method", choices=['subctf', 'cropctf', 'crop'], default='subctf')
 

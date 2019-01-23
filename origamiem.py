@@ -103,6 +103,10 @@ class Project:
         self.relion_norm_exe      = 'relion_preprocess'
         self.relion_norm_args     = []
 
+        self.relion_image_handler_exe = 'relion_image_handler'
+        self.relion_flip_args         = []
+        self.relion_noflip_args       = []
+
         # Particles and class2D models
         self.particles = []
         self.class2Ds  = []
@@ -578,6 +582,13 @@ class Project:
         relion_process = subprocess.run(['which', 'relion_preprocess'], stdout=subprocess.PIPE, universal_newlines=True)
         self.relion_norm_exe = relion_process.stdout.strip()
 
+    def set_relion_image_handler_exe(self):
+        '''
+        Set relion image handler exe
+        '''
+        relion_process = subprocess.run(['which', 'relion_image_handler'], stdout=subprocess.PIPE, universal_newlines=True)
+        self.relion_image_handler_exe = relion_process.stdout.strip()
+
     def set_relion_stack_create_exe(self):
         relion_process = subprocess.run(['which', 'relion_stack_create'], stdout=subprocess.PIPE, universal_newlines=True)
         self.relion_stack_create_exe = relion_process.stdout.strip()
@@ -616,6 +627,298 @@ class Project:
 
             # Read image
             self.first_particle_mrc = MRC(image_name, int(image_num)-1)
+
+    def read_ptcl_mrc(self, ptcl_star):
+
+        # Read particle data
+        particle_image_num, particle_image_name = ptcl_star['rlnImageName'].split('@')
+
+        # Get particle image
+        particle_mrc = MRC(particle_image_name, int(particle_image_num)-1)
+
+        return particle_mrc
+
+
+class ProjectFlip(Project):
+    '''
+    Particle flip project
+    '''
+    def __init__(self, name='EMParticleFlip'):
+        super().__init__(name)
+
+        self.flipped_mrc_file = None
+        self.flipped_mrc      = None
+
+        self.flipped_star_file = None
+        self.flipped_star      = None
+
+        self.flipped_results   = []
+
+        # For relion
+        self.tmp1_star_file = None
+        self.tmp2_star_file = None
+
+        self.tmp_flip_star_file   = None
+        self.tmp_noflip_star_file = None
+
+        self.tmp_flip_star   = None
+        self.tmp_noflip_star = None
+
+        self.combined_flip_star = None
+
+        # Relion arguments
+        self.relion_flip_args   = []
+
+        # Flip and noflip stars for merge project
+        self.flip_star   = None
+        self.noflip_star = None
+
+    def read_flip_star(self, flip_star_file):
+        '''
+        Read flip star file
+        '''
+        if os.path.isfile(flip_star_file):
+            self.flip_star =  Star(flip_star_file)
+
+    def read_noflip_star(self, noflip_star_file):
+        '''
+        Read noflip star file
+        '''
+        if os.path.isfile(noflip_star_file):
+            self.noflip_star = Star(noflip_star_file)
+
+    def prepare_merge_project(self, flip_star_file, noflip_star_file):
+        '''
+        prepare merge project
+        '''
+        combined_flip_star_file = os.path.relpath(os.path.abspath(self.output_directory+'/particle_combined.star'))
+        self.read_flip_star(flip_star_file)
+        self.read_noflip_star(noflip_star_file)
+
+        # Create and set rlnIsFlip column
+        self.flip_star.set_column(label='rlnIsFlip', value=1)
+        self.noflip_star.set_column(label='rlnIsFlip', value=0)
+
+        # Get first data block
+        flip_data_block   = self.flip_star.get_data_block()
+        noflip_data_block = self.noflip_star.get_data_block()
+
+        # Create merge project
+        combined_star = Star()
+        combined_star.set_data_block(pd.concat([flip_data_block, noflip_data_block]))
+
+        # Write the combined file
+        combined_star.write(combined_flip_star_file)
+
+    def prepare_output_files(self):
+        # Copy input file to output directory
+        if self.particle_star_file is not None:
+            head, tail = os.path.split(self.particle_star_file)
+            root, ext  = os.path.splitext(tail)
+
+            self.flipped_mrc_file  = os.path.relpath(os.path.abspath(self.output_directory+'/flipped.mrcs'))
+            self.flipped_star_file = os.path.relpath(os.path.abspath(self.output_directory+'/flipped.star'))
+
+    def create_output_mrc(self):
+        if self.flipped_mrc is None:
+            # Determine shape parameters
+            num_particles = self.particle_star.data_block.shape[0]
+            NY, NX        = self.first_particle_mrc.img2D.shape
+
+            # Create output MRC file
+            self.flipped_mrc = MRC(file=self.flipped_mrc_file, shape=(num_particles, NY, NX))
+
+    def create_output_star(self):
+        if self.flipped_star is None:
+            self.flipped_star = Star()
+            self.flipped_star.copy(self.particle_star)
+
+    def prepare_project(self):
+        '''
+        Prepare project
+        '''
+        self.read_first_particle_mrc()
+        self.prepare_output_files()
+        self.create_output_mrc()
+        self.create_output_star()
+
+    def set_relion_args(self):
+        '''
+        Set relion arguments
+        '''
+        self.relion_flip_args = [self.relion_image_handler_exe,
+                                 '--i', self.tmp1_star_file,
+                                 '--o', 'flip',
+                                 '--flipX']
+
+        self.relion_noflip_args = [self.relion_image_handler_exe,
+                                   '--i', self.tmp2_star_file,
+                                   '--o', 'noflip']
+
+    def prepare_project_relion(self):
+        '''
+        Prepare relion project
+        '''
+        self.create_files_relion()
+        self.set_relion_image_handler_exe()
+        self.set_relion_args()
+        self.split_star_relion()
+
+    def write_results(self):
+        '''
+        Write results
+        '''
+        # Get number of particles
+        num_ptcls = len(self.flipped_results)
+
+        # Show status
+        print('Writing  %d particles' % (num_ptcls))
+
+        # Get all the data
+        ptcl_list = [ptcl_index for ptcl_result, ptcl_index in self.flipped_results]
+        ptcl_data = [ptcl_result.get() for ptcl_result, ptcl_index in self.flipped_results]
+
+        # Write mrc file
+        self.flipped_mrc.mrc_data.data[ptcl_list] = ptcl_data
+
+        # Write star file
+        new_image_names = []
+        for ptcl_index in ptcl_list:
+            new_image_names.append('%07d@%s' % (ptcl_index+1, self.flipped_mrc_file))
+
+        self.flipped_star.data_block.loc[ptcl_list, 'rlnImageName'] = new_image_names
+
+        # Reset the containers
+        self.flipped_results = []
+
+    def create_files_relion(self):
+        '''
+        Create tmp files
+        '''
+        if self.particle_star_file is not None:
+            head, tail = os.path.split(self.particle_star_file)
+            root, ext  = os.path.splitext(tail)
+
+            self.tmp1_star_file = os.path.relpath(os.path.abspath(self.output_directory+'/particle_tmp1.star'))
+            self.tmp2_star_file = os.path.relpath(os.path.abspath(self.output_directory+'/particle_tmp2.star'))
+
+            self.tmp_flip_star_file   = os.path.relpath(os.path.abspath(self.output_directory+'/particle_tmp1_flip.star'))
+            self.tmp_noflip_star_file = os.path.relpath(os.path.abspath(self.output_directory+'/particle_tmp2_noflip.star'))
+
+            self.combined_flip_star_file = os.path.relpath(os.path.abspath(self.output_directory+'/particle_combined.star'))
+
+    def merge_star_relion(self):
+        '''
+        Merge the tmp star files
+        '''
+        # Make star files
+        star1 = Star(self.tmp_flip_star_file)
+        star2 = Star(self.tmp_noflip_star_file)
+
+        # For star1 update the geometry parameters to reflect the flip operation
+        star1.flipX()
+
+        # Get first data block
+        star1_data_block = star1.get_data_block()
+        star2_data_block = star2.get_data_block()
+
+        # Data block list
+        data_block_list = []
+        if star1_data_block is not None:
+            data_block_list.append(star1_data_block)
+        if star2_data_block is not None:
+            data_block_list.append(star2_data_block)
+
+        combined_data_block = pd.concat(data_block_list)
+
+        # Make a combined star file
+        combined_star = Star()
+        combined_star.set_data_block(combined_data_block)
+        combined_star.write(self.combined_flip_star_file)
+
+    def split_star_relion(self):
+        '''
+        Split star file
+        '''
+        # Get particle data block
+        particle_data_block = self.particle_star.get_data_block()
+
+        # Make the masks
+        if 'rlnIsFlip' in particle_data_block:
+            flip_mask   = particle_data_block['rlnIsFlip'] == 1
+            noflip_mask = particle_data_block['rlnIsFlip'] == 0
+
+            # Make star files
+            star1 = Star()
+            star1.set_data_block(particle_data_block.loc[flip_mask, :])
+            star1.write(self.tmp1_star_file)
+
+            star2 = Star()
+            star2.set_data_block(particle_data_block.loc[noflip_mask, :])
+            star2.write(self.tmp2_star_file)
+        else:
+            self.particle_star.add_column('rlnIsFlip')
+            self.particle_star.write(self.tmp2_star_file)
+
+    def flip_particles_relion(self):
+        '''
+        Flip particles using relion
+        '''
+        if len(self.relion_image_handler_exe) > 0:
+
+            # Execute only if the file exists
+            if os.path.isfile(self.tmp1_star_file):
+                self.relion_flip_subprocess = subprocess.run(self.relion_flip_args,
+                                                             universal_newlines=True)
+            if os.path.isfile(self.tmp2_star_file):
+                self.relion_noflip_subprocess = subprocess.run(self.relion_noflip_args,
+                                                               universal_newlines=True)
+        else:
+            sys.exit('Relion image handler doesnt exist')
+
+        # Merge the star files
+        self.merge_star_relion()
+
+    def flip_particles(self, batch_size=50):
+        '''
+        Flip particles
+        '''
+        particle_data_block = self.particle_star.get_data_block()
+
+        # Create a pool
+        mp_pool = multiprocessing.Pool()
+
+        # Initialize results list
+        self.flipped_results = []
+
+        # Get number of particles
+        num_ptcls = particle_data_block.shape[0]
+
+        # Iterate over all the particles
+        for ptcl_index, ptcl_row in particle_data_block.iterrows():
+
+            print('Flipping Particle %d/%d %d/100' % (ptcl_index+1,
+                                                      num_ptcls,
+                                                      100.0*(ptcl_index+1)/num_ptcls))
+
+            # Create a new process
+            worker_result = mp_pool.apply_async(parallelem.flipX_ptcl, args=(ptcl_row,))
+
+            self.flipped_results.append([worker_result, ptcl_index])
+
+            # Write results
+            if len(self.flipped_results) == batch_size:
+                self.write_results()
+
+        # Complete writing the remainings
+        self.write_results()
+
+        # Flip star file parameters
+        self.flipped_star.flipX()
+
+        # Close the output files and write
+        self.flipped_star.write(self.flipped_star_file)
+        self.flipped_mrc.close()
 
 
 class ProjectSubtract2D(Project):
@@ -785,15 +1088,28 @@ class ProjectSubtract2D(Project):
         '''
         Write results
         '''
-        while len(self.subtraction_results) > 0:
-            ptcl_result, ptcl_index = self.subtraction_results.pop(0)
-            ptcl_img2D = ptcl_result.get()
-            # Append image
-            self.subtracted_mrc.append_img(ptcl_img2D, ptcl_index)
+        # Get number of particles
+        num_ptcls = len(self.subtraction_results)
 
-            # Create new imagename
-            new_image_name = '%07d@%s' % (ptcl_index+1, self.subtracted_mrc_file)
-            self.subtracted_star.data_block.loc[ptcl_index, 'rlnImageName'] = new_image_name
+        # Show status
+        print('Writing  %d particles' % (num_ptcls))
+
+        # Get all the data
+        ptcl_list = [ptcl_index for ptcl_result, ptcl_index in self.subtraction_results]
+        ptcl_data = [ptcl_result.get() for ptcl_result, ptcl_index in self.subtraction_results]
+
+        # Write mrc file
+        self.subtracted_mrc.mrc_data.data[ptcl_list] = ptcl_data
+
+        # Write star file
+        new_image_names = []
+        for ptcl_index in ptcl_list:
+            new_image_names.append('%07d@%s' % (ptcl_index+1, self.subtracted_mrc_file))
+
+        self.subtracted_star.data_block.loc[ptcl_list, 'rlnImageName'] = new_image_names
+
+        # Reset the containers
+        self.subtraction_results = []
 
     def duplicate_imgs(self):
         '''
@@ -844,16 +1160,6 @@ class ProjectSubtract2D(Project):
         # Create new imagename
         new_image_name = '%07d@%s' % (ptcl_index, self.subtracted_mrc_file)
         self.subtracted_star.data_block.loc[ptcl_index, 'rlnImageName'] = new_image_name
-
-    def read_ptcl_mrc(self, ptcl_star):
-
-        # Read particle data
-        particle_image_num, particle_image_name = ptcl_star['rlnImageName'].split('@')
-
-        # Get particle image
-        particle_mrc = MRC(particle_image_name, int(particle_image_num)-1)
-
-        return particle_mrc
 
     def subtract_class_mrc(self, threshold_val=0.05, max_ptcl=None, batch_size=100, subtract_func='subctf'):
         '''
@@ -1275,6 +1581,12 @@ class MRC:
                 self.read(file, image_num)
             else:
                 self.create(file, shape)
+
+    def flipX(self):
+        '''
+        Flip on X-axis
+        '''
+        self.img2D = self.img2D[:, ::-1]
 
     def copy(self):
         '''
@@ -1942,8 +2254,14 @@ class Star(EMfile):
         self.mic_apix      = 1.82
 
         # Read file
-        if file is not None:
+        if file is not None and os.path.isfile(file):
             self.read(file)
+
+    def set_data_block(self, data):
+        '''
+        Set data block
+        '''
+        self.data_block = data.copy()
 
     def replace_with_unmasked_classes(self):
         '''
@@ -1983,8 +2301,11 @@ class Star(EMfile):
 
         if self.has_label('rlnIsFlip'):
             valid_rows = self.data_block['rlnIsFlip'] == 1
-        else:
+        elif self.data_block is not None:
             valid_rows = np.arange(self.data_block.shape[0])
+            self.add_column('rlnIsFlip')
+        else:
+            valid_rows = None
 
         # Invert X
         if self.has_label('rlnOriginX'):
@@ -2372,7 +2693,7 @@ class Star(EMfile):
         '''
         Check if the label exists in data frame
         '''
-        if label in self.data_block.columns:
+        if self.data_block is not None and label in self.data_block.columns:
             return True
         else:
             return False

@@ -10,6 +10,37 @@ import numpy as np
 import scipy.ndimage
 
 
+def flipX_ptcl(ptcl_star):
+    '''
+    Flip particle
+    '''
+    img2D = read_ptcl_mrc(ptcl_star)
+    img2D = flipX(img2D, ptcl_star)
+
+    return img2D
+
+
+def is_flipX(ptcl_star):
+    '''
+    Check if particle needs to be flipped
+    '''
+    if 'rlnIsFlip' in ptcl_star and ptcl_star['rlnIsFlip'] == 1:
+        return True
+    else:
+        return False
+
+
+def flipX(img2D, ptcl_star):
+    '''
+    Flip image around X-axis
+    '''
+    new_img2D = img2D
+    if is_flipX(ptcl_star):
+        new_img2D = img2D[:, ::-1]
+
+    return new_img2D
+
+
 def create_noise(img2D, mask=None, noise_mean=0.0, noise_std=1.0):
     '''
     Make Noise
@@ -17,12 +48,17 @@ def create_noise(img2D, mask=None, noise_mean=0.0, noise_std=1.0):
     np.random.seed()
     noise     = np.random.normal(noise_mean, noise_std, img2D.shape)
     new_img2D = img2D.copy()
-    if mask is not None:
-        new_img2D[mask > 0] = noise[mask > 0]
-    else:
-        new_img2D = noise
 
-    return np.array(new_img2D, dtype='float32')
+    try:
+        if mask is not None:
+            new_img2D[mask > 0] = noise[mask > 0]
+        else:
+            new_img2D = noise
+
+        return np.array(new_img2D, dtype='float32')
+
+    except IndexError:
+        return None
 
 
 def read_ptcl_mrc(ptcl_star):
@@ -34,7 +70,10 @@ def read_ptcl_mrc(ptcl_star):
     particle_image_num, particle_image_name = ptcl_star['rlnImageName'].split('@')
 
     with mrcfile.mmap(particle_image_name, mode='r') as mrc_data:
-        img2D    =  mrc_data.data[int(particle_image_num)-1]
+        if len(mrc_data.data.shape) == 3:
+            img2D = mrc_data.data[int(particle_image_num)-1]
+        else:
+            img2D = mrc_data.data
 
     return np.copy(img2D)
 
