@@ -10,6 +10,21 @@ import numpy as np
 import scipy.ndimage
 
 
+def create_noise(img2D, mask=None, noise_mean=0.0, noise_std=1.0):
+    '''
+    Make Noise
+    '''
+    np.random.seed()
+    noise     = np.random.normal(noise_mean, noise_std, img2D.shape)
+    new_img2D = img2D.copy()
+    if mask is not None:
+        new_img2D[mask > 0] = noise[mask > 0]
+    else:
+        new_img2D = noise
+
+    return np.array(new_img2D, dtype='float32')
+
+
 def read_ptcl_mrc(ptcl_star):
     '''
     Particle mrc data
@@ -21,7 +36,7 @@ def read_ptcl_mrc(ptcl_star):
     with mrcfile.mmap(particle_image_name, mode='r') as mrc_data:
         img2D    =  mrc_data.data[int(particle_image_num)-1]
 
-    return img2D
+    return np.copy(img2D)
 
 
 def write_img2D(img2D, ptcl_mrc, ptcl_index):
@@ -36,9 +51,9 @@ def fft_img2D(img2D, mask=None):
     Take fft of image
     '''
     if mask is not None and mask.shape == img2D.shape:
-            img2D_fft = np.fft.fft2(mask*img2D)
+            img2D_fft = np.fft.rfft2(mask*img2D)
     else:
-            img2D_fft = np.fft.fft2(img2D)
+            img2D_fft = np.fft.rfft2(img2D)
 
     return img2D_fft
 
@@ -47,7 +62,7 @@ def ifft_img2D(fft2D):
     '''
     Take ifft of a fft
     '''
-    return np.real(np.fft.ifft2(fft2D))
+    return np.real(np.fft.irfft2(fft2D))
 
 
 def rotate_img2D(img2D, angle):
@@ -251,7 +266,7 @@ def normalize_bg_area_intensity(img2D, mask_bg, new_val_bg, mask_area, new_val_a
     return img2D
 
 
-def subtract_class(class_img2D, ctf_a, ctf_s, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D, apix):
+def subtract_class_ctf(class_img2D, ctf_a, ctf_s, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D, apix):
     '''
     Subtract class
     '''
@@ -261,6 +276,33 @@ def subtract_class(class_img2D, ctf_a, ctf_s, ptcl_star, mask_align_img2D, mask_
     class_img2D = ctf_correct_class_img(class_img2D, class_ctf)
     class_img2D = intensity_norm_class_img(class_img2D, class_ctf, ptcl_img2D, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D)
     ptcl_img2D  = subtract_class_from_ptcl(class_img2D, class_ctf, ptcl_img2D, mask_subtract_img2D)
+
+    return ptcl_img2D
+
+
+def crop_class_ctf(class_img2D, ctf_a, ctf_s, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D, apix):
+    '''
+    Subtract class
+    '''
+    class_img2D = create_noise(class_img2D)
+    ptcl_img2D  = read_ptcl_mrc(ptcl_star)
+    class_ctf   = eval_ptcl_ctf(ctf_s, ctf_a, ptcl_star, bf=0, lp=2*apix)
+    class_img2D, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D = inv_transform_imgs(class_img2D, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D)
+    class_img2D = ctf_correct_class_img(class_img2D, class_ctf)
+    class_img2D = intensity_norm_noise_img(class_img2D, class_ctf, ptcl_img2D, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D)
+    ptcl_img2D  = crop_class_from_ptcl(class_img2D, class_ctf, ptcl_img2D, mask_subtract_img2D)
+
+    return ptcl_img2D
+
+
+def crop_class(class_img2D, ctf_a, ctf_s, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D, apix):
+    '''
+    Crop class with no ctf correction
+    '''
+    ptcl_img2D  = read_ptcl_mrc(ptcl_star)
+    class_img2D, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D = inv_transform_imgs(class_img2D, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D)
+    background_mean, background_std = calc_mean_std_intensity(ptcl_img2D, mask_align_img2D-mask_structure_img2D)
+    ptcl_img2D = create_noise(ptcl_img2D, mask_subtract_img2D, background_mean, background_std)
 
     return ptcl_img2D
 
@@ -322,9 +364,29 @@ def intensity_norm_class_img(class_img2D, class_ctf, ptcl_img2D, mask_align_img2
     return class_img2D
 
 
+def intensity_norm_noise_img(class_img2D, class_ctf, ptcl_img2D, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D):
+    '''
+    Intensity normalize class img2D
+    '''
+
+    # Set background mask
+    mask_background_img2D = mask_align_img2D - mask_structure_img2D
+
+    # Calculate background mean, std intensity
+    background_mean, background_std = calc_mean_std_intensity(ptcl_img2D, mask_background_img2D)
+
+    # Set background intensity to particle background mean intensity
+    class_img2D = normalize_intensity(class_img2D, mask=mask_align_img2D, new_mean=background_mean, new_std=background_std)
+
+    # Store the original class mrc
+    class_img2D = subtract_ctf(class_img2D, class_ctf)
+
+    return class_img2D
+
+
 def subtract_class_from_ptcl(class_img2D, class_ctf, ptcl_img2D, mask_subtract_img2D):
     '''
-    Subtract class from
+    Subtract class from ptcl
     '''
 
     # Take class FFT
@@ -338,3 +400,23 @@ def subtract_class_from_ptcl(class_img2D, class_ctf, ptcl_img2D, mask_subtract_i
 
     # Subtract the class image from ptcl image
     return ptcl_img2D - class_img2D
+
+
+def crop_class_from_ptcl(class_img2D, class_ctf, ptcl_img2D, mask_subtract_img2D):
+    '''
+    Subtract class from ptcl
+    '''
+
+    # Take class FFT
+    class_fft2D = fft_img2D(class_img2D, mask_subtract_img2D)
+
+    # CTF correct class image
+    class_fft2D = correct_fft_ctf(class_fft2D, class_ctf)
+
+    # Take inverse FFT
+    class_img2D = ifft_img2D(class_fft2D)
+
+    # Subtract the class image from ptcl image
+    ptcl_img2D[mask_subtract_img2D > 0] = class_img2D[mask_subtract_img2D > 0]
+
+    return ptcl_img2D
