@@ -886,7 +886,7 @@ class ProjectFlip(Project):
         particle_data_block = self.particle_star.get_data_block()
 
         # Create a pool
-        mp_pool = multiprocessing.Pool()
+        mp_pool = multiprocessing.Pool(multiprocessing.cpu_count())
 
         # Initialize results list
         self.flipped_results = []
@@ -1179,7 +1179,7 @@ class ProjectSubtract2D(Project):
         particle_counter = 0
 
         # Create a pool
-        mp_pool = multiprocessing.Pool()
+        mp_pool = multiprocessing.Pool(multiprocessing.cpu_count())
 
         # Results container
         self.subtraction_results = []
