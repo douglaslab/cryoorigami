@@ -38,8 +38,8 @@ def main():
         sys.exit('Input file does not exist!')
 
     # Create an EM project object
-    new_project = em.Project(name='ProjectCSparc')
-    new_project.set_output_directory(args_dict['input'], args_dict['output'])
+    new_project = em.Project(name='EMcsparc2star')
+    new_project.set_output_directory(args_dict['input'], args_dict['output'], project_root='.')
 
     # Write parameters to args filename
     args_filename = new_project.output_directory+'/args.yaml'

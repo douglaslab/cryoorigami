@@ -10,6 +10,21 @@ import numpy as np
 import scipy.ndimage
 
 
+def ccc(current_img2D, other_img2D, mask=None):
+    '''
+    Measure ccc with other img2D
+    '''
+    current_mean, current_std = calc_mean_std_intensity(current_img2D, mask)
+    other_mean, other_std     = calc_mean_std_intensity(other_img2D, mask)
+
+    if mask is not None:
+        cross_correlation = np.mean((current_img2D[mask > 0]-current_mean)(other_img2D[mask > 0]-other_mean))
+    else:
+        cross_correlation = np.mean((current_img2D-current_mean)(other_img2D-other_mean))
+
+    return cross_correlation/(current_std*other_std)
+
+
 def flipX_ptcl(ptcl_star):
     '''
     Flip particle

@@ -1582,6 +1582,20 @@ class MRC:
             else:
                 self.create(file, shape)
 
+    def ccc(self, other, mask=None):
+        '''
+        Measure ccc with other img2D
+        '''
+        current_mean, current_std = self.calc_mean_std_intensity(mask)
+        other_mean, other_std     = other.calc_mean_std_intensity(mask)
+
+        if mask is not None:
+            cross_correlation = np.mean((self.img2D[mask > 0]-current_mean)(other.img2D[mask > 0]-other_mean))
+        else:
+            cross_correlation = np.mean((self.img2D-current_mean)(other.img2D-other_mean))
+
+        return cross_correlation/(current_std*other_std)
+
     def flipX(self):
         '''
         Flip on X-axis
@@ -2256,6 +2270,50 @@ class Star(EMfile):
         # Read file
         if file is not None and os.path.isfile(file):
             self.read(file)
+
+    def set_barcode(self, barcode={}):
+        '''
+        Set the particle barcode
+        '''
+        barcode_str = ','.join(sorted([str(k)+':'+str(v) for k, v in barcode.items()]))
+        # Set barcode
+        if not self.has_label('rlnComment'):
+            self.set_column('rlnComment', barcode_str)
+
+    def append_barcode(self, barcode={}):
+        '''
+        Append the particle barcode
+        '''
+        barcode_str = ','.join(sorted([str(k)+':'+str(v) for k, v in barcode.items()]))
+
+        if not self.has_label('rlnComment'):
+            self.set_barcode(barcode)
+        else:
+            self.data_block['rlnComment'] += barcode_str
+
+    def read_barcode(self, ptcl_index):
+        '''
+        Read barcode
+        '''
+        if self.has_label('rlnComment'):
+            barcode_str = self.data_block.loc[ptcl_index, 'rlnComment']
+            barcode_str.split(',')
+
+    def intersect(self, other):
+        '''
+        Intersect this star with other star object
+        '''
+        cmp_columns = ['rlnMicrographName', 'rlnCoordinateX', 'rlnCoordinateY']
+        intersect_data_block = pd.merge(self.data_block, other.data_block[cmp_columns], how='inner')
+        self.set_data_block(intersect_data_block)
+
+    def filter(self, prob_threshold=0.95):
+        '''
+        Filter the data using max probability in star data
+        '''
+        if self.has_label('rlnMaxValueProbDistribution'):
+            prob_mask = self.data_block['rlnMaxValueProbDistribution'] >= prob_threshold
+            self.data_block = self.data_block.loc[prob_mask, :]
 
     def set_data_block(self, data):
         '''
