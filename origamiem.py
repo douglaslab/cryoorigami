@@ -524,6 +524,7 @@ class Project:
 
         if self.ref_class_cs is not None:
             self.ref_class_cs.convert2star(img_path=img_root)
+            self.ref_class_cs.convert_idx_to_classnumber()
             self.ref_class_cs.rename_star_columns(columns={'rlnImageName': 'rlnReferenceImage'})
 
     def read_particle_mrc(self, particle_id=0):
@@ -3060,7 +3061,8 @@ class CryoSparc(EMfile):
         self.data_block_dict        = {}
         self.data_block_blob        = None
         self.data_block_passthrough = None
-        self.cs2star_blob           = {'ctf/amp_contrast': 'rlnAmplitudeContrast',
+        self.cs2star_blob           = {'blob/res_A': 'rlnEstimatedResolution',
+                                       'ctf/amp_contrast': 'rlnAmplitudeContrast',
                                        'ctf/accel_kv': 'rlnVoltage',
                                        'ctf/cs_mm': 'rlnSphericalAberration',
                                        'ctf/df1_A': 'rlnDefocusU',
@@ -3101,7 +3103,7 @@ class CryoSparc(EMfile):
         '''
         Check if label exists in blob data block
         '''
-        if label in self.data_block_blob.dtype.names:
+        if self.data_block_blob is not None and label in self.data_block_blob.dtype.names:
             return True
         else:
             return False
@@ -3110,7 +3112,7 @@ class CryoSparc(EMfile):
         '''
         Check if label exists in passthrough data block
         '''
-        if label in self.data_block_passthrough.dtype.names:
+        if self.data_block_passthrough is not None and label in self.data_block_passthrough.dtype.names:
             return True
         else:
             return False
@@ -3147,8 +3149,8 @@ class CryoSparc(EMfile):
             new_data_column = []
             if self.has_label_blob('blob/path') and self.has_label_blob('blob/idx'):
                 for i in range(self.data_block_blob.shape[0]):
-                    image_name = "%010d@%s" % (self.data_block_blob['blob/idx'][i], img_path+self.data_block_blob['blob/path'][i])
-                    new_data_column.append(image_name.decode("utf-8"))
+                    image_name = "%010d@%s" % (self.data_block_blob['blob/idx'][i]+1, img_path+self.data_block_blob['blob/path'][i].decode("utf-8"))
+                    new_data_column.append(image_name)
 
                 self.data_block_dict['rlnImageName'] = np.array(new_data_column,
                                                                 dtype=self.star.PARAMETERS['rlnImageName']['nptype'])
@@ -3250,3 +3252,10 @@ class CryoSparc(EMfile):
         Replace column names
         '''
         self.star.rename_columns(columns)
+
+    def convert_idx_to_classnumber(self):
+        '''
+        Convert idx to classnumber
+        '''
+        self.star.data_block['rlnClassNumber'] = np.array(self.data_block_blob['blob/idx']+1,
+                                                          dtype=self.star.PARAMETERS['rlnClassNumber']['nptype'])

@@ -22,7 +22,7 @@ def main():
     parser.add_argument("-o",       "--output",      type=str, help="Output directory", default=None)
     parser.add_argument("-orig",    "--original",    type=str, help="Original star file", default=None)
     parser.add_argument("-micpath", "--micpath",     type=str, help="Micrographs path", default="Micrographs")
-    parser.add_argument("-imgpath", "--micpath",     type=str, help="Cryosparc root path", default="")
+    parser.add_argument("-imgpath", "--imgpath",     type=str, help="Cryosparc root path", default="")
 
     args = parser.parse_args()
 
