@@ -17,19 +17,23 @@ def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument("-i",       "--input",       type=str, help="Particle star file")
+    parser.add_argument("-ref",     "--reference",   type=str, help="Template star file", default=None)
     parser.add_argument("-pass",    "--passthrough", type=str, help="Passthrough file from cryosparc", default=None)
     parser.add_argument("-o",       "--output",      type=str, help="Output directory", default=None)
     parser.add_argument("-orig",    "--original",    type=str, help="Original star file", default=None)
     parser.add_argument("-micpath", "--micpath",     type=str, help="Micrographs path", default="Micrographs")
+    parser.add_argument("-imgpath", "--micpath",     type=str, help="Cryosparc root path", default="")
 
     args = parser.parse_args()
 
     # Prepare args dict
     args_dict = {'input':        args.input,
+                 'reference':    args.reference,
                  'passthrough':  args.passthrough,
                  'output':       args.output,
                  'original':     args.original,
-                 'micpath':      args.micpath
+                 'micpath':      args.micpath,
+                 'imgpath':      args.imgpath
                  }
 
     # Check if the input file exists
@@ -48,7 +52,8 @@ def main():
     # Set cs files
     new_project.set_cs_files(blob_cs_file=args_dict['input'],
                              passthrough_cs_file=args_dict['passthrough'],
-                             original_star_file=args_dict['original'])
+                             original_star_file=args_dict['original'],
+                             ref_class_cs_file=args_dict['reference'])
 
     # Read cs files
     new_project.read_cs_files()
@@ -57,7 +62,7 @@ def main():
     new_project.prepare_io_files_cs()
 
     # Conert cs to star
-    new_project.convert_cs2star(args_dict['micpath'])
+    new_project.convert_cs2star(args_dict['micpath'], args_dict['imgpath'])
 
     # Write output files
     new_project.write_output_files()

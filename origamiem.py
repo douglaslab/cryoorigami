@@ -372,6 +372,9 @@ class Project:
         if self.particle_cs is not None and write_cs_star:
             self.particle_cs.star.write(self.particle_out_file)
 
+        if self.ref_class_cs is not None and write_cs_star:
+            self.ref_class_cs.star.write(self.ref_class_out_file)
+
     def set_output_directory(self, input_filename, output_directory=None, project_root=None):
         '''
         Set output directory
@@ -471,19 +474,27 @@ class Project:
             root, ext  = os.path.splitext(tail)
             copyfile(self.original_star_file, self.output_directory+'/original_particle'+ext)
 
-    def set_cs_files(self, blob_cs_file=None, passthrough_cs_file=None, original_star_file=None):
+        if self.ref_class_cs_file is not None:
+            head, tail = os.path.split(self.ref_class_cs_file)
+            root, ext  = os.path.splitext(tail)
+            copyfile(self.ref_class_cs_file, self.output_directory+'/class2D_input'+ext)
+            self.ref_class_out_file = self.output_directory+'/class2D_output.star'
+
+    def set_cs_files(self, blob_cs_file=None, passthrough_cs_file=None, original_star_file=None, ref_class_cs_file=None):
         '''
         Set input cs files
         '''
         self.blob_cs_file        = blob_cs_file
         self.passthrough_cs_file = passthrough_cs_file
         self.original_star_file  = original_star_file
+        self.ref_class_cs_file   = ref_class_cs_file
 
     def read_cs_files(self):
         '''
         Read cs file
         '''
-        self.particle_cs = CryoSparc()
+        self.particle_cs =  CryoSparc()
+        self.ref_class_cs = CryoSparc()
 
         if self.blob_cs_file is not None:
             self.particle_cs.read_blob(self.blob_cs_file)
@@ -494,12 +505,26 @@ class Project:
         if self.original_star_file is not None:
             self.particle_cs.read_original_star(self.original_star_file)
 
-    def convert_cs2star(self, mic_path='Micrographs'):
+        if self.ref_class_cs_file is not None:
+            self.ref_class_cs.read_blob(self.ref_class_cs_file)
+
+    def convert_cs2star(self, mic_path='Micrographs', img_path=''):
         '''
         Convert to cs to star file
         '''
-        self.particle_cs.convert2star()
+
+        # Determine img root
+        if len(img_path) > 0:
+            img_root = img_path+'/'
+        else:
+            img_root = ''
+
+        self.particle_cs.convert2star(img_path=img_root)
         self.particle_cs.copy_from_original(mic_path)
+
+        if self.ref_class_cs is not None:
+            self.ref_class_cs.convert2star(img_path=img_root)
+            self.ref_class_cs.rename_star_columns(columns={'rlnImageName': 'rlnReferenceImage'})
 
     def read_particle_mrc(self, particle_id=0):
         '''
@@ -3035,14 +3060,24 @@ class CryoSparc(EMfile):
         self.data_block_dict        = {}
         self.data_block_blob        = None
         self.data_block_passthrough = None
-        self.cs2star_blob           = {}
+        self.cs2star_blob           = {'ctf/amp_contrast': 'rlnAmplitudeContrast',
+                                       'ctf/accel_kv': 'rlnVoltage',
+                                       'ctf/cs_mm': 'rlnSphericalAberration',
+                                       'ctf/df1_A': 'rlnDefocusU',
+                                       'ctf/df2_A': 'rlnDefocusV',
+                                       'ctf/ctf_fit_to_A': "rlnCtfMaxResolution",
+                                       'alignments2D/class_posterior': "rlnMaxValueProbDistribution",
+                                       'alignments2D/class': "rlnClassNumber"}
+
         self.cs2star_passthrough    = {'location/micrograph_path': 'rlnMicrographName',
                                        'ctf/amp_contrast': 'rlnAmplitudeContrast',
                                        'ctf/accel_kv': 'rlnVoltage',
                                        'ctf/cs_mm': 'rlnSphericalAberration',
                                        'ctf/df1_A': 'rlnDefocusU',
                                        'ctf/df2_A': 'rlnDefocusV',
-                                       'ctf/ctf_fit_to_A': "rlnCtfMaxResolution"
+                                       'ctf/ctf_fit_to_A': "rlnCtfMaxResolution",
+                                       'alignments2D/class_posterior': "rlnMaxValueProbDistribution",
+                                       'alignments2D/class': "rlnClassNumber"
                                        }
 
         self.star                   = None
@@ -3086,7 +3121,7 @@ class CryoSparc(EMfile):
         '''
         self.original_star = Star(fname)
 
-    def convert2star(self):
+    def convert2star(self, img_path=''):
         '''
         Convert to star format
         '''
@@ -3102,12 +3137,18 @@ class CryoSparc(EMfile):
                     self.data_block_dict[rln_label] = np.array(self.data_block_passthrough[cs_label],
                                                                dtype=self.star.PARAMETERS[rln_label]['nptype'])
 
+            # Do the  direct copies
+            for cs_label, rln_label in self.cs2star_blob.items():
+                if self.has_label_blob(cs_label):
+                    self.data_block_dict[rln_label] = np.array(self.data_block_blob[cs_label],
+                                                               dtype=self.star.PARAMETERS[rln_label]['nptype'])
+
             # rlnImageName
             new_data_column = []
             if self.has_label_blob('blob/path') and self.has_label_blob('blob/idx'):
                 for i in range(self.data_block_blob.shape[0]):
-                    image_name = "%010d@%s" % (self.data_block_blob['blob/idx'][i], self.data_block_blob['blob/path'][i])
-                    new_data_column.append(image_name)
+                    image_name = "%010d@%s" % (self.data_block_blob['blob/idx'][i], img_path+self.data_block_blob['blob/path'][i])
+                    new_data_column.append(image_name.decode("utf-8"))
 
                 self.data_block_dict['rlnImageName'] = np.array(new_data_column,
                                                                 dtype=self.star.PARAMETERS['rlnImageName']['nptype'])
@@ -3178,6 +3219,15 @@ class CryoSparc(EMfile):
                 self.data_block_dict['rlnPhaseShift'] = np.array(util.rad2deg(self.data_block_passthrough['ctf/phase_shift_rad']),
                                                                  dtype=self.star.PARAMETERS['rlnPhaseShift']['nptype'])
 
+            # Defocus and phase-shift angles
+            if self.has_label_blob('ctf/df_angle_rad'):
+                self.data_block_dict['rlnDefocusAngle'] = np.array(util.rad2deg(self.data_block_blob['ctf/df_angle_rad']),
+                                                                   dtype=self.star.PARAMETERS['rlnDefocusAngle']['nptype'])
+
+            if self.has_label_blob('ctf/phase_shift_rad'):
+                self.data_block_dict['rlnPhaseShift'] = np.array(util.rad2deg(self.data_block_blob['ctf/phase_shift_rad']),
+                                                                 dtype=self.star.PARAMETERS['rlnPhaseShift']['nptype'])
+
             # Create the data block for star
             self.star.data_block = pd.DataFrame.from_dict(self.data_block_dict)
 
@@ -3194,3 +3244,9 @@ class CryoSparc(EMfile):
 
         if mic_path is not None:
             self.star.create_micname_from_imagename(mic_path)
+
+    def rename_star_columns(self, columns={}):
+        '''
+        Replace column names
+        '''
+        self.star.rename_columns(columns)
