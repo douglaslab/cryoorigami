@@ -22,7 +22,6 @@ def main():
     parser.add_argument("-o",       "--output",      type=str, help="Output directory", default=None)
     parser.add_argument("-orig",    "--original",    type=str, help="Original star file", default=None)
     parser.add_argument("-micpath", "--micpath",     type=str, help="Micrographs path", default="Micrographs")
-    parser.add_argument("-imgpath", "--imgpath",     type=str, help="Cryosparc root path", default="")
 
     args = parser.parse_args()
 
@@ -32,8 +31,7 @@ def main():
                  'passthrough':  args.passthrough,
                  'output':       args.output,
                  'original':     args.original,
-                 'micpath':      args.micpath,
-                 'imgpath':      args.imgpath
+                 'micpath':      args.micpath
                  }
 
     # Check if the input file exists
@@ -62,7 +60,7 @@ def main():
     new_project.prepare_io_files_cs()
 
     # Conert cs to star
-    new_project.convert_cs2star(args_dict['micpath'], args_dict['imgpath'])
+    new_project.convert_cs2star(args_dict['micpath'])
 
     # Write output files
     new_project.write_output_files()

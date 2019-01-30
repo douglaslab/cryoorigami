@@ -75,9 +75,11 @@ class Project:
 
         # Cryosparc objects
         self.particle_cs    = None
+        self.ref_class_cs   = None
 
         # Cryosparc files
         self.blob_cs_file        = None
+        self.ref_class_cs_file   = None
         self.passthrough_cs_file = None
         self.original_star_file  = None
 
@@ -494,7 +496,6 @@ class Project:
         Read cs file
         '''
         self.particle_cs =  CryoSparc()
-        self.ref_class_cs = CryoSparc()
 
         if self.blob_cs_file is not None:
             self.particle_cs.read_blob(self.blob_cs_file)
@@ -506,24 +507,19 @@ class Project:
             self.particle_cs.read_original_star(self.original_star_file)
 
         if self.ref_class_cs_file is not None:
+            self.ref_class_cs = CryoSparc()
             self.ref_class_cs.read_blob(self.ref_class_cs_file)
 
-    def convert_cs2star(self, mic_path='Micrographs', img_path=''):
+    def convert_cs2star(self, mic_path='Micrographs'):
         '''
         Convert to cs to star file
         '''
 
-        # Determine img root
-        if len(img_path) > 0:
-            img_root = img_path+'/'
-        else:
-            img_root = ''
-
-        self.particle_cs.convert2star(img_path=img_root)
+        self.particle_cs.convert2star()
         self.particle_cs.copy_from_original(mic_path)
 
         if self.ref_class_cs is not None:
-            self.ref_class_cs.convert2star(img_path=img_root)
+            self.ref_class_cs.convert2star()
             self.ref_class_cs.convert_idx_to_classnumber()
             self.ref_class_cs.rename_star_columns(columns={'rlnImageName': 'rlnReferenceImage'})
 
@@ -3084,6 +3080,7 @@ class CryoSparc(EMfile):
 
         self.star                   = None
         self.original_star          = None
+        self.original_path          = ''
 
     def read_blob(self, file):
         '''
@@ -3121,9 +3118,13 @@ class CryoSparc(EMfile):
         '''
         Read original star file
         '''
+        # Read original path
+        head, tail = os.path.split(fname)
+        self.original_path = head+'/Micrographs/'
+
         self.original_star = Star(fname)
 
-    def convert2star(self, img_path=''):
+    def convert2star(self):
         '''
         Convert to star format
         '''
@@ -3149,7 +3150,10 @@ class CryoSparc(EMfile):
             new_data_column = []
             if self.has_label_blob('blob/path') and self.has_label_blob('blob/idx'):
                 for i in range(self.data_block_blob.shape[0]):
-                    image_name = "%010d@%s" % (self.data_block_blob['blob/idx'][i]+1, img_path+self.data_block_blob['blob/path'][i].decode("utf-8"))
+
+                    # Read the root and the file
+                    head, tail = os.path.split(self.data_block_blob['blob/path'][i].decode("utf-8"))
+                    image_name = "%010d@%s" % (self.data_block_blob['blob/idx'][i]+1, self.original_path+tail)
                     new_data_column.append(image_name)
 
                 self.data_block_dict['rlnImageName'] = np.array(new_data_column,
@@ -3257,5 +3261,6 @@ class CryoSparc(EMfile):
         '''
         Convert idx to classnumber
         '''
-        self.star.data_block['rlnClassNumber'] = np.array(self.data_block_blob['blob/idx']+1,
-                                                          dtype=self.star.PARAMETERS['rlnClassNumber']['nptype'])
+        if self.star is not None and self.star.data_block is not None:
+            self.star.data_block['rlnClassNumber'] = np.array(self.data_block_blob['blob/idx']+1,
+                                                              dtype=self.star.PARAMETERS['rlnClassNumber']['nptype'])
