@@ -96,8 +96,11 @@ class Project:
         self.mask_subtract_mrc_file = None
 
         # First particle and class mrc files
-        self.first_particle_mrc     = None
-        self.first_ref_class_mrc    = None
+        self.first_particle_mrc       = None
+        self.first_particle_mrc_file  = None
+
+        self.first_ref_class_mrc      = None
+        self.first_ref_class_mrc_file = None
 
         # Relion code
         self.relion_refine_exe    = 'relion_refine'
@@ -519,7 +522,6 @@ class Project:
         self.particle_cs.set_project_path(proj_path)
         self.particle_cs.convert2star()
         self.particle_cs.copy_from_original(mic_path)
-        self.particle_cs.adjust_class_number()
 
         # Delete classes
         self.particle_cs.delete_classes(del_classes)
@@ -535,7 +537,7 @@ class Project:
             
             # Convert template mrc file to mrcs
             self.ref_class_cs.get_ref_mrc_file()
-            self.ref_class_cs.rename_ref_mrc_to_mrcs()
+            self.ref_class_cs.convert_ref_mrc_to_mrcs()
             self.ref_class_cs.rename_ref_star_to_mrcs()
 
             # Delete unwanted classes
@@ -667,6 +669,20 @@ class Project:
 
             # Read image
             self.first_particle_mrc = MRC(image_name, int(image_num)-1)
+
+    def read_first_ref_class_mrc(self):
+        '''
+        Read first particle mrc
+        '''
+        if self.ref_class_star is not None:
+            # Get first particle image to determine shape parameters
+            image_num, image_name = self.ref_class_star.get_image_num_name(0)
+
+            # Read image
+            self.first_ref_class_mrc = MRC(image_name, int(image_num)-1)
+
+            # Get the reference mrc file name
+            self.first_ref_class_mrc_file = image_name
 
     def read_ptcl_mrc(self, ptcl_star):
 
@@ -1236,6 +1252,9 @@ class ProjectSubtract2D(Project):
             # Normalize class mrc
             self.class_mrc.normalize_intensity(new_mean=0, new_std=1.0)
 
+            # Transform the class mrc with 
+            self.class_mrc.transform_ptcl_img2D(class_row)
+
             # Store to original
             self.class_mrc.store_to_original()
 
@@ -1404,6 +1423,12 @@ class ProjectAlign2D(Project):
         # Relion output string
         self.relion_output_str    = None
 
+        # Trasnformed mrc file
+        self.ref_class_transformed_star_file = None
+        self.ref_class_transformed_mrc_file  = None
+        self.ref_class_transformed_star      = None
+        self.ref_class_transformed_mrc       = None
+
     def prepare_project(self):
         '''
         Prepare project
@@ -1416,19 +1441,84 @@ class ProjectAlign2D(Project):
         self.set_relion_refine_exe()
         self.set_relion_norm_exe()
         self.set_relion_stack_create_exe()
+        self.read_first_ref_class_mrc()
+
+    def create_output_transformed_mrc(self):
+        '''
+        Create output subtract mrc object and file
+        '''
+
+        # Read first ref class mrc file
+        self.read_first_ref_class_mrc()
+
+        # Determine the output transformed mrcs and star files
+        self.ref_class_transformed_mrc_file  = os.path.relpath(os.path.abspath(self.output_directory+'/Class2D_output_transformed.mrcs'))
+        self.ref_class_transformed_star_file = os.path.relpath(os.path.abspath(self.output_directory+'/Class2D_output_transformed.star'))
+
+        # Create MRCS output file
+        if self.ref_class_transformed_mrc is None:
+            # Determine shape parameters
+            num_particles = self.ref_class_star.data_block.shape[0]
+            NY, NX        = self.first_ref_class_mrc.img2D.shape
+
+            # Create output MRC file
+            self.ref_class_transformed_mrc = MRC(file=self.ref_class_transformed_mrc_file, shape=(num_particles, NY, NX))
+
+    def write_transformed_stack(self):
+        '''
+        Write transformed stack
+        '''
+        # Get class data
+        class_data_block   = self.ref_class_star.get_data_block()
+
+        # Keep transformed imgs
+        transformed_img2Ds = []
+        ptcl_list          = []
+
+        # Iterate over each class
+        for class_index, class_row in class_data_block.iterrows():
+
+            # Get class info
+            class_image_num, class_image_name = self.ref_class_star.get_image_num_name(class_index)
+
+            # Read image
+            class_mrc = MRC(class_image_name, int(class_image_num)-1)
+
+            # Transform image
+            class_mrc.transform_ptcl_img2D(class_row)
+
+            # Add img to list
+            transformed_img2Ds.append(class_mrc.img2D.copy())
+
+            # ptcl list
+            ptcl_list.append(class_index)
+
+        # Write the transfomed img2D
+        self.ref_class_transformed_mrc.mrc_data.data[ptcl_list] = transformed_img2Ds
+        self.ref_class_transformed_mrc.close()
+
+
+    def write_transformed_star(self):
+        '''
+        Write transformed star
+        '''
+        if self.ref_class_star.has_label('rlnImageName'):
+            self.ref_class_star.data_block['rlnImageName'] = self.ref_class_star.data_block.rlnImageName.replace({r'@.*':'@'+self.ref_class_transformed_mrc_file},regex=True)
+
+        # Reset the offsets and angles
+        self.ref_class_star.data_block['rlnOriginX']  = 0.0
+        self.ref_class_star.data_block['rlnOriginY']  = 0.0
+        self.ref_class_star.data_block['rlnAnglePsi'] = 0.0
+
+        self.ref_class_star.write(self.ref_class_transformed_star_file)
 
     def create_transformed_class_stacks(self):
         '''
         Create transformed class2D stacks
         '''
-        self.relion_output_str        = os.path.relpath(os.path.abspath(self.output_directory+'/Class2D_output_transformed'))
-        self.relion_stack_create_args = [self.relion_stack_create_exe,
-                                         '--apply_transformation',
-                                         '--i', self.ref_class_out_file,
-                                         '--o', self.relion_output_str]
-        self.relion_stack_create_subprocess = subprocess.run(self.relion_stack_create_args,
-                                                             stdout=subprocess.PIPE,
-                                                             universal_newlines=True)
+        self.create_output_transformed_mrc()
+        self.write_transformed_stack()
+        self.write_transformed_star()
 
     def normalize_class_refs(self):
         '''
@@ -1444,13 +1534,16 @@ class ProjectAlign2D(Project):
                                                      stdout=subprocess.PIPE,
                                                      universal_newlines=True)
 
-    def prepare_tmp_input(self):
+    def prepare_tmp_input(self, use_unmasked=False):
         '''
         Prepare the class reference star file for alignment of class averages
         '''
         if self.ref_class_star is not None:
             self.ref_class_star.change_label('rlnReferenceImage', 'rlnImageName')
-            self.ref_class_star.replace_with_unmasked_classes()
+            
+            # If unmasked class option is on, use unmasked classes 
+            if use_unmasked:
+                self.ref_class_star.replace_with_unmasked_classes()
 
     def create_tmp_files_star(self):
         # Copy input file to output directory
@@ -1496,7 +1589,11 @@ class ProjectAlign2D(Project):
         '''
         self.ref_class_star.write(self.ref_class_tmp_star_file)
 
-    def set_relion_refine_args(self, offset_range=50, offset_step=1, psi_step=1, gpu=0):
+    def set_relion_refine_args(self, offset_range=100, offset_step=1, psi_step=1, gpu=0):
+        
+        # Get the maximum offset range possible
+        offset_range_max = int(self.first_ref_class_mrc.img2D.shape[0]//2)
+        
         self.relion_refine_args = [self.relion_refine_exe,
                                    '--i', self.ref_class_tmp_star_norm_file,
                                    '--o', self.relion_output_str,
@@ -1507,7 +1604,7 @@ class ProjectAlign2D(Project):
                                    '--norm',
                                    '--scale',
                                    '--offset_step',  str(offset_step),
-                                   '--offset_range', str(offset_range),
+                                   '--offset_range', str(offset_range_max),
                                    '--psi_step',     str(psi_step),
                                    '--j', '1',
                                    '--pool', '3',
@@ -2956,6 +3053,10 @@ class Star(EMfile):
         if ptcls is None:
             ptcls = np.arange(self.num_data_points)
 
+        # Check if there is any particle to transform
+        if len(ptcls) == 0:
+            return
+
         # Iterate through each particle to get the corrected offset
         new_offsets = []
 
@@ -3118,6 +3219,13 @@ class CryoSparc(EMfile):
         self.ref_mrcs_file          = None
 
 
+    def set_relion_image_handler_exe(self):
+        '''
+        Set relion image handler exe
+        '''
+        relion_process = subprocess.run(['which', 'relion_image_handler'], stdout=subprocess.PIPE, universal_newlines=True)
+        self.relion_image_handler_exe = relion_process.stdout.strip()
+
     def remove_str_from_micrograph_names(self, del_str=''):
         '''
         Remove a string from micrograph names
@@ -3147,17 +3255,32 @@ class CryoSparc(EMfile):
             ref_index, self.ref_mrc_file = self.star.data_block['rlnReferenceImage'][0].split('@')
 
 
-    def rename_ref_mrc_to_mrcs(self):
+    def convert_ref_mrc_to_mrcs(self):
         '''
         Rename img file to mrcs
         '''
+        # Get the path for relion image handler
+        self.set_relion_image_handler_exe()
+
         if self.ref_mrc_file is not None:
             mrc_file, ext = os.path.splitext(self.ref_mrc_file)
             if os.path.isfile(self.ref_mrc_file) and ext == '.mrc':
-                self.ref_mrcs_file = mrc_file + '.mrcs'
-
-                # Make a copy of the file
+                
+                # Define the new files
+                self.ref_mrcs_file        = mrc_file + '.mrcs'
+                self.ref_mrcs_flipXY_file = mrc_file + '_flipXY.mrcs'
+                
+                # Make an mrcs copy of the mrc file
                 shutil.copy(self.ref_mrc_file, self.ref_mrcs_file)
+
+                # RUn relion image handler to flipXY ref mrc
+                relion_args = [self.relion_image_handler_exe,
+                               '--flipXY',
+                               '--i', self.ref_mrcs_file,
+                               '--o', self.ref_mrcs_flipXY_file]
+                relion_subprocess = subprocess.run(relion_args,
+                                                   stdout=subprocess.PIPE,
+                                                   universal_newlines=True)
 
     def rename_ref_star_to_mrcs(self):
         '''
@@ -3166,7 +3289,7 @@ class CryoSparc(EMfile):
         if self.ref_mrc_file is not None:
             mrc_file, ext = os.path.splitext(self.ref_mrc_file)
             if os.path.isfile(self.ref_mrc_file) and ext == '.mrc':
-                self.star.data_block.loc[:,'rlnReferenceImage'] = self.star.data_block.loc[:,'rlnReferenceImage'] + 's'
+                self.star.data_block.loc[:,'rlnReferenceImage'] = self.star.data_block.rlnReferenceImage.replace({".mrc": "_flipXY.mrcs"},regex=True)
 
     def read_blob(self, file):
         '''
@@ -3357,5 +3480,5 @@ class CryoSparc(EMfile):
         Convert idx to classnumber
         '''
         if self.star is not None and self.star.data_block is not None:
-            self.star.data_block['rlnClassNumber'] = np.array(self.data_block_blob['blob/idx']+1,
+            self.star.data_block['rlnClassNumber'] = np.array(self.data_block_blob['blob/idx'],
                                                               dtype=self.star.PARAMETERS['rlnClassNumber']['nptype'])
