@@ -16,12 +16,15 @@ def main():
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument("-i",       "--input",       type=str, help="Particle star file")
-    parser.add_argument("-ref",     "--reference",   type=str, help="Template star file", default=None)
-    parser.add_argument("-pass",    "--passthrough", type=str, help="Passthrough file from cryosparc", default=None)
-    parser.add_argument("-o",       "--output",      type=str, help="Output directory", default=None)
-    parser.add_argument("-orig",    "--original",    type=str, help="Original star file", default=None)
-    parser.add_argument("-micpath", "--micpath",     type=str, help="Micrographs path", default="Micrographs")
+    parser.add_argument("-i",        "--input",       type=str, help="Particle star file")
+    parser.add_argument("-ref",      "--reference",   type=str, help="Template star file", default=None)
+    parser.add_argument("-pass",     "--passthrough", type=str, help="Passthrough file from cryosparc", default=None)
+    parser.add_argument("-o",        "--output",      type=str, help="Output directory", default=None)
+    parser.add_argument("-orig",     "--original",    type=str, help="Original star file", default=None)
+    parser.add_argument("-micpath",  "--micpath",     type=str, help="Micrographs path", default="Micrographs")
+    parser.add_argument("-projpath", "--projpath",    type=str, help="Cryosparc project path", default="")
+    parser.add_argument("-delclass", "--delclass",    type=int, nargs='+', help="Classes to delete", default=[])
+    parser.add_argument("-delstr",   "--delstr",      type=str, help="String to delete from Micrograph name", default='')
 
     args = parser.parse_args()
 
@@ -31,7 +34,10 @@ def main():
                  'passthrough':  args.passthrough,
                  'output':       args.output,
                  'original':     args.original,
-                 'micpath':      args.micpath
+                 'micpath':      args.micpath,
+                 'projpath':     args.projpath,
+                 'delclass':     args.delclass,
+                 'delstr':       args.delstr
                  }
 
     # Check if the input file exists
@@ -60,7 +66,7 @@ def main():
     new_project.prepare_io_files_cs()
 
     # Conert cs to star
-    new_project.convert_cs2star(args_dict['micpath'])
+    new_project.convert_cs2star(args_dict['micpath'], args_dict['projpath'], args_dict['delclass'], args_dict['delstr'])
 
     # Write output files
     new_project.write_output_files()

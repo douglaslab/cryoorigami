@@ -17,6 +17,7 @@ import sys
 import scipy.ndimage
 import parallelem
 import multiprocessing
+import shutil
 
 from shutil import copyfile
 
@@ -510,18 +511,35 @@ class Project:
             self.ref_class_cs = CryoSparc()
             self.ref_class_cs.read_blob(self.ref_class_cs_file)
 
-    def convert_cs2star(self, mic_path='Micrographs'):
+    def convert_cs2star(self, mic_path='Micrographs', proj_path='', del_classes=[], del_str=''):
         '''
         Convert to cs to star file
         '''
 
+        self.particle_cs.set_project_path(proj_path)
         self.particle_cs.convert2star()
         self.particle_cs.copy_from_original(mic_path)
+        self.particle_cs.adjust_class_number()
+
+        # Delete classes
+        self.particle_cs.delete_classes(del_classes)
+
+        # Remove a string from micrographs name
+        self.particle_cs.remove_str_from_micrograph_names(del_str)
 
         if self.ref_class_cs is not None:
+            self.ref_class_cs.set_project_path(proj_path)
             self.ref_class_cs.convert2star()
             self.ref_class_cs.convert_idx_to_classnumber()
             self.ref_class_cs.rename_star_columns(columns={'rlnImageName': 'rlnReferenceImage'})
+            
+            # Convert template mrc file to mrcs
+            self.ref_class_cs.get_ref_mrc_file()
+            self.ref_class_cs.rename_ref_mrc_to_mrcs()
+            self.ref_class_cs.rename_ref_star_to_mrcs()
+
+            # Delete unwanted classes
+            self.ref_class_cs.delete_classes(del_classes)
 
     def read_particle_mrc(self, particle_id=0):
         '''
@@ -3048,6 +3066,19 @@ class Star(EMfile):
         np.savetxt(out_fname, self.data_block.values, fmt=self.write_formatter, header=header, comments='')
 
 
+class Cistem(EMfile):
+    '''
+    Cistem class
+    '''
+    def __init__(self):
+        self.name    = None
+        
+        self.db2star = {}
+        self.db_file = None
+
+        self.original_star      = None
+        self.original_star_file = None
+
 class CryoSparc(EMfile):
     '''
         Cryosparc class
@@ -3081,6 +3112,61 @@ class CryoSparc(EMfile):
         self.star                   = None
         self.original_star          = None
         self.original_path          = ''
+
+        self.project_path           = ''
+        self.ref_mrc_file           = None
+        self.ref_mrcs_file          = None
+
+
+    def remove_str_from_micrograph_names(self, del_str=''):
+        '''
+        Remove a string from micrograph names
+        '''
+        if self.star.has_label('rlnMicrographName'):
+            self.star.data_block['rlnMicrographName'] = self.star.data_block.rlnMicrographName.replace({del_str: ""},regex=True)
+
+    def adjust_class_number(self):
+        '''
+        Adjust class number so that it is in relion format starting from 1 to N
+        '''
+        if self.star.has_label('rlnClassNumber'):
+            self.star.data_block['rlnClassNumber'] += 1
+
+    def delete_classes(self, del_classes=[]):
+        '''
+        Delete classes
+        '''
+        keep_classes = ~self.star.data_block['rlnClassNumber'].isin(del_classes)
+        self.star.data_block = self.star.data_block.loc[keep_classes, :]
+
+    def get_ref_mrc_file(self):
+        '''
+        Get first ref mrc file
+        '''
+        if self.star is not None and self.star.has_label('rlnReferenceImage'):
+            ref_index, self.ref_mrc_file = self.star.data_block['rlnReferenceImage'][0].split('@')
+
+
+    def rename_ref_mrc_to_mrcs(self):
+        '''
+        Rename img file to mrcs
+        '''
+        if self.ref_mrc_file is not None:
+            mrc_file, ext = os.path.splitext(self.ref_mrc_file)
+            if os.path.isfile(self.ref_mrc_file) and ext == '.mrc':
+                self.ref_mrcs_file = mrc_file + '.mrcs'
+
+                # Make a copy of the file
+                shutil.copy(self.ref_mrc_file, self.ref_mrcs_file)
+
+    def rename_ref_star_to_mrcs(self):
+        '''
+        Rename rlnImagename to *.mrcs
+        '''
+        if self.ref_mrc_file is not None:
+            mrc_file, ext = os.path.splitext(self.ref_mrc_file)
+            if os.path.isfile(self.ref_mrc_file) and ext == '.mrc':
+                self.star.data_block.loc[:,'rlnReferenceImage'] = self.star.data_block.loc[:,'rlnReferenceImage'] + 's'
 
     def read_blob(self, file):
         '''
@@ -3124,6 +3210,15 @@ class CryoSparc(EMfile):
 
         self.original_star = Star(fname)
 
+    def set_project_path(self, project_path=''):
+        '''
+        Set project path
+        '''
+        if len(project_path) > 0:
+            self.project_path = project_path + '/' 
+        else:
+            self.project_path = ''
+
     def convert2star(self):
         '''
         Convert to star format
@@ -3152,8 +3247,8 @@ class CryoSparc(EMfile):
                 for i in range(self.data_block_blob.shape[0]):
 
                     # Read the root and the file
-                    head, tail = os.path.split(self.data_block_blob['blob/path'][i].decode("utf-8"))
-                    image_name = "%010d@%s" % (self.data_block_blob['blob/idx'][i]+1, self.original_path+tail)
+                    image_name = "%010d@%s" % (self.data_block_blob['blob/idx'][i]+1,
+                                               self.project_path+self.data_block_blob['blob/path'][i].decode("utf-8"))
                     new_data_column.append(image_name)
 
                 self.data_block_dict['rlnImageName'] = np.array(new_data_column,
