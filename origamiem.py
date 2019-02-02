@@ -1165,6 +1165,10 @@ class ProjectSubtract2D(Project):
         # Get number of particles
         num_ptcls = len(self.subtraction_results)
 
+        # If number of particles is 0, then quit early
+        if num_ptcls == 0:
+            return
+
         # Show status
         print('Writing  %d particles' % (num_ptcls))
 
