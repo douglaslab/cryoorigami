@@ -183,7 +183,7 @@ def shift_ptcl_img2D(img2D, ptcl_star):
     return shift_img2D(img2D, originX, originY)
 
 
-def eval_ptcl_ctf(ctf_s, ctf_a, ptcl_star, bf=0, lp=0.0):
+def eval_ptcl_ctf(ctf_s, ctf_a, ptcl_star, bf=0, lp=None, hp=None):
     '''
     Determine ctf from particle data
     '''
@@ -195,7 +195,7 @@ def eval_ptcl_ctf(ctf_s, ctf_a, ptcl_star, bf=0, lp=0.0):
     ac         = ptcl_star['rlnAmplitudeContrast']
     cs         = ptcl_star['rlnSphericalAberration']
 
-    return eval_ctf(ctf_s, ctf_a, defU, defV, defA, phaseShift, kV, ac, cs, bf, lp)
+    return eval_ctf(ctf_s, ctf_a, defU, defV, defA, phaseShift, kV, ac, cs, bf, lp, hp)
 
 
 def subtract_ctf(img2D, ctf):
