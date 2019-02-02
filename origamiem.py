@@ -102,6 +102,10 @@ class Project:
         self.first_ref_class_mrc      = None
         self.first_ref_class_mrc_file = None
 
+        # Low and highpass filters
+        self.highpass_angstrom        = None
+        self.lowpass_angstrom         = None
+
         # Relion code
         self.relion_refine_exe    = 'relion_refine'
         self.relion_refine_args   = []
@@ -117,6 +121,20 @@ class Project:
         self.particles = []
         self.class2Ds  = []
         self.class3Ds  = []
+
+    def set_highpass_filter(self, hp=None):
+        '''
+        Set highpass filter
+        '''
+        if hp is not None:
+            self.highpass_angstrom = hp
+
+    def set_lowpass_filter(self, lp=None):
+        '''
+        Set lowpass filter
+        '''
+        if lp is not None:
+            self.lowpass_angstrom = lp
 
     def set_particle_radius(self):
         '''
@@ -1252,7 +1270,7 @@ class ProjectSubtract2D(Project):
             # Normalize class mrc
             self.class_mrc.normalize_intensity(new_mean=0, new_std=1.0)
 
-            # Transform the class mrc with 
+            # Transform the class mrc with
             self.class_mrc.transform_ptcl_img2D(class_row)
 
             # Store to original
@@ -1300,7 +1318,8 @@ class ProjectSubtract2D(Project):
                                                                                          mask_align_img2D,
                                                                                          mask_structure_img2D,
                                                                                          mask_subtract_img2D,
-                                                                                         self.particle_apix,))
+                                                                                         2.0*self.particle_apix,
+                                                                                         self.highpass_angstrom))
 
                 self.subtraction_results.append([worker_result, ptcl_index])
 
@@ -1497,7 +1516,6 @@ class ProjectAlign2D(Project):
         self.ref_class_transformed_mrc.mrc_data.data[ptcl_list] = transformed_img2Ds
         self.ref_class_transformed_mrc.close()
 
-
     def write_transformed_star(self):
         '''
         Write transformed star
@@ -1540,8 +1558,8 @@ class ProjectAlign2D(Project):
         '''
         if self.ref_class_star is not None:
             self.ref_class_star.change_label('rlnReferenceImage', 'rlnImageName')
-            
-            # If unmasked class option is on, use unmasked classes 
+
+            # If unmasked class option is on, use unmasked classes
             if use_unmasked:
                 self.ref_class_star.replace_with_unmasked_classes()
 
@@ -1590,10 +1608,10 @@ class ProjectAlign2D(Project):
         self.ref_class_star.write(self.ref_class_tmp_star_file)
 
     def set_relion_refine_args(self, offset_range=100, offset_step=1, psi_step=1, gpu=0):
-        
+
         # Get the maximum offset range possible
         offset_range_max = int(self.first_ref_class_mrc.img2D.shape[0]//2)
-        
+
         self.relion_refine_args = [self.relion_refine_exe,
                                    '--i', self.ref_class_tmp_star_norm_file,
                                    '--o', self.relion_output_str,
@@ -1973,7 +1991,7 @@ class MRC:
         self.img2D_pshift = np.exp(-2 * np.pi * 1j * (-originx * self.ctf_sx + -originy * self.ctf_sy))
         return self.img2D_pshift
 
-    def _eval_ctf(self, defU, defV, defA=0, phaseShift=0, kv=300, ac=0.1, cs=2.0, bf=0, lp=0):
+    def _eval_ctf(self, defU, defV, defA=0, phaseShift=0, kv=300, ac=0.1, cs=2.0, bf=0, lp=None, hp=None):
         '''
         :param defU: 1st prinicipal underfocus distance (Å).
         :param defV: 2nd principal underfocus distance (Å).
@@ -1983,7 +2001,8 @@ class MRC:
         :param ac:  Amplitude contrast in [0, 1.0].
         :param cs:  Spherical aberration (mm).
         :param bf:  B-factor, divided by 4 in exponential, lowpass positive.
-        :param lp:  Hard low-pass filter (Å), should usually be Nyquist.
+        :param lp:  Hard low-pass filter (Å), should usually be Nyquist
+        :param hp:  High-pass filter (Å)
         '''
 
         # parameter unit conversions
@@ -2001,11 +2020,16 @@ class MRC:
         k4 = bf / 4.                # B-factor, follows RELION convention.
         k5 = np.deg2rad(phaseShift)  # Phase shift.
 
+        # Assign s grid
+        s = self.ctf_s
+
         # Hard low-pass filter
-        if lp != 0:
+        if lp is not None:
             s = self.ctf_s*(self.ctf_s <= (1. / lp))
-        else:
-            s = self.ctf_s
+
+        # Hard high-pass filter
+        if hp is not None:
+            s = self.ctf_s*(self.ctf_s >= (1. / hp))
 
         s2 = s**2
         s4 = s2**2

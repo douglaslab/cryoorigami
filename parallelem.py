@@ -215,7 +215,7 @@ def correct_fft_ctf(fft2D, ctf):
     return fft2D*ctf
 
 
-def eval_ctf(ctf_s, ctf_a, defU, defV, defA=0, phaseShift=0, kv=300, ac=0.1, cs=2.0, bf=0, lp=0):
+def eval_ctf(ctf_s, ctf_a, defU, defV, defA=0, phaseShift=0, kv=300, ac=0.1, cs=2.0, bf=0, lp=None, hp=None):
     '''
     :param defU: 1st prinicipal underfocus distance (Å).
     :param defV: 2nd principal underfocus distance (Å).
@@ -226,6 +226,7 @@ def eval_ctf(ctf_s, ctf_a, defU, defV, defA=0, phaseShift=0, kv=300, ac=0.1, cs=
     :param cs:  Spherical aberration (mm).
     :param bf:  B-factor, divided by 4 in exponential, lowpass positive.
     :param lp:  Hard low-pass filter (Å), should usually be Nyquist.
+    :param hp:  High-pass filter (Å)
     '''
 
     # parameter unit conversions
@@ -243,11 +244,16 @@ def eval_ctf(ctf_s, ctf_a, defU, defV, defA=0, phaseShift=0, kv=300, ac=0.1, cs=
     k4 = bf / 4.                # B-factor, follows RELION convention.
     k5 = np.deg2rad(phaseShift)  # Phase shift.
 
+    # Assign s grid
+    s = ctf_s
+
     # Hard low-pass filter
-    if lp != 0:
+    if lp is not None:
         s = ctf_s*(ctf_s <= (1. / lp))
-    else:
-        s = ctf_s
+
+    # Hard high-pass filter
+    if hp is not None:
+        s = ctf_s*(ctf_s >= (1. / hp))
 
     s2 = s**2
     s4 = s2**2
@@ -320,12 +326,12 @@ def normalize_bg_area_intensity(img2D, mask_bg, new_val_bg, mask_area, new_val_a
     return img2D
 
 
-def subtract_class_ctf(class_img2D, ctf_a, ctf_s, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D, apix):
+def subtract_class_ctf(class_img2D, ctf_a, ctf_s, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D, lowpass=None, highpass=None):
     '''
     Subtract class
     '''
     ptcl_img2D  = read_ptcl_mrc(ptcl_star)
-    class_ctf   = eval_ptcl_ctf(ctf_s, ctf_a, ptcl_star, bf=0, lp=2*apix)
+    class_ctf   = eval_ptcl_ctf(ctf_s, ctf_a, ptcl_star, bf=0, lp=lowpass, hp=highpass)
     class_img2D, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D = inv_transform_imgs(class_img2D, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D)
     class_img2D = ctf_correct_class_img(class_img2D, class_ctf)
     class_img2D = intensity_norm_class_img(class_img2D, class_ctf, ptcl_img2D, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D)
@@ -334,13 +340,13 @@ def subtract_class_ctf(class_img2D, ctf_a, ctf_s, ptcl_star, mask_align_img2D, m
     return ptcl_img2D
 
 
-def crop_class_ctf(class_img2D, ctf_a, ctf_s, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D, apix):
+def crop_class_ctf(class_img2D, ctf_a, ctf_s, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D, lowpass=None, highpass=None):
     '''
     Subtract class
     '''
     class_img2D = create_noise(class_img2D)
     ptcl_img2D  = read_ptcl_mrc(ptcl_star)
-    class_ctf   = eval_ptcl_ctf(ctf_s, ctf_a, ptcl_star, bf=0, lp=2*apix)
+    class_ctf   = eval_ptcl_ctf(ctf_s, ctf_a, ptcl_star, bf=0, lp=lowpass, hp=highpass)
     class_img2D, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D = inv_transform_imgs(class_img2D, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D)
     class_img2D = ctf_correct_class_img(class_img2D, class_ctf)
     class_img2D = intensity_norm_noise_img(class_img2D, class_ctf, ptcl_img2D, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D)
@@ -349,7 +355,7 @@ def crop_class_ctf(class_img2D, ctf_a, ctf_s, ptcl_star, mask_align_img2D, mask_
     return ptcl_img2D
 
 
-def crop_class(class_img2D, ctf_a, ctf_s, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D, apix):
+def crop_class(class_img2D, ctf_a, ctf_s, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D, lowpass=None, highpass=None):
     '''
     Crop class with no ctf correction
     '''

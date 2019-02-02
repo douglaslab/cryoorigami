@@ -16,16 +16,18 @@ def main():
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument("-i",            "--input",         type=str,   help="Particle star file")
-    parser.add_argument("-refclass",     "--refclass",      type=str,   help="Class star file")
-    parser.add_argument("-o",            "--output",        type=str,   help="Output directory", default=None)
-    parser.add_argument("-diameter",     "--diameter",      type=float, help="Particle diameter in Angstroms", default=None)
-    parser.add_argument("-maskalign",    "--maskalign",     type=str,   help="Mask used for 2D classification", default=None)
-    parser.add_argument("-masksub",      "--masksub",       type=str,   help="Mask used for the subtraction", default=None)
-    parser.add_argument("-maskstruct",   "--maskstruct",    type=str,   help="Maks that defines the boundaries of structure", default=None)
-    parser.add_argument("-batch",        "--batch",         type=int,   help="Particle batch size", default=100)
-    parser.add_argument("-maxptcl",      "--maxptcl",       type=int,   help="Maximum number of particles to write", default=None)
-    parser.add_argument("-method",       "--method",        type=str,   help="Particle subtraction method", choices=['subctf', 'cropctf', 'crop'], default='subctf')
+    parser.add_argument("-i",            "--input",         type=str,     help="Particle star file")
+    parser.add_argument("-refclass",     "--refclass",      type=str,     help="Class star file")
+    parser.add_argument("-o",            "--output",        type=str,     help="Output directory", default=None)
+    parser.add_argument("-diameter",     "--diameter",      type=float,   help="Particle diameter in Angstroms", default=None)
+    parser.add_argument("-maskalign",    "--maskalign",     type=str,     help="Mask used for 2D classification", default=None)
+    parser.add_argument("-masksub",      "--masksub",       type=str,     help="Mask used for the subtraction", default=None)
+    parser.add_argument("-maskstruct",   "--maskstruct",    type=str,     help="Maks that defines the boundaries of structure", default=None)
+    parser.add_argument("-batch",        "--batch",         type=int,     help="Particle batch size", default=100)
+    parser.add_argument("-maxptcl",      "--maxptcl",       type=int,     help="Maximum number of particles to write", default=None)
+    parser.add_argument("-method",       "--method",        type=str,     help="Particle subtraction method", choices=['subctf', 'cropctf', 'crop'], default='subctf')
+    parser.add_argument("-lp",           "--lowpass",       type=float,   help="Lowpass filter in Angstrom",  default=None)
+    parser.add_argument("-hp",           "--highpass",      type=float,   help="Highpass filter in Angstrom", default=None)
 
     args = parser.parse_args()
 
@@ -39,7 +41,9 @@ def main():
                  'maskstruct':    args.maskstruct,
                  'batch':         args.batch,
                  'maxptcl':       args.maxptcl,
-                 'method':        args.method
+                 'method':        args.method,
+                 'lowpass':       args.lowpass,
+                 'highpass':      args.highpass
                  }
 
     # Check if the input file exists
@@ -87,6 +91,10 @@ def main():
 
     # Prepare project files
     new_project.prepare_project()
+
+    # Set the low and high pass filters
+    new_project.set_lowpass_filter(args_dict['lowpass'])
+    new_project.set_highpass_filter(args_dict['highpass'])
 
     # Subtract class mrc from particle mrc
     new_project.subtract_class_mrc(max_ptcl=args_dict['maxptcl'], batch_size=args_dict['batch'], subtract_func=args_dict['method'])
