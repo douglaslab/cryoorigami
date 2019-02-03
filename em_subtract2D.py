@@ -28,6 +28,7 @@ def main():
     parser.add_argument("-method",       "--method",        type=str,     help="Particle subtraction method", choices=['subctf', 'cropctf', 'crop'], default='subctf')
     parser.add_argument("-lp",           "--lowpass",       type=float,   help="Lowpass filter in Angstrom",  default=None)
     parser.add_argument("-hp",           "--highpass",      type=float,   help="Highpass filter in Angstrom", default=None)
+    parser.add_argument("-subtractbg",   "--subtractbg",    action='store_true', help="Subtract background (~subtracture mask)")
 
     args = parser.parse_args()
 
@@ -43,7 +44,8 @@ def main():
                  'maxptcl':       args.maxptcl,
                  'method':        args.method,
                  'lowpass':       args.lowpass,
-                 'highpass':      args.highpass
+                 'highpass':      args.highpass,
+                 'subtractbg':    args.subtractbg
                  }
 
     # Check if the input file exists
@@ -97,7 +99,10 @@ def main():
     new_project.set_highpass_filter(args_dict['highpass'])
 
     # Subtract class mrc from particle mrc
-    new_project.subtract_class_mrc(max_ptcl=args_dict['maxptcl'], batch_size=args_dict['batch'], subtract_func=args_dict['method'])
+    new_project.subtract_class_mrc(max_ptcl=args_dict['maxptcl'],
+                                   batch_size=args_dict['batch'],
+                                   subtract_func=args_dict['method'],
+                                   subtract_bg=args_dict['subtractbg'])
 
     # Write output files
     new_project.write_output_files()

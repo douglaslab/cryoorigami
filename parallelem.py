@@ -326,7 +326,7 @@ def normalize_bg_area_intensity(img2D, mask_bg, new_val_bg, mask_area, new_val_a
     return img2D
 
 
-def subtract_class_ctf(class_img2D, ctf_a, ctf_s, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D, lowpass=None, highpass=None):
+def subtract_class_ctf(class_img2D, ctf_a, ctf_s, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D, lowpass=None, highpass=None, subtract_bg=True):
     '''
     Subtract class
     '''
@@ -340,7 +340,7 @@ def subtract_class_ctf(class_img2D, ctf_a, ctf_s, ptcl_star, mask_align_img2D, m
     return ptcl_img2D
 
 
-def crop_class_ctf(class_img2D, ctf_a, ctf_s, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D, lowpass=None, highpass=None):
+def crop_class_ctf(class_img2D, ctf_a, ctf_s, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D, lowpass=None, highpass=None, subtract_bg=True):
     '''
     Subtract class
     '''
@@ -350,19 +350,36 @@ def crop_class_ctf(class_img2D, ctf_a, ctf_s, ptcl_star, mask_align_img2D, mask_
     class_img2D, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D = inv_transform_imgs(class_img2D, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D)
     class_img2D = ctf_correct_class_img(class_img2D, class_ctf)
     class_img2D = intensity_norm_noise_img(class_img2D, class_ctf, ptcl_img2D, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D)
-    ptcl_img2D  = crop_class_from_ptcl(class_img2D, class_ctf, ptcl_img2D, mask_subtract_img2D)
+
+    # Determine the mask for bg subtraction
+    if subtract_bg:
+        mask_bg_img2D = mask_subtract_img2D + 1-mask_structure_img2D
+    else:
+        mask_bg_img2D = mask_subtract_img2D
+
+    ptcl_img2D  = crop_class_from_ptcl(class_img2D, class_ctf, ptcl_img2D, mask_bg_img2D)
 
     return ptcl_img2D
 
 
-def crop_class(class_img2D, ctf_a, ctf_s, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D, lowpass=None, highpass=None):
+def crop_class(class_img2D, ctf_a, ctf_s, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D, lowpass=None, highpass=None, subtract_bg=True):
     '''
     Crop class with no ctf correction
     '''
     ptcl_img2D  = read_ptcl_mrc(ptcl_star)
     class_img2D, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D = inv_transform_imgs(class_img2D, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D)
-    background_mean, background_std = calc_mean_std_intensity(ptcl_img2D, mask_align_img2D-mask_structure_img2D)
-    ptcl_img2D = create_noise(ptcl_img2D, mask_subtract_img2D, background_mean, background_std)
+
+    # Get the mask for noise stats
+    mask_noise_img2D = mask_align_img2D-mask_structure_img2D
+    background_mean, background_std = calc_mean_std_intensity(ptcl_img2D, mask_noise_img2D)
+
+    # Determine the mask for bg subtraction
+    if subtract_bg:
+        mask_bg_img2D = mask_subtract_img2D + 1-mask_structure_img2D
+    else:
+        mask_bg_img2D = mask_subtract_img2D
+
+    ptcl_img2D = create_noise(ptcl_img2D, mask_bg_img2D, background_mean, background_std)
 
     return ptcl_img2D
 

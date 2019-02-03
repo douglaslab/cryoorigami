@@ -1239,7 +1239,7 @@ class ProjectSubtract2D(Project):
         new_image_name = '%07d@%s' % (ptcl_index, self.subtracted_mrc_file)
         self.subtracted_star.data_block.loc[ptcl_index, 'rlnImageName'] = new_image_name
 
-    def subtract_class_mrc(self, threshold_val=0.05, max_ptcl=None, batch_size=100, subtract_func='subctf'):
+    def subtract_class_mrc(self, threshold_val=0.05, max_ptcl=None, batch_size=100, subtract_func='subctf', subtract_bg=True):
         '''
         Subtract class mrc file
         '''
@@ -1323,7 +1323,8 @@ class ProjectSubtract2D(Project):
                                                                                          mask_structure_img2D,
                                                                                          mask_subtract_img2D,
                                                                                          2.0*self.particle_apix,
-                                                                                         self.highpass_angstrom))
+                                                                                         self.highpass_angstrom,
+                                                                                         subtract_bg))
 
                 self.subtraction_results.append([worker_result, ptcl_index])
 
@@ -1348,7 +1349,7 @@ class ProjectSubtract2D(Project):
 
     def read_masks(self):
         '''
-        Read masks    def subtract_class_mrc()                :855
+        Read masks
         '''
         # 1. Alignment mask - ideally a circular mask
         if self.mask_align_mrc_file is not None:
@@ -1367,6 +1368,10 @@ class ProjectSubtract2D(Project):
         if self.mask_subtract_mrc_file is not None:
             self.mask_subtract_mrc = MRC(self.mask_subtract_mrc_file)
             self.mask_subtract_mrc.convert_to_binary_mask()
+
+        # Take the intersection of the masks with alignment mask
+        self.mask_structure_mrc.intersect(self.mask_align_mrc)
+        self.mask_subtract_mrc.intersect(self.mask_align_mrc)
 
         # Store the originals of masks
         self.mask_align_mrc.store_to_original()
@@ -1760,6 +1765,13 @@ class MRC:
         Flip on X-axis
         '''
         self.img2D = self.img2D[:, ::-1]
+
+    def intersect(self, other):
+        '''
+        Take the intersection with other
+        '''
+        if self.img2D.shape == other.img2D.shape:
+            self.img2D = self.img2D*other.img2D
 
     def copy(self):
         '''
