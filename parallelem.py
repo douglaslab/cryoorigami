@@ -340,6 +340,17 @@ def subtract_class_ctf(class_img2D, ctf_a, ctf_s, ptcl_star, mask_align_img2D, m
     return ptcl_img2D
 
 
+def blur_class_ctf(class_img2D, ctf_a, ctf_s, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D, lowpass=None, highpass=None, subtract_bg=True):
+    '''
+    Add class blur ctf
+    '''
+    class_ctf   = eval_ptcl_ctf(ctf_s, ctf_a, ptcl_star, bf=0, lp=lowpass, hp=highpass)
+    class_img2D, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D = inv_transform_imgs(class_img2D, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D)
+    class_img2D = ctf_correct_class_img(class_img2D, class_ctf)
+
+    return gaussian_filter(class_img2D, 5.0)
+
+
 def crop_class_ctf(class_img2D, ctf_a, ctf_s, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D, lowpass=None, highpass=None, subtract_bg=True):
     '''
     Subtract class
@@ -413,6 +424,13 @@ def ctf_correct_class_img(class_img2D, class_ctf):
     class_img2D = ifft_img2D(class_fft2D)
 
     return class_img2D
+
+
+def gaussian_filter(img2D, sigma):
+    '''
+    Gaussian filter
+    '''
+    return scipy.ndimage.filters.gaussian_filter(img2D, sigma)
 
 
 def intensity_norm_class_img(class_img2D, class_ctf, ptcl_img2D, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D):

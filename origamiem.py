@@ -1049,7 +1049,8 @@ class ProjectSubtract2D(Project):
         # Subtraction functions
         self.sub_funcs = {'subctf':  parallelem.subtract_class_ctf,
                           'cropctf': parallelem.crop_class_ctf,
-                          'crop':    parallelem.crop_class}
+                          'crop':    parallelem.crop_class,
+                          'other':   parallelem.blur_class_ctf}
 
     def _subtract_class(self, class_mrc, ptcl_mrc, ptcl_star, mask_align_mrc, mask_structure_mrc, mask_subtract_mrc, norm=['']):
         '''
