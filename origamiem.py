@@ -1049,8 +1049,7 @@ class ProjectSubtract2D(Project):
         # Subtraction functions
         self.sub_funcs = {'subctf':  parallelem.subtract_class_ctf,
                           'cropctf': parallelem.crop_class_ctf,
-                          'crop':    parallelem.crop_class,
-                          'other':   parallelem.blur_class_ctf}
+                          'crop':    parallelem.crop_class}
 
     def _subtract_class(self, class_mrc, ptcl_mrc, ptcl_star, mask_align_mrc, mask_structure_mrc, mask_subtract_mrc, norm=['']):
         '''
@@ -1355,7 +1354,6 @@ class ProjectSubtract2D(Project):
         # 1. Alignment mask - ideally a circular mask
         if self.mask_align_mrc_file is not None:
             self.mask_align_mrc = MRC(self.mask_align_mrc_file)
-            self.mask_align_mrc.convert_to_binary_mask()
         else:
             self.mask_align_mrc = MRC()
             self.mask_align_mrc.set_img2D(self.circular_mask)
@@ -1363,16 +1361,10 @@ class ProjectSubtract2D(Project):
         # 2. Structure mask - mask that defines the boundaries of structure
         if self.mask_structure_mrc_file is not None:
             self.mask_structure_mrc = MRC(self.mask_structure_mrc_file)
-            self.mask_structure_mrc.convert_to_binary_mask()
 
         # 3. Subtract mask - mask used for subtraction
         if self.mask_subtract_mrc_file is not None:
             self.mask_subtract_mrc = MRC(self.mask_subtract_mrc_file)
-            self.mask_subtract_mrc.convert_to_binary_mask()
-
-        # Take the intersection of the masks with alignment mask
-        self.mask_structure_mrc.intersect(self.mask_align_mrc)
-        self.mask_subtract_mrc.intersect(self.mask_align_mrc)
 
         # Store the originals of masks
         self.mask_align_mrc.store_to_original()
@@ -1407,7 +1399,7 @@ class ProjectSubtract2D(Project):
             # Create output MRC file
             self.subtracted_mrc = MRC(file=self.subtracted_mrc_file, shape=(num_particles, NY, NX))
 
-    def create_circular_mask(self):
+    def create_circular_mask(self, sigma=4):
         '''
         Create circular mask
         '''
@@ -1419,6 +1411,9 @@ class ProjectSubtract2D(Project):
             self.circular_mask = util.circular_mask(self.first_particle_mrc.img2D.shape,
                                                     center=None,
                                                     radius=self.particle_radius_pix)
+            # Make the mask soft
+            self.circular_mask = scipy.ndimage.filters.gaussian_filter(self.circular_mask, sigma)
+            
 
     def prepare_meta_objects(self):
         '''
@@ -1747,6 +1742,11 @@ class MRC:
             else:
                 self.create(file, shape)
 
+    def gaussian_filter(self, sigma=2):
+        '''
+        Apply gaussian filter to img2D
+        '''
+
     def ccc(self, other, mask=None):
         '''
         Measure ccc with other img2D
@@ -1755,7 +1755,7 @@ class MRC:
         other_mean, other_std     = other.calc_mean_std_intensity(mask)
 
         if mask is not None:
-            cross_correlation = np.mean((self.img2D[mask > 0]-current_mean)(other.img2D[mask > 0]-other_mean))
+            cross_correlation = np.average((self.img2D-current_mean)*(other.img2D-other_mean), weights=mask)
         else:
             cross_correlation = np.mean((self.img2D-current_mean)(other.img2D-other_mean))
 
