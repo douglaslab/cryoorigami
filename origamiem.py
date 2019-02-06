@@ -712,6 +712,13 @@ class Project:
 
         return particle_mrc
 
+    def filter_ptcls(self, maxprob=0.5, maxclass=10):
+        '''
+        Filter ptcls
+        '''
+        if self.particle_star is not None:
+            self.particle_star.filter(maxprob, maxclass)
+
 
 class ProjectFlip(Project):
     '''
@@ -2485,7 +2492,7 @@ class Star(EMfile):
         intersect_data_block = pd.merge(self.data_block, other.data_block[cmp_columns], how='inner')
         self.set_data_block(intersect_data_block)
 
-    def filter_ptcls(self, maxprob=0.5, maxclass=10):
+    def filter(self, maxprob=0.5, maxclass=10):
         '''
         Filter the data using max probability in star data
         '''
@@ -2494,7 +2501,7 @@ class Star(EMfile):
             self.data_block = self.data_block.loc[prob_mask, :]
 
         if self.has_label('rlnNrOfSignificantSamples'):
-            class_mask = self.data_block['rlnNrOfSignificantSamples'] >= maxclass
+            class_mask = self.data_block['rlnNrOfSignificantSamples'] < maxclass
             self.data_block = self.data_block.loc[class_mask, :]
 
     def set_data_block(self, data):
