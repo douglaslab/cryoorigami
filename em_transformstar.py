@@ -59,8 +59,8 @@ def main():
         new_column_parameters = None
 
     # Create an EM project object
-    new_project = em.Project(name='ProjectTransform')
-    new_project.set_output_directory(args_dict['input'], args_dict['output'])
+    new_project = em.Project(name='EMTransform')
+    new_project.set_output_directory(args_dict['input'], args_dict['output'], project_root='.')
 
     # Set microgragraph pixel size
     new_project.set_mic_apix(args_dict['apix'])

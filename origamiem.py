@@ -1413,7 +1413,7 @@ class ProjectSubtract2D(Project):
                                                     radius=self.particle_radius_pix)
             # Make the mask soft
             self.circular_mask = scipy.ndimage.filters.gaussian_filter(self.circular_mask, sigma)
-            
+
 
     def prepare_meta_objects(self):
         '''
@@ -2485,13 +2485,17 @@ class Star(EMfile):
         intersect_data_block = pd.merge(self.data_block, other.data_block[cmp_columns], how='inner')
         self.set_data_block(intersect_data_block)
 
-    def filter(self, prob_threshold=0.95):
+    def filter_ptcls(self, maxprob=0.5, maxclass=10):
         '''
         Filter the data using max probability in star data
         '''
         if self.has_label('rlnMaxValueProbDistribution'):
-            prob_mask = self.data_block['rlnMaxValueProbDistribution'] >= prob_threshold
+            prob_mask = self.data_block['rlnMaxValueProbDistribution'] >= maxprob
             self.data_block = self.data_block.loc[prob_mask, :]
+
+        if self.has_label('rlnNrOfSignificantSamples'):
+            class_mask = self.data_block['rlnNrOfSignificantSamples'] >= maxclass
+            self.data_block = self.data_block.loc[class_mask, :]
 
     def set_data_block(self, data):
         '''
