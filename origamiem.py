@@ -399,7 +399,7 @@ class Project:
         if self.ref_class_cs is not None and write_cs_star:
             self.ref_class_cs.star.write(self.ref_class_out_file)
 
-    def set_output_directory(self, input_filename, output_directory=None, project_root=None):
+    def set_output_directory(self, output_directory=None, project_root=None):
         '''
         Set output directory
         '''
@@ -1430,6 +1430,56 @@ class ProjectSubtract2D(Project):
         self.create_output_subtract_mrc()
         self.create_output_subtract_star()
         self.create_circular_mask()
+
+
+class ProjectIntersect(Project):
+    '''
+    Intersection project
+    '''
+    def __init__(self, name='EMIntersect'):
+        super().__init__(name)
+
+        self.particle_star      = None
+        self.particle_star_file = None
+
+        self.stars = []
+        self.files = []
+
+
+    def set_star_files(self, star_files):
+        '''
+        Set star files
+        '''
+        self.files = star_files
+
+    def read_particle_star_file(self):
+        '''
+        Read first star file
+        '''
+        if len(self.files) > 0 and os.path.isfile(self.files[0]):
+            self.particle_star_file = self.files[0]
+            self.particle_star      = Star(self.particle_star_file)
+
+    def intersect_stars(self):
+        '''
+        Intersect star files
+        '''
+        if self.particle_star is not None:
+            for i in range(1, len(self.files)):
+                # Read new star file
+                current_star = Star(self.files[i])
+
+                # Intersect with the first star
+                self.particle_star.intersect(current_star)
+
+    def run(self, star_files):
+        '''
+        Run project
+        '''
+        self.set_star_files(star_files)
+        self.read_particle_star_file()
+        self.intersect_stars()
+        self.prepare_io_files_star()
 
 
 class ProjectAlign2D(Project):
@@ -2501,7 +2551,7 @@ class Star(EMfile):
             self.data_block = self.data_block.loc[prob_mask, :]
 
         if self.has_label('rlnNrOfSignificantSamples'):
-            class_mask = self.data_block['rlnNrOfSignificantSamples'] < maxclass
+            class_mask = self.data_block['rlnNrOfSignificantSamples'] <= maxclass
             self.data_block = self.data_block.loc[class_mask, :]
 
     def set_data_block(self, data):

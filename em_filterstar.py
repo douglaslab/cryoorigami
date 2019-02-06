@@ -16,15 +16,18 @@ def main():
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument("-i",        "--input",       type=str, help="Particle star file")
-    parser.add_argument("-o",        "--output",      type=str, help="Output directory", default=None)
+    parser.add_argument("-i",            "--input",         type=str,     help="Particle star file")
+    parser.add_argument("-o",            "--output",        type=str,     help="Output directory", default=None)
+    parser.add_argument("-maxprob",      "--maxprob",       type=float,   help="Maximum probability", default=0.5)
+    parser.add_argument("-maxclass",     "--maxclass",      type=int,     help="Maximum number of classes assigned for a particle", default=10)
 
     args = parser.parse_args()
 
     # Prepare args dict
-    args_dict = {'input':       args.input,
-                 'output':      args.output
-                 }
+    args_dict = {'input':         args.input,
+                 'output':        args.output,
+                 'maxprob':       args.maxprob,
+                 'maxclass':      args.maxclass}
 
     # Check if the input file exists
     if args_dict['input'] is None or not os.path.isfile(args_dict['input']):
@@ -32,7 +35,7 @@ def main():
         sys.exit('Input file does not exist!')
 
     # Create an EM project object
-    new_project = em.Project(name='EMSplitMirrors')
+    new_project = em.Project(name='EMFilter2D')
     new_project.set_output_directory(args_dict['output'], project_root='.')
 
     # Write parameters to args filename
@@ -44,13 +47,16 @@ def main():
     print('Read particle star file {}'.format(args_dict['input']))
 
     # Prepare input and output files
-    new_project.prepare_mirror_files_star()
+    new_project.prepare_io_files_star()
 
-    # Add new columns
-    new_project.split_mirrors()
+    # Determine pixel size from particle star file
+    new_project.read_particle_apix()
+
+    # Subtract class mrc from particle mrc
+    new_project.filter_ptcls(maxprob=args_dict['maxprob'], maxclass=args_dict['maxclass'])
 
     # Write output files
-    new_project.write_mirror_files()
+    new_project.write_output_files()
 
 
 if __name__ == "__main__":
