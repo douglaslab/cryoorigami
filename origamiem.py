@@ -206,9 +206,14 @@ class Project:
         '''
         Set micrograph dimensions
         '''
-        self.mic_NX = self.first_mic_mrc.header['NX']
-        self.mic_NY = self.first_mic_mrc.header['NY']
-        self.mic_NZ = self.first_mic_mrc.header['NZ']
+        if 'NX' in self.first_mic_mrc.header.dtype.names:
+            self.mic_NX = self.first_mic_mrc.header['NX']
+            self.mic_NY = self.first_mic_mrc.header['NY']
+            self.mic_NZ = self.first_mic_mrc.header['NZ']
+        elif len(self.first_mic_mrc.img3D.shape) == 3:
+            self.mic_NZ, self.mic_NY, self.mic_NX = self.first_mic_mrc.img3D.shape
+        else:
+            self.mic_NY, self.mic_NX = self.first_mic_mrc.img3D.shape
 
     def set_mic_apix(self, apix=1.82):
         '''
@@ -579,6 +584,10 @@ class Project:
 
             # Delete unwanted classes
             self.ref_class_cs.delete_classes(del_classes)
+
+        # Merge the data from original star file
+        if self.particle_cs.original_star is not None:
+            self.particle_cs.merge_with_original_star()
 
     def read_particle_mrc(self, particle_id=0):
         '''
@@ -2404,7 +2413,7 @@ class MRC:
         Read MRC file
         '''
 
-        with mrcfile.mmap(file, mode='r') as self.mrc_data:
+        with mrcfile.mmap(file, permissive=True, mode='r') as self.mrc_data:
             self.header   = self.mrc_data.header
             self.img3D    = self.mrc_data.data
 
@@ -2422,6 +2431,8 @@ class MRC:
 
             # Store an original copy of img2D
             self.img2D_original = np.copy(self.img2D)
+
+
 
     def store_from_original(self):
         '''
@@ -2654,6 +2665,34 @@ class Star(EMfile):
         # Read file
         if file is not None and os.path.isfile(file):
             self.read(file)
+
+    def create_shortImageName(self):
+        '''
+        Create short image name column from imagename
+        '''
+        new_column = []
+        for ptcl_index, ptcl_row in self.data_block.iterrows():
+            # Parse imagename
+            image_id, image_name = ptcl_row['rlnImageName'].split('@')
+            head, tail = os.path.split(image_name)
+
+            # New image name
+            new_image_name = str(int(image_id))+'@'+tail
+
+            # Append image to list
+            new_column.append(new_image_name)
+
+        # Assign new column to short imagename
+        self.data_block['shortImageName'] = new_column
+
+        # Add new parameter
+        self.PARAMETERS['shortImageName'] = self.PARAMETERS['rlnImageName']
+
+    def delete_shortImageName(self):
+        '''
+        Delete short image name
+        '''
+        self.delete_column('shortImageName')
 
     def set_barcode(self, barcode={}):
         '''
@@ -3535,6 +3574,43 @@ class CryoSparc(EMfile):
         '''
         if self.star is not None and self.star.has_label('rlnReferenceImage'):
             ref_index, self.ref_mrc_file = self.star.data_block['rlnReferenceImage'][0].split('@')
+
+
+    def merge_with_original_star(self):
+        '''
+        Merge with original star
+        '''
+        # Create shortImageName and delete rlnImageName for ptcl star
+        self.star.create_shortImageName()
+        self.star.delete_column('rlnImageName')
+        self.star.delete_column('rlnMicrographName')
+
+        # Create shortImage nam
+        self.original_star.create_shortImageName()
+
+        # Candidate column list
+        candidate_list = ['shortImageName', 'rlnCoordinateX','rlnCoordinateY', 'rlnImageName', 'rlnMicrographName', 'rlnIsFlip', 'rlnParticleName']
+        
+        # Comparison list
+        cmp_list = ['shortImageName', 'rlnCoordinateX', 'rlnCoordinateY']
+
+        # Final list
+        final_list = [label for label in candidate_list if self.original_star.has_label(label)]
+
+        # Get the original block
+        original_block = self.original_star.data_block[final_list]
+
+        # Get particle data block
+        ptcl_block = self.star.get_data_block()
+        
+        # Merge star with original
+        intersected_block = pd.merge(ptcl_block, original_block, on=cmp_list, how='inner')
+
+        # Set data block for star
+        self.star.set_data_block(intersected_block)
+
+        # Finally remove shortImageName
+        self.star.delete_column('shortImageName')
 
 
     def convert_ref_mrc_to_mrcs(self):
