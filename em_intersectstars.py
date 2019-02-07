@@ -16,7 +16,7 @@ def main():
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument("-i",            "--input",         type=str,     narg='+', help="Particle star file")
+    parser.add_argument("-i",            "--input",         type=str,     nargs='+', help="Particle star file")
     parser.add_argument("-o",            "--output",        type=str,     help="Output directory", default=None)
 
     args = parser.parse_args()
@@ -24,11 +24,6 @@ def main():
     # Prepare args dict
     args_dict = {'input':         args.input,
                  'output':        args.output}
-
-    # Check if the input file exists
-    if args_dict['input'] is None or not os.path.isfile(args_dict['input']):
-        parser.print_help()
-        sys.exit('Input file does not exist!')
 
     # Create an EM project object
     new_project = em.ProjectIntersect(name='EMIntersect')

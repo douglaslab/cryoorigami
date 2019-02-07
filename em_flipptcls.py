@@ -50,11 +50,12 @@ def main():
     # Determine pixel size from particle star file
     new_project.read_particle_apix()
 
-    # Prepare project
-    new_project.prepare_project_relion()
-
-    # Flip particles
-    new_project.flip_particles_relion()
+    if args_dict['relion']:
+        new_project.prepare_project_relion()
+        new_project.flip_particles_relion()
+    else:
+        new_project.prepare_project()
+        new_project.flip_particles(batch_size=args_dict['batch'])
 
 
 if __name__ == "__main__":

@@ -18,6 +18,7 @@ import scipy.ndimage
 import parallelem
 import multiprocessing
 import shutil
+import matplotlib.pyplot as py
 
 from shutil import copyfile
 
@@ -142,6 +143,20 @@ class Project:
         '''
         if self.particle_diameter_A is not None and self.particle_apix is not None:
             self.particle_radius_pix = int(self.particle_diameter_A//(2*self.particle_apix))
+
+    def append_particle_barcode(self, barcode={}):
+        '''
+        Append particle barcode
+        '''
+        if self.particle_star is not None:
+            self.particle_star.append_barcode(barcode)
+
+    def set_particle_barcode(self, barcode={}):
+        '''
+        Append particle barcode
+        '''
+        if self.particle_star is not None:
+            self.particle_star.set_barcode(barcode)
 
     def rename_columns(self, column_params):
         '''
@@ -325,6 +340,13 @@ class Project:
             for label, value in column_params.items():
                 self.particle_star.delete_column(label)
 
+    def toggle_flip_on(self):
+        '''
+        Set flip on for particles
+        '''
+        if self.particle_star:
+            self.particle_star.set_column('rlnIsFlip', 1)
+
     def transform_particles(self, final_offset=[0, 0], com_offset=False, rotate_psi=0):
         '''
         Transform particle star file based on the class star file
@@ -399,20 +421,17 @@ class Project:
         if self.ref_class_cs is not None and write_cs_star:
             self.ref_class_cs.star.write(self.ref_class_out_file)
 
-    def set_output_directory(self, output_directory=None, project_root=None):
+    def set_output_directory(self, output_directory=None, project_root='.'):
         '''
         Set output directory
         '''
 
-        # Parse input file
-        head, tail       = os.path.split(os.path.abspath(input_filename))
-        root, ext        = os.path.splitext(tail)
-
-        if output_directory:
+        if output_directory is not None:
             self.output_directory = output_directory
         else:
-            if project_root is not None and os.path.isdir(project_root):
-                head = project_root
+            # Get project root
+            head = project_root
+            
             # List existing output directories
             potential_directories = list(filter(lambda x: os.path.isdir(x),
                                          glob.glob(head+'/'+self.name+'_em_[0-9][0-9][0-9]')))
@@ -960,7 +979,7 @@ class ProjectFlip(Project):
         # Merge the star files
         self.merge_star_relion()
 
-    def flip_particles(self, batch_size=50):
+    def flip_particles(self, batch_size=100):
         '''
         Flip particles
         '''
@@ -1001,6 +1020,124 @@ class ProjectFlip(Project):
         self.flipped_star.write(self.flipped_star_file)
         self.flipped_mrc.close()
 
+
+class ProjectStack(Project):
+    '''
+    Create particle stack
+    '''
+    def __init__(self, name='EMStack'):
+        super().__init__(name)
+        self.stack_mrc_file  = None
+        self.stack_star_file = None
+
+        self.stack_mrc       = None
+        self.stack_star      = None
+
+    def prepare_output_files(self):
+        '''
+        Create output files
+        '''
+
+        self.stack_star_file = os.path.relpath(os.path.abspath(self.output_directory+'/subtracted.star'))
+        self.stack_mrc_file  = os.path.relpath(os.path.abspath(self.output_directory+'/subtracted.mrcs'))
+
+    def prepare_project(self):
+        '''
+        Prepare meta objects using reference class avarages
+        '''
+        self.read_first_particle_mrc()
+        self.prepare_output_files()
+        self.create_output_stack_mrc()
+        self.create_output_stack_star()
+
+    def create_output_stack_star(self):
+        '''
+        Create output star file
+        '''
+        self.stack_star = Star()
+        self.stack_star.copy(self.particle_star)
+
+    def create_output_stack_mrc(self):
+        '''
+        Create output subtract mrc object and file
+        '''
+        # Create MRCS output file
+        if self.stack_mrc is None:
+            # Determine shape parameters
+            num_particles = self.particle_star.data_block.shape[0]
+            NY, NX        = self.first_particle_mrc.img2D.shape
+
+            # Create output MRC file
+            self.stack_mrc = MRC(file=self.stack_mrc_file, shape=(num_particles, NY, NX))
+
+    def write_results(self):
+        '''
+        Write results
+        '''
+        # Get number of particles
+        num_ptcls = len(self.stack_results)
+
+        # If number of particles is 0, then quit early
+        if num_ptcls == 0:
+            return
+
+        # Show status
+        print('Writing  %d particles' % (num_ptcls))
+
+        # Get all the data
+        ptcl_list = [ptcl_index for ptcl_result, ptcl_index in self.stack_results]
+        ptcl_data = [ptcl_result.get() for ptcl_result, ptcl_index in self.stack_results]
+
+        # Write mrc file
+        self.stack_mrc.mrc_data.data[ptcl_list] = ptcl_data
+
+        # Write star file
+        new_image_names = []
+        for ptcl_index in ptcl_list:
+            new_image_names.append('%07d@%s' % (ptcl_index+1, self.stack_mrc_file))
+
+        self.stack_star.data_block.loc[ptcl_list, 'rlnImageName'] = new_image_names
+
+        # Reset the containers
+        self.stack_results = []
+
+    def create_stack(self, batch_size=100):
+        '''
+        Flip particles
+        '''
+        particle_data_block = self.particle_star.get_data_block()
+
+        # Create a pool
+        mp_pool = multiprocessing.Pool(multiprocessing.cpu_count())
+
+        # Initialize results list
+        self.stack_results = []
+
+        # Get number of particles
+        num_ptcls = particle_data_block.shape[0]
+
+        # Iterate over all the particles
+        for ptcl_index, ptcl_row in particle_data_block.iterrows():
+
+            print('Writing Particle %d/%d %d/100' % (ptcl_index+1,
+                                                      num_ptcls,
+                                                      100.0*(ptcl_index+1)/num_ptcls))
+
+            # Create a new process
+            worker_result = mp_pool.apply_async(parallelem.read_ptcl_mrc, args=(ptcl_row,))
+
+            self.stack_results.append([worker_result, ptcl_index])
+
+            # Write results
+            if len(self.stack_results) == batch_size:
+                self.write_results()
+
+        # Complete writing the remainings
+        self.write_results()
+
+        # Close the output files and write
+        self.stack_star.write(self.stack_star_file)
+        self.stack_mrc.close()
 
 class ProjectSubtract2D(Project):
     '''
@@ -1457,6 +1594,8 @@ class ProjectIntersect(Project):
         Read first star file
         '''
         if len(self.files) > 0 and os.path.isfile(self.files[0]):
+
+            print('Reading first star file %s' % (self.files[0]))
             self.particle_star_file = self.files[0]
             self.particle_star      = Star(self.particle_star_file)
 
@@ -1466,6 +1605,9 @@ class ProjectIntersect(Project):
         '''
         if self.particle_star is not None:
             for i in range(1, len(self.files)):
+
+                print('Reading star file:%d %s' % (i, self.files[i]))
+                
                 # Read new star file
                 current_star = Star(self.files[i])
 
@@ -1480,6 +1622,13 @@ class ProjectIntersect(Project):
         self.read_particle_star_file()
         self.intersect_stars()
         self.prepare_io_files_star()
+
+
+class ProjectPlot(Project):
+    '''
+    Plotting project
+    '''
+
 
 
 class ProjectAlign2D(Project):
@@ -2510,29 +2659,56 @@ class Star(EMfile):
         '''
         Set the particle barcode
         '''
-        barcode_str = ','.join(sorted([str(k)+':'+str(v) for k, v in barcode.items()]))
+        barcode_str = util.convert_dict2str(barcode)
+
         # Set barcode
-        if not self.has_label('rlnComment'):
-            self.set_column('rlnComment', barcode_str)
+        if not self.has_label('rlnParticleName'):
+            self.set_column('rlnParticleName', barcode_str)
+
+    def set_ptcl_barcode(self, ptcl_index, barcode={}):
+        '''
+        Set ptcl barcode
+        '''
+
+        if ptcl_index < self.data_block.shape[0] and self.has_label('rlnParticleName'):
+            current_barcode = self.read_ptcl_barcode(ptcl_index)
+            new_barcode     = {**current_barcode, **barcode}
+
+            self.data_block.loc[ptcl_index,'rlnParticleName'] = util.convert_dict2str(new_barcode)
 
     def append_barcode(self, barcode={}):
         '''
         Append the particle barcode
         '''
-        barcode_str = ','.join(sorted([str(k)+':'+str(v) for k, v in barcode.items()]))
 
-        if not self.has_label('rlnComment'):
+        if not self.has_label('rlnParticleName'):
             self.set_barcode(barcode)
         else:
-            self.data_block['rlnComment'] += barcode_str
+            barcode_str_list = []
+            for ptlc_index, ptcl_row in self.data_block.iterrows():
+                # Get new barcode
+                new_barcode = self.read_ptcl_barcode(ptcl_index, barcode)
 
-    def read_barcode(self, ptcl_index):
+                # Get barcode information for the particle
+                barcode_str_list.append(util.convert_dict2str(new_barcode))
+
+            self.data_block['rlnParticleName'] = barcode_str_list
+
+    def read_ptcl_barcode(self, ptcl_index, barcode={}):
         '''
         Read barcode
         '''
-        if self.has_label('rlnComment'):
-            barcode_str = self.data_block.loc[ptcl_index, 'rlnComment']
-            barcode_str.split(',')
+        current_barcode = {}
+        new_barcode     = {}
+
+        if self.has_label('rlnParticleName'):
+            barcode_str = self.data_block.loc[ptcl_index, 'rlnParticleName']
+            current_barcode = util.parse_star_parameters(barcode_str.split(','))
+        
+        # Update new barcode
+        new_barcode = {**current_barcode, **barcode}
+
+        return new_barcode
 
     def intersect(self, other):
         '''
@@ -2911,15 +3087,15 @@ class Star(EMfile):
         '''
         Set comment
         '''
-        if self.has_label('rlnComment'):
-            self.data_block.loc[ptcl, 'rlnComment'] = comment
+        if self.has_label('rlnParticleName'):
+            self.data_block.loc[ptcl, 'rlnParticleName'] = comment
 
     def get_comment(self, ptcl):
         '''
         Read the comment
         '''
-        if self.has_label('rlnComment'):
-            return self.data_block['rlnComment'][ptcl]
+        if self.has_label('rlnParticleName'):
+            return self.data_block['rlnParticleName'][ptcl]
         else:
             return None
 
@@ -3242,7 +3418,7 @@ class Star(EMfile):
         # Create write formatter
         self.write_formatter = '  '.join(formatter)
 
-    def write(self, out_fname):
+    def write(self, out_fname, verbose=True):
         '''
         Write star file
         '''
@@ -3264,6 +3440,10 @@ class Star(EMfile):
 
         # Make header string
         header = '\n'.join(header)
+
+        # Print particle number info
+        if verbose:
+            print('Writing %d particles in %s' % (self.data_block.shape[0], out_fname))
 
         # Save file
         np.savetxt(out_fname, self.data_block.values, fmt=self.write_formatter, header=header, comments='')

@@ -22,6 +22,16 @@ def write_config_file(fname, args_dict):
         yaml.dump(args_dict, outfile, default_flow_style=False)
 
 
+def convert_dict2str(dictionary={}):
+    '''
+    Convert dictionary to string
+    '''
+    conversion_str = ''
+    if dictionary:
+        conversion_str = ','.join(sorted([str(k)+':'+str(v) for k, v in dictionary.items()]))
+
+    return conversion_str
+
 def parse_star_parameters(parameter_input):
     '''
     Parse  parameter input
