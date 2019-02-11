@@ -1685,13 +1685,13 @@ class ProjectAlign2D(Project):
         self.ref_class_transformed_star      = None
         self.ref_class_transformed_mrc       = None
 
-    def prepare_project(self):
+    def prepare_project(self, use_unmasked_classes=False):
         '''
         Prepare project
         '''
         self.set_particle_radius()
         self.create_tmp_files_star()
-        self.prepare_tmp_input()
+        self.prepare_tmp_input(use_unmasked_classes)
         self.write_tmp_files()
         self.set_relion_output_str()
         self.set_relion_refine_exe()
@@ -1789,7 +1789,7 @@ class ProjectAlign2D(Project):
                                                      stdout=subprocess.PIPE,
                                                      universal_newlines=True)
 
-    def prepare_tmp_input(self, use_unmasked=False):
+    def prepare_tmp_input(self, use_unmasked_classes=False):
         '''
         Prepare the class reference star file for alignment of class averages
         '''
@@ -1797,7 +1797,7 @@ class ProjectAlign2D(Project):
             self.ref_class_star.change_label('rlnReferenceImage', 'rlnImageName')
 
             # If unmasked class option is on, use unmasked classes
-            if use_unmasked:
+            if use_unmasked_classes:
                 self.ref_class_star.replace_with_unmasked_classes()
 
     def create_tmp_files_star(self):

@@ -16,13 +16,14 @@ def main():
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument("-i",          "--input",         type=str,   help="Particle star file")
-    parser.add_argument("-refclass",   "--refclass",      type=str,   help="Class star file")
-    parser.add_argument("-o",          "--output",        type=str,   help="Output directory", default=None)
-    parser.add_argument("-diameter",   "--diameter",      type=float, help="Particle diameter in Angstroms", default=None)
-    parser.add_argument("-maskalign",  "--maskalign",     type=str,   help="Mask used for 2D classification", default=None)
-    parser.add_argument("-refalign",   "--refalign",      type=str,   help="Reference mrc file used for alignment", default=None)
-    parser.add_argument("-skip-rotate","--skiprotate",    action='store_true',   help="Skip rotation in alignment of class averages to reference")
+    parser.add_argument("-i",           "--input",         type=str,   help="Particle star file")
+    parser.add_argument("-refclass",    "--refclass",      type=str,   help="Class star file")
+    parser.add_argument("-o",           "--output",        type=str,   help="Output directory", default=None)
+    parser.add_argument("-diameter",    "--diameter",      type=float, help="Particle diameter in Angstroms", default=None)
+    parser.add_argument("-maskalign",   "--maskalign",     type=str,   help="Mask used for 2D classification", default=None)
+    parser.add_argument("-refalign",    "--refalign",      type=str,   help="Reference mrc file used for alignment", default=None)
+    parser.add_argument("-skip-rotate", "--skiprotate",    action='store_true',   help="Skip rotation in alignment of class averages to reference")
+    parser.add_argument("-use-unmasked","--useunmasked",   action='store_true',   help="Use unmasked classes for alignment of classes")
 
     args = parser.parse_args()
 
@@ -33,7 +34,8 @@ def main():
                  'diameter':      args.diameter,
                  'maskalign':     args.maskalign,
                  'refalign':      args.refalign,
-                 'skiprotate':    args.skiprotate
+                 'skiprotate':    args.skiprotate,
+                 'useunmasked':   args.useunmasked
                  }
 
     # Check if the input file exists
@@ -77,7 +79,7 @@ def main():
     new_project.set_alignment_ref(args_dict['refalign'])
 
     # Prepare project files
-    new_project.prepare_project()
+    new_project.prepare_project(use_unmasked_classes=args_dict['useunmasked'])
 
     # Normalize class averages
     new_project.normalize_class_refs()
