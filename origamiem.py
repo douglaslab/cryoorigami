@@ -1844,7 +1844,7 @@ class ProjectAlign2D(Project):
         '''
         self.ref_class_star.write(self.ref_class_tmp_star_file)
 
-    def set_relion_refine_args(self, skip_rotate=False, offset_range=100, offset_step=1, psi_step=1, gpu=0):
+    def set_relion_refine_args(self, skip_rotate=False, sigma_psi=-1, offset_range=100, offset_step=1, psi_step=1, gpu=0):
 
         # Get the maximum offset range possible
         offset_range_max = int(self.first_ref_class_mrc.img2D.shape[0]//2)
@@ -1875,6 +1875,10 @@ class ProjectAlign2D(Project):
         # Check rotation option for 2D class alignment
         if skip_rotate:
             self.relion_refine_args.append('--skip_rotate')
+
+        # Sigma psi option to limit psi search
+        if sigma_psi > 0:
+            self.relion_refine_args += ['--sigma_psi', str(sigma_psi)]
 
 
         if self.ref_align_mrc_file is not None:

@@ -24,6 +24,7 @@ def main():
     parser.add_argument("-refalign",    "--refalign",      type=str,   help="Reference mrc file used for alignment", default=None)
     parser.add_argument("-skip-rotate", "--skiprotate",    action='store_true',   help="Skip rotation in alignment of class averages to reference")
     parser.add_argument("-use-unmasked","--useunmasked",   action='store_true',   help="Use unmasked classes for alignment of classes")
+    parser.add_argument("-sigma-psi",   "--sigmapsi",      type=float, help="Sigma-psi for alignment of classes", default=-1)
 
     args = parser.parse_args()
 
@@ -35,7 +36,8 @@ def main():
                  'maskalign':     args.maskalign,
                  'refalign':      args.refalign,
                  'skiprotate':    args.skiprotate,
-                 'useunmasked':   args.useunmasked
+                 'useunmasked':   args.useunmasked,
+                 'sigmapsi':      args.sigmapsi
                  }
 
     # Check if the input file exists
@@ -85,7 +87,7 @@ def main():
     new_project.normalize_class_refs()
 
     # Run relion
-    new_project.set_relion_refine_args(skip_rotate=args_dict['skiprotate'])
+    new_project.set_relion_refine_args(skip_rotate=args_dict['skiprotate'], sigma_psi=args_dict['sigmapsi'])
     new_project.run_refine2D()
 
     # Process 2D refine files
