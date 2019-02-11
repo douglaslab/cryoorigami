@@ -1060,8 +1060,8 @@ class ProjectStack(Project):
         Create output files
         '''
 
-        self.stack_star_file = os.path.relpath(os.path.abspath(self.output_directory+'/subtracted.star'))
-        self.stack_mrc_file  = os.path.relpath(os.path.abspath(self.output_directory+'/subtracted.mrcs'))
+        self.stack_star_file = os.path.relpath(os.path.abspath(self.output_directory+'/stack.star'))
+        self.stack_mrc_file  = os.path.relpath(os.path.abspath(self.output_directory+'/stack.mrcs'))
 
     def prepare_project(self):
         '''
@@ -1123,7 +1123,7 @@ class ProjectStack(Project):
         # Reset the containers
         self.stack_results = []
 
-    def create_stack(self, batch_size=100):
+    def create_stack(self, batch_size=100, transform=False):
         '''
         Flip particles
         '''
@@ -1146,7 +1146,7 @@ class ProjectStack(Project):
                                                       100.0*(ptcl_index+1)/num_ptcls))
 
             # Create a new process
-            worker_result = mp_pool.apply_async(parallelem.read_ptcl_mrc, args=(ptcl_row,))
+            worker_result = mp_pool.apply_async(parallelem.read_ptcl_mrc, args=(ptcl_row, transform))
 
             self.stack_results.append([worker_result, ptcl_index])
 
@@ -1156,6 +1156,10 @@ class ProjectStack(Project):
 
         # Complete writing the remainings
         self.write_results()
+
+        # If transform is ON, reset the offsets
+        if transform:
+            self.stack_star.reset_offsets()
 
         # Close the output files and write
         self.stack_star.write(self.stack_star_file)
@@ -2818,6 +2822,31 @@ class Star(EMfile):
                 # Check that the column name exists and the new name is a proper star varaible
                 if self.has_label(old_column) and new_column in self.PARAMETERS:
                     self.data_block = self.data_block.rename(index=str, columns={old_column:new_column})
+
+    def reset_offsets(self):
+        '''
+        Reset all the offsets and the classification angles
+        '''
+        offset_params = ['rlnOriginX',
+                             'rlnOriginY',
+                             'rlnAnglePsi',
+                             'rlnAngleRot',
+                             'rlnAngleTilt']
+            
+        prior_params = [ 'rlnOriginXPrior',
+                         'rlnOriginYPrior',
+                         'rlnAnglePsiPrior',
+                         'rlnAngleRotPrior',
+                         'rlnAngleTiltPrior']
+
+        # Set offsets to 0
+        for param in offset_params:
+            self.set_column(param, 0)
+
+        # Delete the prior columns
+        for param in prior_params:
+            self.delete_column(param)
+
 
     def flipX(self):
         '''

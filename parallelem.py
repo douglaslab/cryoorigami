@@ -76,7 +76,7 @@ def create_noise(img2D, mask=None, noise_mean=0.0, noise_std=1.0, sigma=0):
         return None
 
 
-def read_ptcl_mrc(ptcl_star):
+def read_ptcl_mrc(ptcl_star, transform=False):
     '''
     Particle mrc data
     '''
@@ -89,6 +89,11 @@ def read_ptcl_mrc(ptcl_star):
             img2D = mrc_data.data[int(particle_image_num)-1]
         else:
             img2D = mrc_data.data
+
+        # If transform is ON, transform the ptcl image and rest the offset distance and angles
+        if transform:
+            img2D = transform_ptcl_img2D(img2D, ptcl_star)
+
 
     return np.copy(img2D)
 
