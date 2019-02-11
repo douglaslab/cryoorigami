@@ -16,10 +16,11 @@ def main():
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument("-i",           "--input",       type=str, help="Particle star file")
-    parser.add_argument("-o",           "--output",      type=str, help="Output directory", default=None)
-    parser.add_argument("-cols",        "--columns",     type=str, help="Columns to copy", nargs='*', default=None)
-    parser.add_argument("-copy-priors", "--copypriors",  action='store_true', help="Copy offset and angle parameters to priors")
+    parser.add_argument("-i",            "--input",       type=str, help="Particle star file")
+    parser.add_argument("-o",            "--output",      type=str, help="Output directory", default=None)
+    parser.add_argument("-cols",         "--columns",     type=str, help="Columns to copy", nargs='*', default=None)
+    parser.add_argument("-copy-priors",  "--copypriors",  action='store_true', help="Copy offset and angle parameters to priors")
+    parser.add_argument("-reset-priors", "--resetpriors", action='store_true', help="Delete prior offset and angle columngs")
 
     args = parser.parse_args()
 
@@ -27,7 +28,8 @@ def main():
     args_dict = {'input':       args.input,
                  'output':      args.output,
                  'columns':     args.columns,
-                 'copypriors':  args.copypriors
+                 'copypriors':  args.copypriors,
+                 'resetpriors': args.resetpriors
                  }
 
     # Check if the input file exists
@@ -64,6 +66,10 @@ def main():
 
     # Add new columns
     new_project.copy_columns(new_column_parameters)
+
+    # If reset option is ON
+    if args_dict['resetpriors']:
+        new_project.reset_priors()
 
     # Write output files
     new_project.write_output_files(write_ref_class_star=False)

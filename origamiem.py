@@ -345,6 +345,19 @@ class Project:
             for label, value in column_params.items():
                 self.particle_star.delete_column(label)
 
+    def reset_priors(self):
+        '''
+        Delete prior columns
+        '''
+        prior_columns = ['rlnOriginXPrior',
+                         'rlnOriginYPrior',
+                         'rlnAnglePsiPrior',
+                         'rlnAngleRotPrior',
+                         'rlnAngleTiltPrior']
+        
+        for label in prior_columns:
+            self.particle_star.delete_column(label)
+
     def toggle_flip_on(self):
         '''
         Set flip on for particles
