@@ -569,7 +569,7 @@ class Project:
             self.ref_class_cs = CryoSparc()
             self.ref_class_cs.read_blob(self.ref_class_cs_file)
 
-    def convert_cs2star(self, mic_path='Micrographs', proj_path='', del_classes=[], del_str=''):
+    def convert_cs2star(self, mic_path='Micrographs', proj_path='', del_classes=[], del_str='', restore_offsets=False):
         '''
         Convert to cs to star file
         '''
@@ -600,7 +600,7 @@ class Project:
 
         # Merge the data from original star file
         if self.particle_cs.original_star is not None:
-            self.particle_cs.merge_with_original_star()
+            self.particle_cs.merge_with_original_star(restore_offsets)
 
     def read_particle_mrc(self, particle_id=0):
         '''
@@ -3589,7 +3589,7 @@ class CryoSparc(EMfile):
             ref_index, self.ref_mrc_file = self.star.data_block['rlnReferenceImage'][0].split('@')
 
 
-    def merge_with_original_star(self):
+    def merge_with_original_star(self, restore_offsets=False):
         '''
         Merge with original star
         '''
@@ -3606,6 +3606,26 @@ class CryoSparc(EMfile):
         
         # Comparison list
         cmp_list = ['shortImageName', 'rlnCoordinateX', 'rlnCoordinateY']
+
+        # If to restore the coordinate and angle offsets
+        if restore_offsets:
+            offset_params = ['rlnOriginX',
+                             'rlnOriginY',
+                             'rlnAnglePsi',
+                             'rlnAngleRot',
+                             'rlnAngleTilt']
+            
+            prior_params = [ 'rlnOriginXPrior',
+                             'rlnOriginYPrior',
+                             'rlnAnglePsiPrior',
+                             'rlnAngleRotPrior',
+                             'rlnAngleTiltPrior']
+
+            for param in offset_params+prior_params:
+                self.star.delete_column(param)
+
+            # Add offset params to the candidate list
+            candidate_list += offset_params
 
         # Final list
         final_list = [label for label in candidate_list if self.original_star.has_label(label)]

@@ -25,19 +25,21 @@ def main():
     parser.add_argument("-projpath", "--projpath",    type=str, help="Cryosparc project path", default="")
     parser.add_argument("-delclass", "--delclass",    type=int, nargs='+', help="Classes to delete", default=[])
     parser.add_argument("-delstr",   "--delstr",      type=str, help="String to delete from Micrograph name", default='')
+    parser.add_argument("-restore-offsets", "--restoreoffsets", action='store_true', help="Restore offsets from original star file")
 
     args = parser.parse_args()
 
     # Prepare args dict
-    args_dict = {'input':        args.input,
-                 'reference':    args.reference,
-                 'passthrough':  args.passthrough,
-                 'output':       args.output,
-                 'original':     args.original,
-                 'micpath':      args.micpath,
-                 'projpath':     args.projpath,
-                 'delclass':     args.delclass,
-                 'delstr':       args.delstr
+    args_dict = {'input':          args.input,
+                 'reference':      args.reference,
+                 'passthrough':    args.passthrough,
+                 'output':         args.output,
+                 'original':       args.original,
+                 'micpath':        args.micpath,
+                 'projpath':       args.projpath,
+                 'delclass':       args.delclass,
+                 'delstr':         args.delstr,
+                 'restoreoffsets': args.restoreoffsets
                  }
 
     # Check if the input file exists
@@ -66,7 +68,7 @@ def main():
     new_project.prepare_io_files_cs()
 
     # Conert cs to star
-    new_project.convert_cs2star(args_dict['micpath'], args_dict['projpath'], args_dict['delclass'], args_dict['delstr'])
+    new_project.convert_cs2star(args_dict['micpath'], args_dict['projpath'], args_dict['delclass'], args_dict['delstr'], args_dict['restoreoffsets'])
 
     # Write output files
     new_project.write_output_files()

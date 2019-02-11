@@ -64,12 +64,12 @@ def main():
     # Prepare input and output files
     new_project.prepare_io_files_star()
 
-    # Add new columns
-    new_project.copy_columns(new_column_parameters)
-
     # If reset option is ON
     if args_dict['resetpriors']:
         new_project.reset_priors()
+
+    # Add new columns
+    new_project.copy_columns(new_column_parameters)
 
     # Write output files
     new_project.write_output_files(write_ref_class_star=False)
