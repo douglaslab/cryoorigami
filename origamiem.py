@@ -2724,7 +2724,7 @@ class Star(EMfile):
             self.set_barcode(barcode)
         else:
             barcode_str_list = []
-            for ptlc_index, ptcl_row in self.data_block.iterrows():
+            for ptcl_index, ptcl_row in self.data_block.iterrows():
                 # Get new barcode
                 new_barcode = self.read_ptcl_barcode(ptcl_index, barcode)
 
