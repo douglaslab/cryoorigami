@@ -125,7 +125,7 @@ class Project:
         self.class3Ds  = []
 
         # Barcode functions
-        self.barcode_funcs = {'Framev3-7': barcode.Framev3_7}
+        self.barcode_funcs = {'Frame': barcode.Frame_angle}
 
     def set_highpass_filter(self, hp=None):
         '''
@@ -147,6 +147,13 @@ class Project:
         '''
         if self.particle_diameter_A is not None and self.particle_apix is not None:
             self.particle_radius_pix = int(self.particle_diameter_A//(2*self.particle_apix))
+
+    def select_by_barcode(self, barcode_list):
+        '''
+        Select by barcode
+        '''
+        self.particle_star.select_by_barcode(barcode_list)
+
 
     def apply_barcode(self, barcode_func):
         '''
@@ -2795,6 +2802,30 @@ class Star(EMfile):
         new_barcode = {**current_barcode, **barcode}
 
         return new_barcode
+
+    def select_by_barcode(self, select_barcode_list):
+        '''
+        Select ptcls by barcode
+        '''
+
+        if not self.has_label('rlnParticleName'):
+            return
+
+        selected_ptcls = []
+
+        for ptcl_index, ptcl_row in self.data_block.iterrows():
+            ptcl_barcode_list = ptcl_row['rlnParticleName'].strip().split(',')
+
+            # Get intersection elements
+            intersect = [barcode for barcode in select_barcode_list if barcode in ptcl_barcode_list]
+
+            if len(intersect) > 0:
+                selected_ptcls.append(ptcl_index)
+
+        # Make list numpy array
+        selected_ptcls = np.array(selected_ptcls)
+
+        self.data_block = self.data_block.loc[selected_ptcls, :]
 
     def intersect(self, other):
         '''

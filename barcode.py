@@ -24,7 +24,10 @@ def parse_barcode(ptcl_star):
 	return barcode_dict
 
 
-def Framev3_7_ptcl(ptcl_star):
+def Frame_
+
+
+def Frame_ptcl_angle(ptcl_star):
 	'''
 	Frame v3-7 barcode function
 	'''
@@ -50,7 +53,7 @@ def Framev3_7_ptcl(ptcl_star):
 
 	return result_dict
 
-def Framev3_7(data_star):
+def Frame_angle(data_star):
 	'''
 	Frame v3-7 barcode function for data star
 	'''
@@ -61,7 +64,7 @@ def Framev3_7(data_star):
 
 	for ptcl_index, ptcl_row in data_star.iterrows():
 
-		barcode_dict = Framev3_7_ptcl(ptcl_row)
+		barcode_dict = Framev3_7_ptcl_angle(ptcl_row)
 		tilt_angle_list.append(barcode_dict['rlnAngleTilt'])
 		tilt_angle_list.append(barcode_dict['rlnAngleRot'])
 
