@@ -2819,7 +2819,7 @@ class Star(EMfile):
             # Get intersection elements
             intersect = [barcode for barcode in select_barcode_list if barcode in ptcl_barcode_list]
 
-            if len(intersect) > 0:
+            if len(intersect) == len(select_barcode_list):
                 selected_ptcls.append(ptcl_index)
 
         # Make list numpy array

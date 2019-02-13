@@ -7,6 +7,7 @@
 
 
 import utilities as util
+import numpy as np
 
 # Barcode functions for DNA origami assisted cryo-EM
 
@@ -22,9 +23,6 @@ def parse_barcode(ptcl_star):
 		barcode_dict = util.parse_star_parameters(barcode_arr)
 
 	return barcode_dict
-
-
-def Frame_
 
 
 def Frame_ptcl_angle(ptcl_star):
@@ -53,6 +51,7 @@ def Frame_ptcl_angle(ptcl_star):
 
 	return result_dict
 
+
 def Frame_angle(data_star):
 	'''
 	Frame v3-7 barcode function for data star
@@ -64,13 +63,13 @@ def Frame_angle(data_star):
 
 	for ptcl_index, ptcl_row in data_star.iterrows():
 
-		barcode_dict = Framev3_7_ptcl_angle(ptcl_row)
+		barcode_dict = Frame_ptcl_angle(ptcl_row)
 		tilt_angle_list.append(barcode_dict['rlnAngleTilt'])
-		tilt_angle_list.append(barcode_dict['rlnAngleRot'])
+		rot_angle_list.append(barcode_dict['rlnAngleRot'])
 
 	# Assign the new values
-	data_star['rlnAngleTilt'] = tilt_angle_list
-	data_star['rlnAngleRot']  = rot_angle_list
+	data_star['rlnAngleTilt'] = np.array(tilt_angle_list)
+	data_star['rlnAngleRot']  = np.array(rot_angle_list)
 
 	return data_star
 
