@@ -19,6 +19,7 @@ import parallelem
 import multiprocessing
 import shutil
 import matplotlib.pyplot as py
+import barcode
 
 from shutil import copyfile
 
@@ -123,6 +124,9 @@ class Project:
         self.class2Ds  = []
         self.class3Ds  = []
 
+        # Barcode functions
+        self.barcode_funcs = {'Framev3-7': barcode.Framev3_7}
+
     def set_highpass_filter(self, hp=None):
         '''
         Set highpass filter
@@ -143,6 +147,14 @@ class Project:
         '''
         if self.particle_diameter_A is not None and self.particle_apix is not None:
             self.particle_radius_pix = int(self.particle_diameter_A//(2*self.particle_apix))
+
+    def apply_barcode(self, barcode_func):
+        '''
+        Apply barcode on particle star
+        '''
+        if barcode_func in self.barcode_funcs:
+            new_data_block = self.barcode_funcs[barcode_func](self.particle_star.get_data_block())
+            self.particle_star.set_data_block(new_data_block)
 
     def append_particle_barcode(self, barcode={}):
         '''
@@ -1795,6 +1807,15 @@ class ProjectAlign2D(Project):
         '''
         if self.ref_class_star is not None:
             self.ref_class_star.change_label('rlnReferenceImage', 'rlnImageName')
+
+            # Add psi prior column
+            self.ref_class_star.set_column('rlnAnglePsiPrior',0)
+
+            # Add offset prior columns
+            self.ref_class_star.set_column('rlnOriginXPrior',0)
+
+            # Add offset prior columns
+            self.ref_class_star.set_column('rlnOriginYPrior',0)
 
             # If unmasked class option is on, use unmasked classes
             if use_unmasked_classes:
