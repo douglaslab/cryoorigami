@@ -522,6 +522,9 @@ class Project:
             copyfile(self.particle_star_file, self.output_directory+'/particle_input'+ext)
             self.particle_out_file = self.output_directory+'/particle_output'+ext
 
+            # Make symlink
+            self.make_symlink2parent(self.particle_star_file)
+
         if self.ref_class_star_file is not None:
             head, tail = os.path.split(self.ref_class_star_file)
             copyfile(self.ref_class_star_file, self.output_directory+'/class2D_input'+ext)
@@ -543,6 +546,9 @@ class Project:
             root, ext  = os.path.splitext(tail)
             copyfile(self.blob_cs_file, self.output_directory+'/blob_input'+ext)
             self.particle_out_file = self.output_directory+'/particle_output.star'
+
+            # Make symlink
+            self.make_symlink2parent(self.blob_cs_file)
 
         if self.passthrough_cs_file is not None:
             head, tail = os.path.split(self.passthrough_cs_file)
@@ -779,6 +785,23 @@ class Project:
         if self.particle_star is not None:
             self.particle_star.filter(maxprob, maxclass)
 
+    def make_symlink2parent(self, input_file, out_path='particle_input'):
+        '''
+        Make symlink to input file folder
+        '''
+        
+        # Split input file
+        head, tail = os.path.split(input_file)
+
+        # Get relative directory to input file folder
+        relative_input_dir = os.path.abspath(head)
+
+        # Destination directory
+        relative_output_dir = os.path.relpath(os.path.abspath(self.output_directory+'/'+out_path))
+
+        # Create symlink
+        os.symlink(relative_input_dir, relative_output_dir)
+
 
 class ProjectFlip(Project):
     '''
@@ -836,6 +859,10 @@ class ProjectFlip(Project):
         self.read_flip_star(flip_star_file)
         self.read_noflip_star(noflip_star_file)
 
+        # Make the symlinks to input folders
+        self.make_symlink2parent(flip_star_file, 'flip_input')
+        self.make_symlink2parent(noflip_star_file, 'noflip_input')
+
         # Create and set rlnIsFlip column
         self.flip_star.set_column(label='rlnIsFlip', value=1)
         self.noflip_star.set_column(label='rlnIsFlip', value=0)
@@ -856,6 +883,9 @@ class ProjectFlip(Project):
         if self.particle_star_file is not None:
             head, tail = os.path.split(self.particle_star_file)
             root, ext  = os.path.splitext(tail)
+
+            # Prepare symlink to input folder
+            self.make_symlink2parent(self.particle_star_file)
 
             self.flipped_mrc_file  = os.path.relpath(os.path.abspath(self.output_directory+'/flipped.mrcs'))
             self.flipped_star_file = os.path.relpath(os.path.abspath(self.output_directory+'/flipped.star'))
@@ -1078,6 +1108,9 @@ class ProjectStack(Project):
         '''
         Create output files
         '''
+
+        # Make symlink to input folder
+        self.make_symlink2parent(self.particle_star_file)
 
         self.stack_star_file = os.path.relpath(os.path.abspath(self.output_directory+'/stack.star'))
         self.stack_mrc_file  = os.path.relpath(os.path.abspath(self.output_directory+'/stack.mrcs'))
