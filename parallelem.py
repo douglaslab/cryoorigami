@@ -76,7 +76,7 @@ def create_noise(img2D, mask=None, noise_mean=0.0, noise_std=1.0, sigma=0):
         return None
 
 
-def read_ptcl_mrc(ptcl_star, transform=False):
+def read_ptcl_mrc(ptcl_star, transform=False, fft_mask=None):
     '''
     Particle mrc data
     '''
@@ -94,9 +94,22 @@ def read_ptcl_mrc(ptcl_star, transform=False):
         if transform:
             img2D = transform_ptcl_img2D(img2D, ptcl_star)
 
+        # Check pass filter options
+        if fft_mask is not None:
+            img2D = pass_filter(img2D, fft_mask)
+
 
     return np.copy(img2D)
 
+def pass_filter(img2D, fft_mask):
+    '''
+    Perform highpass and/or lowpass filter on the image
+    '''
+    fft_img2D       = np.fft.fft2(img2D)
+    fft_img2D_shift = np.fft.fftshift(fft_img2D)
+    fft_img2D       = np.fft.ifftshift(fft_img2D_shift*fft_mask)
+
+    return np.real(np.fft.ifft2(fft_img2D))
 
 def write_img2D(img2D, ptcl_mrc, ptcl_index):
     '''

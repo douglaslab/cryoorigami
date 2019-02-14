@@ -1104,6 +1104,9 @@ class ProjectStack(Project):
         self.stack_mrc       = None
         self.stack_star      = None
 
+        # Fft grid parameters
+        self.fft_r           = None
+
     def prepare_output_files(self):
         '''
         Create output files
@@ -1115,14 +1118,46 @@ class ProjectStack(Project):
         self.stack_star_file = os.path.relpath(os.path.abspath(self.output_directory+'/stack.star'))
         self.stack_mrc_file  = os.path.relpath(os.path.abspath(self.output_directory+'/stack.mrcs'))
 
-    def prepare_project(self):
+    def prepare_project(self, highpass=None, lowpass=None):
         '''
         Prepare meta objects using reference class avarages
         '''
+        self.read_particle_apix()
         self.read_first_particle_mrc()
+        self.eval_fft_grid()
+        self.make_filter_mask(highpass, lowpass)
         self.prepare_output_files()
         self.create_output_stack_mrc()
         self.create_output_stack_star()
+
+    def eval_fft_grid(self):
+        '''
+        Eval fft grid
+        '''
+        self.first_particle_mrc.eval_fft_grid(apix=self.particle_apix)
+        self.fft_r = self.first_particle_mrc.get_fft_r()
+
+    def make_filter_mask(self, highpass=None, lowpass=None, sigma=2):
+        '''
+        Make filter pass - centered at 0 frequency
+        '''
+        #Shift fft_r grid
+        self.fft_r_shift = np.fft.fftshift(self.fft_r)
+
+        lowpass_mask  = np.ones(self.fft_r_shift.shape, dtype=bool)
+        highpass_mask = np.ones(self.fft_r_shift.shape, dtype=bool)
+
+        # Highpass and lowpass filter masks
+        if highpass:
+            highpass_mask = self.fft_r > 1.0/highpass
+        if lowpass:
+            lowpass_mask  = self.fft_r < 1.0/lowpass
+
+        # Get the combination of two masks
+        self.fft_mask = np.logical_or(highpass_mask, lowpass_mask)
+        
+        # Apply gaussian filter to smooth the mask
+        self.fft_mask = scipy.ndimage.filters.gaussian_filter(self.fft_mask, sigma)
 
     def create_output_stack_star(self):
         '''
@@ -1198,7 +1233,7 @@ class ProjectStack(Project):
                                                       100.0*(ptcl_index+1)/num_ptcls))
 
             # Create a new process
-            worker_result = mp_pool.apply_async(parallelem.read_ptcl_mrc, args=(ptcl_row, transform))
+            worker_result = mp_pool.apply_async(parallelem.read_ptcl_mrc, args=(ptcl_row, transform, self.fft_mask))
 
             self.stack_results.append([worker_result, ptcl_index])
 
@@ -1536,17 +1571,26 @@ class ProjectSubtract2D(Project):
                  mask_structure_img2D,
                  mask_subtract_img2D) = self.duplicate_imgs()
 
+                # Organize parallel processing input parameters
+                pl_class_img2D        = class_img2D
+                pl_ctf_grid_angle     = self.class_mrc.ctf_a
+                pl_ctf_grid_s         = self.class_mrc.ctf_s
+                pl_ptcl_star          = ptcl_row
+                pl_particle_diameter  = 2.0*self.particle_apix
+                pl_highpass_cutoff    = self.highpass_angstrom
+                pl_subtract_bg        = subtract_bg 
+
                 # Create a new process
-                worker_result = mp_pool.apply_async(self.sub_funcs[subtract_func], args=(class_img2D,
-                                                                                         self.class_mrc.ctf_a,
-                                                                                         self.class_mrc.ctf_s,
-                                                                                         ptcl_row,
+                worker_result = mp_pool.apply_async(self.sub_funcs[subtract_func], args=(pl_class_img2D,
+                                                                                         pl_ctf_grid_angle,
+                                                                                         pl_ctf_grid_s,
+                                                                                         pl_ptcl_star,
                                                                                          mask_align_img2D,
                                                                                          mask_structure_img2D,
                                                                                          mask_subtract_img2D,
-                                                                                         2.0*self.particle_apix,
-                                                                                         self.highpass_angstrom,
-                                                                                         subtract_bg))
+                                                                                         pl_particle_diameter,
+                                                                                         pl_highpass_cutoff,
+                                                                                         pl_subtract_bg))
 
                 self.subtraction_results.append([worker_result, ptcl_index])
 
@@ -1587,6 +1631,9 @@ class ProjectSubtract2D(Project):
         # 3. Subtract mask - mask used for subtraction
         if self.mask_subtract_mrc_file is not None:
             self.mask_subtract_mrc = MRC(self.mask_subtract_mrc_file)
+        else:
+            self.mask_subtract_mrc = MRC()
+            self.mask_subtract_mrc.set_img2D(np.zeros(self.circular_mask.shape))
 
         # Store the originals of masks
         self.mask_align_mrc.store_to_original()
@@ -2199,6 +2246,39 @@ class MRC:
             # Determine r
             spacing = 1.0/(self.img2D.shape[0]*apix)
             self.ctf_r  = np.round(self.ctf_s/spacing)*spacing
+
+    def get_ctf_r(self):
+        '''
+        Get ctf_r
+        '''
+        return self.ctf_r.copy()
+
+    def eval_fft_grid(self, apix=1.0):
+        '''
+        Create fft freq grids
+        '''
+        if self.img2D is not None:
+            assert self.img2D.shape[0] == self.img2D.shape[1]
+
+            # Get the pixel size information
+            if self.apix is not None:
+                apix = self.apix
+
+            xfreq   = np.fft.fftfreq(self.img2D.shape[1], apix)
+            yfreq   = np.fft.fftfreq(self.img2D.shape[0], apix)
+
+            self.fft_sx, self.fft_sy  = np.meshgrid(xfreq, yfreq)
+            self.fft_s                = np.sqrt(self.fft_sx**2 + self.fft_sy**2)
+
+            # Determine r
+            spacing = 1.0/(self.img2D.shape[0]*apix)
+            self.fft_r  = np.round(self.fft_s/spacing)*spacing
+
+    def get_fft_r(self):
+        '''
+        Get fft_r
+        '''
+        return self.fft_r.copy()
 
     def rotate_img2D(self, angle):
         '''
