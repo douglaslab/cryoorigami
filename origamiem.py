@@ -127,6 +127,23 @@ class Project:
         # Barcode functions
         self.barcode_funcs = {'Frame': barcode.Frame_angle}
 
+    def invert_psi(self):
+        '''
+        Invert psi angle
+        '''
+        if self.particle_star.has_label('rlnAnglePsi'):
+            self.particle_star.data_block['rlnAnglePsi'] *= -1.0
+
+    def invert_origin(self):
+        '''
+        Invert origin
+        '''
+        if self.particle_star.has_label('rlnOriginX'):
+            self.particle_star.data_block['rlnOriginX'] *= -1.0
+
+        if self.particle_star.has_label('rlnOriginY'):
+            self.particle_star.data_block['rlnOriginY'] *= -1.0
+
     def set_highpass_filter(self, hp=None):
         '''
         Set highpass filter
@@ -3704,18 +3721,126 @@ class Star(EMfile):
         np.savetxt(out_fname, self.data_block.values, fmt=self.write_formatter, header=header, comments='')
 
 
-class Cistem(EMfile):
+class Cistem(Project):
     '''
     Cistem class
     '''
-    def __init__(self):
-        self.name    = None
-        
-        self.db2star = {}
-        self.db_file = None
+    def __init__(self, name='EMStar2Par'):
+        super().__init__(name)
 
-        self.original_star      = None
-        self.original_star_file = None
+        self.par_file  = None
+        self.par_data  = None
+
+    def create_write_formatter(self):
+        '''
+        Create write formatter
+        '''
+        self.header_list     = ('C', 'PSI','THETA','PHI', 'SHX', 'SHY', 'MAG', 'INCLUDE', 'DF1', 'DF2', 'ANGAST', 'PSHIFT','OCC','LogP', 'SIGMA', 'SCORE', 'CHANGE')
+        self.write_header    = "%-7s%8s%8s%8s%10s%10s%8s%9s%6s%9s%8s%8s%8s%10s%11s%8s%8s" % self.header_list
+        self.write_formatter = "%7d%8.2f%8.2f%8.2f%10.2f%10.2f%8d%6d%9.1f%9.1f%8.2f%8.2f%8.2f%10d%11.4f%8.2f%8.2f"
+
+    def write_output_file(self, verbose=True):
+        # Save file
+        # Print particle number info
+        if verbose:
+            print('Writing %d particles in %s' % (self.par_data.shape[0], self.particle_out_file))
+        np.savetxt(self.particle_out_file, self.par_data.values, fmt=self.write_formatter, header=self.write_header, comments='')
+
+    def prepare_project(self):
+        '''
+        Prepare project
+        '''
+        self.prepare_io_files_par()
+        self.read_particle_apix()
+        self.create_write_formatter()
+
+    def prepare_io_files_par(self):
+        # Copy input file to output directory
+        if self.particle_star_file is not None:
+            head, tail = os.path.split(self.particle_star_file)
+            root, ext  = os.path.splitext(tail)
+            copyfile(self.particle_star_file, self.output_directory+'/particle_input'+ext)
+            self.particle_out_file = self.output_directory+'/particle_output.par'
+
+            # Make symlink
+            self.make_symlink2parent(self.particle_star_file)
+
+    def convert2par(self):
+        '''
+        Convert star dataframe to par data frame
+        '''
+        # 1. Initialize data frame with C column
+        self.par_data      = pd.DataFrame(columns=self.header_list)
+        self.par_data['C'] = np.arange(self.particle_star.data_block.shape[0], dtype=int) + 1 
+
+        # 2. PSI angle
+        if self.particle_star.has_label('rlnAnglePsi'):
+            self.par_data['PSI'] = self.particle_star.data_block['rlnAnglePsi']
+        else:
+            self.par_data['PSI'] = 0
+
+        # 3. THETA ANGLE
+        if self.particle_star.has_label('rlnAngleTilt'):
+            self.par_data['THETA'] = self.particle_star.data_block['rlnAngleTilt']
+        else:
+            self.par_data['THETA'] = 0
+
+        # 4. PHI ANGLE
+        if self.particle_star.has_label('rlnAngleRot'):
+            self.par_data['PHI'] = self.particle_star.data_block['rlnAngleRot']
+        else:
+            self.par_data['PHI'] = 0
+
+        # 5. SHX
+        if self.particle_star.has_label('rlnOriginX'):
+            self.par_data['SHX'] = -self.particle_star.data_block['rlnOriginX']*self.particle_apix
+        else:
+            self.par_data['SHX'] = 0
+
+        # 6. SHY
+        if self.particle_star.has_label('rlnOriginY'):
+            self.par_data['SHY'] = -self.particle_star.data_block['rlnOriginY']*self.particle_apix
+        else:
+            self.par_data['SHY'] = 0
+
+        # 7. MAG
+        if self.particle_star.has_label('rlnMagnification'):
+            self.par_data['MAG'] = self.particle_star.data_block['rlnMagnification']
+        else:
+            self.par_data['MAG'] = 0
+
+        # 8. INCLUDE
+        if self.particle_star.has_label('rlnGroupNumber'):
+            self.par_data['INCLUDE'] = self.particle_star.data_block['rlnGroupNumber']
+        else:
+            self.par_data['INCLUDE'] = 0
+
+        # 9. DF1
+        if self.particle_star.has_label('rlnDefocusU'):
+            self.par_data['DF1'] = self.particle_star.data_block['rlnDefocusU']
+        else:
+            self.par_data['DF1'] = 0
+
+        # 10. DF2
+        if self.particle_star.has_label('rlnDefocusV'):
+            self.par_data['DF2'] = self.particle_star.data_block['rlnDefocusV']
+        else:
+            self.par_data['DF2'] = 0
+
+        # 11. ANGAST
+        if self.particle_star.has_label('rlnDefocusAngle'):
+            self.par_data['ANGAST'] = self.particle_star.data_block['rlnDefocusAngle']
+        else:
+            self.par_data['ANGAST'] = 0
+
+        # REST
+        self.par_data['PSHIFT'] = 0.0
+        self.par_data['OCC']    = 100
+        self.par_data['LogP']   = 0.0
+        self.par_data['SIGMA']  = 0.5
+        self.par_data['SCORE']  = 0.0
+        self.par_data['CHANGE'] = 0.0
+
 
 class CryoSparc(EMfile):
     '''

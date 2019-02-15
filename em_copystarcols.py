@@ -16,20 +16,24 @@ def main():
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument("-i",            "--input",       type=str, help="Particle star file")
-    parser.add_argument("-o",            "--output",      type=str, help="Output directory", default=None)
-    parser.add_argument("-cols",         "--columns",     type=str, help="Columns to copy", nargs='*', default=None)
-    parser.add_argument("-copy-priors",  "--copypriors",  action='store_true', help="Copy offset and angle parameters to priors")
-    parser.add_argument("-reset-priors", "--resetpriors", action='store_true', help="Delete prior offset and angle columngs")
+    parser.add_argument("-i",             "--input",        type=str, help="Particle star file")
+    parser.add_argument("-o",             "--output",       type=str, help="Output directory", default=None)
+    parser.add_argument("-cols",          "--columns",      type=str, help="Columns to copy", nargs='*', default=None)
+    parser.add_argument("-copy-priors",   "--copypriors",   action='store_true', help="Copy offset and angle parameters to priors")
+    parser.add_argument("-reset-priors",  "--resetpriors",  action='store_true', help="Delete prior offset and angle columngs")
+    parser.add_argument("-invert-psi",    "--invertpsi",    action='store_true', help="Invert psi angle")
+    parser.add_argument("-invert-origin", "--invertorigin", action='store_true', help="Invert originX and originY")
 
     args = parser.parse_args()
 
     # Prepare args dict
-    args_dict = {'input':       args.input,
-                 'output':      args.output,
-                 'columns':     args.columns,
-                 'copypriors':  args.copypriors,
-                 'resetpriors': args.resetpriors
+    args_dict = {'input':        args.input,
+                 'output':       args.output,
+                 'columns':      args.columns,
+                 'copypriors':   args.copypriors,
+                 'resetpriors':  args.resetpriors,
+                 'invertpsi':    args.invertpsi,
+                 'invertorigin': args.invertorigin
                  }
 
     # Check if the input file exists
@@ -45,9 +49,11 @@ def main():
 
     # Copy priors overwrites
     if args_dict['copypriors']:
-        new_column_parameters = {'rlnOriginX':'rlnOriginXPrior',
-                                 'rlnOriginY':'rlnOriginYPrior',
-                                 'rlnAnglePsi':'rlnAnglePsiPrior'}
+        new_column_parameters = {'rlnOriginX':  'rlnOriginXPrior',
+                                 'rlnOriginY':  'rlnOriginYPrior',
+                                 'rlnAnglePsi': 'rlnAnglePsiPrior',
+                                 'rlnAngleRot': 'rlnAngleRotPrior',
+                                 'rlnAngleTilt':'rlnAngleTiltPrior'}
 
     # Create an EM project object
     new_project = em.Project(name='EMCopyColumns')
@@ -63,6 +69,14 @@ def main():
 
     # Prepare input and output files
     new_project.prepare_io_files_star()
+
+    # If invert-psi option is on
+    if args_dict['invertpsi']:
+        new_project.invert_psi()
+
+    # If invert-origin
+    if args_dict['invertorigin']:
+        new_project.invert_origin()
 
     # If reset option is ON
     if args_dict['resetpriors']:
