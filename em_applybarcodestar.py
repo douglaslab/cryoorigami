@@ -18,7 +18,6 @@ def main():
 
     parser.add_argument("-i",        "--input",       type=str, help="Particle star file")
     parser.add_argument("-o",        "--output",      type=str, help="Output directory", default=None)
-    parser.add_argument("-barcode",  "--barcode",     type=str, help="Barcode to set", nargs='*', default={})
     parser.add_argument("-func",     "--function",    type=str, help="Function to apply on the barcode", choices=['Frame'], default='Frame')
 
     args = parser.parse_args()
@@ -26,7 +25,6 @@ def main():
     # Prepare args dict
     args_dict = {'input':       args.input,
                  'output':      args.output,
-                 'barcode':     args.barcode,
                  'function':    args.function
                  }
 
@@ -34,13 +32,6 @@ def main():
     if args_dict['input'] is None or not os.path.isfile(args_dict['input']):
         parser.print_help()
         sys.exit('Input file does not exist!')
-
-    # Get the new column parameters
-    if args_dict['barcode'] is not None:
-        barcode_parameters = util.parse_star_parameters(args_dict['barcode'])
-    else:
-        barcode_parameters = {}
-
 
     # Create an EM project object
     new_project = em.Project(name='EMApplyBarcode')

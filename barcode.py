@@ -39,8 +39,8 @@ def Frame_ptcl_angle(ptcl_star):
 	# Rotation angle pitch
 	angle_pitch = 34.28
 
-	# Rotation angle
-	rot_angle  = bottom_code*angle_pitch if bottom_code < 4 else -(bottom_code-3)*34.28 
+	# Rotation angle (The signing of the rot angle provies right handedness)
+	rot_angle  = -bottom_code*angle_pitch if bottom_code < 4 else (bottom_code-3)*34.28 
 
 	# Tilt angle
 	tilt_angle = 90.0 

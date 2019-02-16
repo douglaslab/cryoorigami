@@ -127,6 +127,14 @@ class Project:
         # Barcode functions
         self.barcode_funcs = {'Frame': barcode.Frame_angle}
 
+    def group_ptcls(method='defocus'):
+        '''
+        Grouping method
+        '''
+
+        # Sort particles using defocus or intensity scale
+
+
     def invert_psi(self):
         '''
         Invert psi angle
