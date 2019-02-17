@@ -85,7 +85,7 @@ def main():
         new_project.reset_priors()
 
     # If reset offset option is on
-    if argse_dict['resetoffsets']:
+    if args_dict['resetoffsets']:
         new_project.reset_offsets()
 
     # Add new columns
