@@ -373,6 +373,18 @@ class Project:
             for from_column, to_column in column_params.items():
                 self.particle_star.copy_column2column(from_column, to_column)
 
+    def reset_offsets(self):
+        '''
+        Make all offsets 0
+        '''
+        offset_columns = ['rlnOriginX',
+                          'rlnOriginY',
+                          'rlnAnglePsi',
+                          'rlnAngleTilt',
+                          'rlnAngleRot']
+        for column in offset_columns:
+            self.particle_star.set_column(column, 0)
+
     def add_columns(self, column_params=None):
         '''
         Add new columns

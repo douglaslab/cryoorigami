@@ -21,6 +21,7 @@ def main():
     parser.add_argument("-cols",          "--columns",      type=str, help="Columns to copy", nargs='*', default=None)
     parser.add_argument("-copy-priors",   "--copypriors",   action='store_true', help="Copy offset and angle parameters to priors")
     parser.add_argument("-reset-priors",  "--resetpriors",  action='store_true', help="Delete prior offset and angle columngs")
+    parser.add_argument("-reset-offsets", "--resetoffsets", action='store_true', help="Assign angle and origin offsets to 0")
     parser.add_argument("-invert-psi",    "--invertpsi",    action='store_true', help="Invert psi angle")
     parser.add_argument("-invert-origin", "--invertorigin", action='store_true', help="Invert originX and originY")
 
@@ -32,6 +33,7 @@ def main():
                  'columns':      args.columns,
                  'copypriors':   args.copypriors,
                  'resetpriors':  args.resetpriors,
+                 'resetoffsets': args.resetoffsets,
                  'invertpsi':    args.invertpsi,
                  'invertorigin': args.invertorigin
                  }
@@ -78,9 +80,13 @@ def main():
     if args_dict['invertorigin']:
         new_project.invert_origin()
 
-    # If reset option is ON
+    # If reset priors option is ON
     if args_dict['resetpriors']:
         new_project.reset_priors()
+
+    # If reset offset option is on
+    if argse_dict['resetoffsets']:
+        new_project.reset_offsets()
 
     # Add new columns
     new_project.copy_columns(new_column_parameters)
