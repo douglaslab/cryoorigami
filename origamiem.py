@@ -142,6 +142,19 @@ class Project:
         if self.particle_star.has_label('rlnAnglePsi'):
             self.particle_star.data_block['rlnAnglePsi'] *= -1.0
 
+    def invert_angles(self):
+        '''
+        Invert psi/rot/tilt angles
+        '''
+        if self.particle_star.has_label('rlnAnglePsi'):
+            self.particle_star.data_block['rlnAnglePsi'] *= -1.0
+
+        if self.particle_star.has_label('rlnAngleRot'):
+            self.particle_star.data_block['rlnAngleRot'] *= -1.0
+
+        if self.particle_star.has_label('rlnAngleTilt'):
+            self.particle_star.data_block['rlnAngleTilt'] *= -1.0
+
     def invert_origin(self):
         '''
         Invert origin
