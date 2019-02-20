@@ -992,6 +992,10 @@ class ProjectFlip(Project):
         # Get number of particles
         num_ptcls = len(self.flipped_results)
 
+        # If there is not ptcl to write, return only
+        if num_ptcls == 0:
+            return
+
         # Show status
         print('Writing  %d particles' % (num_ptcls))
 
@@ -3099,11 +3103,11 @@ class Star(EMfile):
 
         # Update Tilt
         if self.has_label('rlnAngleTilt'):
-            self.data_block.loc[valid_rows,'rlnAngleTilt'] = 180.0 + self.data_block.loc[valid_rows,'rlnAngleTilt']
+            self.data_block.loc[valid_rows,'rlnAngleTilt'] = (180.0 + self.data_block.loc[valid_rows,'rlnAngleTilt']) % 360.0
 
         # Update Psi-Prior
         if self.has_label('rlnAngleTiltPrior'):
-            self.data_block.loc[valid_rows,'rlnAngleTiltPrior'] = 180.0 + self.data_block.loc[valid_rows,'rlnAngleTiltPrior']
+            self.data_block.loc[valid_rows,'rlnAngleTiltPrior'] = (180.0 + self.data_block.loc[valid_rows,'rlnAngleTiltPrior']) % 360.0
 
     def create_micname_from_imagename(self, mic_path='Micrographs'):
         '''
@@ -3763,6 +3767,19 @@ class Cistem(Project):
 
         self.par_file  = None
         self.par_data  = None
+
+        self.original_star      = None
+        self.original_star_file = None
+
+    def read_par(self):
+        '''
+        Read par file from Cistem
+        '''
+
+    def convert2star(self):
+        '''
+        Convert par data to star object
+        '''
 
     def create_write_formatter(self):
         '''
