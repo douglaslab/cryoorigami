@@ -3765,29 +3765,65 @@ class Cistem(Project):
     def __init__(self, name='EMStar2Par'):
         super().__init__(name)
 
-        self.par_file  = None
-        self.par_data  = None
+        self.par_file       = None
+        self.par_data_block = None 
 
         self.original_star      = None
         self.original_star_file = None
 
-    def read_par(self):
+        # Par to star parameters
+        self.delclasses  = []
+        self.selclasses  = []
+        self.scorecutoff = None
+        self.sigmacutoff = None
+        self.mlcutoff    = None
+
+    def set_par2star_params(self, delclasses=None, selclasses=None, scorecutoff=None, sigmacutoff=None, mlcutoff=None):
+        '''
+        Set par2star params
+        '''
+        self.delclasses  = delclasses
+        self.selclasses  = selclasses
+        self.scorecutoff = scorecutoff
+        self.sigmacutoff = sigmacutoff
+        self.mlcutoff    = mlcutoff 
+
+    def read_par(self, fname):
         '''
         Read par file from Cistem
         '''
+        if os.path.isfile(fname):
+            self.par_data_block = np.genfromtxt(fname,
+                                                skip_header=self.par_skip_rows,
+                                                dtype=self.par_dtypes,
+                                                comments='C')
 
-    def convert2star(self):
+    def copy2star(self):
         '''
         Convert par data to star object
         '''
+        if self.particle_star is not None and self.par_data_block is not None:
+            # Copy the data columns from par to star
+            self.particle_star.data_block['rlnOriginX'] = -self.par_data_block['SHX']/self.particle_apix
+            self.particle_star.data_block['rlnOriginY'] = -self.par_data_block['SHY']/self.particle_apix
+
+            self.particle_star.data_block['rlnAnglePsi']  = self.par_data_block['PSI']
+            self.particle_star.data_block['rlnAngleTilt'] = self.par_data_block['THETA']
+            self.particle_star.data_block['rlnAngleRot']  = self.par_data_block['PHI']
 
     def create_write_formatter(self):
         '''
         Create write formatter
         '''
+        self.par_skip_rows   = 1
         self.header_list     = ('C', 'PSI','THETA','PHI', 'SHX', 'SHY', 'MAG', 'INCLUDE', 'DF1', 'DF2', 'ANGAST', 'PSHIFT','OCC','LogP', 'SIGMA', 'SCORE', 'CHANGE')
+        self.data_formats    = ('i4', 'f4','f4','f4', 'f4', 'f4', 'i4', 'i4', 'f4', 'f4', 'f4', 'f4','f4','i4', 'f4', 'f4', 'f4')
         self.write_header    = "%-7s%8s%8s%8s%10s%10s%8s%9s%6s%9s%8s%8s%8s%10s%11s%8s%8s" % self.header_list
         self.write_formatter = "%7d%8.2f%8.2f%8.2f%10.2f%10.2f%8d%6d%9.1f%9.1f%8.2f%8.2f%8.2f%10d%11.4f%8.2f%8.2f"
+
+        # Par data types
+        self.par_dtypes   = {'names': self.header_list,
+                            'formats': self.data_formats}
 
     def write_output_file(self, verbose=True):
         # Save file
@@ -3795,6 +3831,10 @@ class Cistem(Project):
         if verbose:
             print('Writing %d particles in %s' % (self.par_data.shape[0], self.particle_out_file))
         np.savetxt(self.particle_out_file, self.par_data.values, fmt=self.write_formatter, header=self.write_header, comments='')
+
+    def write_star_file(self):
+        if self.particle_star is not None:
+            self.particle_star.write(self.particle_out_file)
 
     def prepare_project(self):
         '''
