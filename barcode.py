@@ -32,7 +32,7 @@ def Frame_ptcl_angle(ptcl_star):
 	barcode_dict = parse_barcode(ptcl_star)
 
 	# Get bottom code
-	# The code is in reverse order compared to the DNA origami design
+	# The code is in reverse order compared to the DNA origami design (e.g. 0 is actually 6, 6 is actually 0)
 
 	bottom_code  = 6-int(barcode_dict['bottom'])
 

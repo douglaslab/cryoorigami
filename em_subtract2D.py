@@ -26,8 +26,7 @@ def main():
     parser.add_argument("-batch",        "--batch",         type=int,     help="Particle batch size", default=100)
     parser.add_argument("-maxptcl",      "--maxptcl",       type=int,     help="Maximum number of particles to write", default=None)
     parser.add_argument("-method",       "--method",        type=str,     help="Particle subtraction method", choices=['subctf', 'cropctf', 'crop'], default='subctf')
-    parser.add_argument("-lp",           "--lowpass",       type=float,   help="Lowpass filter in Angstrom",  default=None)
-    parser.add_argument("-hp",           "--highpass",      type=float,   help="Highpass filter in Angstrom", default=None)
+    parser.add_argument("-norm",         "--norm",          type=str,     help="Normalization method for subtraction", choices=['frc', 'ccc'], default=None)
     parser.add_argument("-subtractbg",   "--subtractbg",    action='store_true', help="Subtract background (~subtracture mask)")
 
     args = parser.parse_args()
@@ -43,8 +42,7 @@ def main():
                  'batch':         args.batch,
                  'maxptcl':       args.maxptcl,
                  'method':        args.method,
-                 'lowpass':       args.lowpass,
-                 'highpass':      args.highpass,
+                 'norm':          args.norm,
                  'subtractbg':    args.subtractbg
                  }
 
@@ -94,15 +92,12 @@ def main():
     # Prepare project files
     new_project.prepare_project()
 
-    # Set the low and high pass filters
-    new_project.set_lowpass_filter(args_dict['lowpass'])
-    new_project.set_highpass_filter(args_dict['highpass'])
-
     # Subtract class mrc from particle mrc
     new_project.subtract_class_mrc(max_ptcl=args_dict['maxptcl'],
                                    batch_size=args_dict['batch'],
                                    subtract_func=args_dict['method'],
-                                   subtract_bg=args_dict['subtractbg'])
+                                   subtract_bg=args_dict['subtractbg'],
+                                   norm_method=args_dict['norm'])
 
     # Write output files
     new_project.write_output_files()

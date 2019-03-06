@@ -342,6 +342,12 @@ class Project:
         self.micrograph_star_file = os.path.abspath(file)
         self.micrograph_star      = Star(file)
 
+    def sort_micrographs(self, column='rlnDefocusU'):
+        '''
+        Sort micrographs
+        '''
+        self.micrograph_star.sort(column=column)
+
     def get_class_ids(self):
         '''
         Get class names
@@ -1416,7 +1422,7 @@ class ProjectSubtract2D(Project):
         if self.threshold_mask is None:
             self.threshold_mask = class_mrc.make_threshold_mask(threshold_high=threshold_high, threshold_low=threshold_low)
 
-    def subtract_class_mrc(self, threshold_val=0.05, max_ptcl=None, batch_size=100, subtract_func='subctf', subtract_bg=False):
+    def subtract_class_mrc(self, threshold_val=0.05, max_ptcl=None, batch_size=100, subtract_func='subctf', subtract_bg=False, norm_method='frc'):
         '''
         Subtract class mrc file
         '''
@@ -1507,7 +1513,8 @@ class ProjectSubtract2D(Project):
                                                                                          mask_align_img2D,
                                                                                          mask_structure_img2D,
                                                                                          mask_subtract_img2D,
-                                                                                         pl_subtract_bg))
+                                                                                         pl_subtract_bg,
+                                                                                         norm_method))
 
                 self.subtraction_results.append([worker_result, ptcl_index])
 
@@ -1609,6 +1616,91 @@ class ProjectSubtract2D(Project):
         self.create_output_subtract_mrc()
         self.create_output_subtract_star()
         self.create_circular_mask()
+
+
+class ProjectGroup(Project):
+    '''
+    Intersection project
+    '''
+    def __init__(self, name='EMGroup'):
+        super().__init__(name)
+
+        self.particle_star        = None
+        self.particle_star_file   = None
+
+        self.micrograph_star      = None
+        self.micrograph_star_file = None
+
+        self.maxmics              = None
+        self.thresholddef         = None
+        self.thresholdint         = None
+
+        # Column value to compare
+        self.cmp_column           = 'rlnDefocusU'
+
+    def set_params(self, maxmics=50, threshdef=100, threshint=0.1):
+        '''
+        Set grouping parameters
+        '''
+        self.maxmics      = maxmics
+        self.thresholddef = threshdef
+        self.thresholdint = threshint
+
+    def group_micrographs(self):
+        '''
+        Make the groups
+        '''
+
+        # If the micrograph star is not compatible, skip
+        if self.micrograph_star is None or not self.micrograph_star.has_label(self.cmp_column) or self.micrograph_star.has_label('rlnGroupName'):
+            return
+
+        # Sort groups based on defocus groups
+        self.sort_micrographs(self.cmp_column)
+
+        # Group names
+        group_name_list    = []
+        current_group_name = 1
+
+        # Get the first defocus value
+        previous_defocus = self.micrograph_star.data_block[self.cmp_column].values.tolist()[0]
+
+        # Iterate through the list
+        for mic_index, mic_row in self.micrograph_star.data_block.iterrows():
+            if mic_row[self.cmp_column] - previous_defocus > self.thresholddef:
+                # Set the new group name
+                current_group_name += 1
+
+                # Set the previous defocus
+                previous_defocus = mic_row[self.cmp_column]
+
+            # Add the group name
+            group_name_list.append(str(current_group_name))
+
+        # Set the group name in reference star
+        self.micrograph_star.data_block['rlnGroupName'] = np.array(group_name_list)
+
+    def assign_groups(self):
+        '''
+        Assign groups to particles
+        '''
+        # If the star data doesnt have the right columns, skip
+        if not self.micrograph_star.has_label('rlnGroupName') or self.particle_star is None:
+            return
+
+        # Set a new column for the particle star
+        self.particle_star.set_column('rlnGroupName', 0)
+
+        # Iterate over the class names
+        for mic_index, mic_row in self.micrograph_star.data_block.iterrows():
+            # Get micrograph name
+            micrograph_name = mic_row['rlnMicrographName']
+
+            # Micrograph maske
+            mask = self.particle_star.data_block['rlnMicrographName'] == micrograph_name 
+
+            # Set the new group name
+            self.particle_star.data_block.loc[mask, 'rlnGroupName'] = mic_row['rlnGroupName']
 
 
 class ProjectIntersect(Project):
@@ -2866,6 +2958,13 @@ class Star(EMfile):
         cmp_columns = ['rlnMicrographName', 'rlnCoordinateX', 'rlnCoordinateY']
         intersect_data_block = pd.merge(self.data_block, other.data_block[cmp_columns], how='inner')
         self.set_data_block(intersect_data_block)
+
+    def sort(self, column='rlnDefocusU'):
+        '''
+        Sort the star object based on a column
+        '''
+        if self.has_label(column):
+            self.data_block.sort_values(column, inplace=True)
 
     def filter(self, maxprob=0.5, maxclass=10):
         '''
