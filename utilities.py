@@ -155,11 +155,15 @@ def circular_mask(shape, center=None, radius=None):
     return np.array(mask, dtype='float32')
 
 
-def threshold_mask(data, threshold_val=0.05, erode=2, dilate=5):
+def threshold_mask(data, threshold_high=0.05, threshold_low=None, erode=2, dilate=5):
     '''
     Create a threshold based mask from a 2D img data
     '''
-    mask = np.array(data > threshold_val, dtype=int)
+    mask = np.array(data > threshold_high, dtype=int)
+
+    # Apply lower threshold
+    if threshold_low is not None:
+        mask += np.array(data < threshold_low, dtype=int)
 
     # Perform erosion to remove small disconnected areas
     if erode > 0:

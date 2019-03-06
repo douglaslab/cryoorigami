@@ -22,6 +22,7 @@ def main():
     parser.add_argument("-transform",    "--transform", action='store_true', help='Transform the images before writing the stacks')
     parser.add_argument("-hp",           "--highpass",      type=float, help="Highpass filter in Angstrom units", default=None)
     parser.add_argument("-lp",           "--lowpass",       type=float, help="Lowpass filter in Angstrom units", default=None)
+    parser.add_argument("-clip",         "--clip",          type=int,   help="Clip images to new box size", default=None)
 
     args = parser.parse_args()
 
@@ -31,7 +32,8 @@ def main():
                  'batch':         args.batch,
                  'transform':     args.transform,
                  'highpass':      args.highpass,
-                 'lowpass':       args.lowpass
+                 'lowpass':       args.lowpass,
+                 'clip':          args.clip
                  }
 
     # Check if the input file exists
@@ -52,10 +54,10 @@ def main():
     print('Read particle star file {}'.format(args_dict['input']))
 
     # Prepare project
-    new_project.prepare_project(args_dict['highpass'], args_dict['lowpass'])
+    new_project.prepare_project(args_dict['highpass'], args_dict['lowpass'], args_dict['clip'])
 
     # Flip particles
-    new_project.create_stack(args_dict['batch'], args_dict['transform'])
+    new_project.create_stack(args_dict['batch'], args_dict['transform'], args_dict['clip'])
 
 
 if __name__ == "__main__":
