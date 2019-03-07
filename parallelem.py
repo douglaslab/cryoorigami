@@ -8,7 +8,7 @@
 import mrcfile
 import numpy as np
 import scipy.ndimage
-
+from numba import jit
 
 def calc_ccc(current_img2D, other_img2D, mask=None):
     '''
@@ -244,7 +244,7 @@ def correct_fft_ctf(fft2D, ctf):
     '''
     return fft2D*ctf
 
-
+@jit(nopython=True)
 def eval_ctf(ctf_s, ctf_a, defU, defV, defA=0, phaseShift=0, kv=300, ac=0.1, cs=2.0, bf=0, do_intact_until_first_peak=False):
     '''
     :param defU: 1st prinicipal underfocus distance (Å).
@@ -288,18 +288,17 @@ def eval_ctf(ctf_s, ctf_a, defU, defV, defA=0, phaseShift=0, kv=300, ac=0.1, cs=
     # Do intact until first peak
     if do_intact_until_first_peak:
         
-        # Mask for low angles
-        low_mask = np.abs(gamma) < np.pi/2
-
-        # Assign 1
-        img2D_ctf[low_mask] = 1.0
+        # Loop for the numba jit
+        for i in range(gamma.shape[0]):
+            for j in range(gamma.shape[1]):
+                if np.abs(gamma[i,j]) < np.pi/2: 
+                    img2D_ctf[i, j] = 1.0
 
     # Enforce envelope
     if bf != 0:
         img2D_ctf *= np.exp(-k4 * s2)
 
     return img2D_ctf
-
 
 def calc_frc(current_fft, other_fft, ctf_r):
     '''
