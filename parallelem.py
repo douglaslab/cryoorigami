@@ -213,7 +213,7 @@ def shift_ptcl_img2D(img2D, ptcl_star):
     return shift_img2D(img2D, originX, originY)
 
 
-def eval_ptcl_ctf(ctf_s, ctf_a, ptcl_star, bf=0, do_intact_until_first_peak=False):
+def eval_ptcl_ctf(ctf_s, ctf_a, ptcl_star, bf=0, do_intact_until_first_peak=True):
     '''
     Determine ctf from particle data
     '''
@@ -270,7 +270,7 @@ def eval_ctf(ctf_s, ctf_a, defU, defV, defA=0, phaseShift=0, kv=300, ac=0.1, cs=
     # k paramaters
     k1 = np.pi / 2. * 2 * lamb
     k2 = np.pi / 2. * cs * lamb**3
-    k3 = np.atan(ac/np.sqrt(1 - ac**2))
+    k3 = np.arctan(ac/np.sqrt(1 - ac**2))
     k4 = bf / 4.                # B-factor, follows RELION convention.
     k5 = np.deg2rad(phaseShift)  # Phase shift.
 
@@ -310,8 +310,8 @@ def calc_frc(current_fft, other_fft, ctf_r):
 
     # Get cross correlations
     cross_cc = current_fft*np.conj(other_fft)
-    self1_cc = np.abs(current_fft[mask])**2
-    self2_cc = np.abs(other_fft[mask])**2
+    self1_cc = np.abs(current_fft)**2
+    self2_cc = np.abs(other_fft)**2
 
     # Quarter of  the number of bins 
     # Merge two bins to single bin and work on half the fourier space
@@ -319,7 +319,7 @@ def calc_frc(current_fft, other_fft, ctf_r):
 
     # Calculate for half the FFT
     for i in range(half_nbins):
-        mask = (ctf_r == rbins[2*i]) & (ctf_r == rbins[2*i+1])
+        mask = (ctf_r == rbins[2*i]) | (ctf_r == rbins[2*i+1])
         corr  = np.sum(cross_cc[mask])
         norm1 = np.sum(self1_cc[mask])
         norm2 = np.sum(self2_cc[mask])
@@ -328,7 +328,7 @@ def calc_frc(current_fft, other_fft, ctf_r):
 
     # For the rest assign it to 0
     mask = ctf_r >= rbins[2*half_nbins]
-    frc2D[mask] = 0.0
+    frc2D[mask] = 1.0
     
     return frc2D
 
@@ -352,6 +352,19 @@ def calc_dot(current_img2D, ref_img2D, mask=None):
         self_cc  = np.mean(ref_img2D*ref_img2D)
 
     return cross_cc/self_cc
+
+def calc_intensity_ratio(current_img2D, ref_img2D, mask=None):
+    '''
+    Calc the mean intensity ratio between the images
+    '''
+    if mask is not None and mask.shape == img2D.shape:
+        current_mean = np.average(current_img2D, weights=mask)
+        ref_mean     = np.average(ref_img2D, weights=mask)
+    else:
+        current_mean = np.mean(current_img2D)
+        ref_mean     = np.mean(ref_img2D)
+
+    return 1.0*current_mean/ref_mean
 
 def normalize_dot(img2D, scale):
     '''
@@ -399,12 +412,12 @@ def create_bg_mask(mask_align_img2D, mask_subtract_img2D):
 
     return mask_bg_img2D
 
-def subtract_class_ctf(class_img2D, ctf_a, ctf_s, ctf_r, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D, subtract_bg, norm_method):
+def subtract_class_ctf(class_img2D, ctf_a, ctf_s, ctf_r, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D, subtract_bg, norm_method, do_intact_until_first_peak):
     '''
     Subtract class
     '''
     ptcl_img2D  = read_ptcl_mrc(ptcl_star)
-    class_ctf   = eval_ptcl_ctf(ctf_s, ctf_a, ptcl_star)
+    class_ctf   = eval_ptcl_ctf(ctf_s, ctf_a, ptcl_star, 0, do_intact_until_first_peak)
     class_img2D = inv_transform_imgs(class_img2D, ptcl_star)
     mask_align_img2D, mask_structure_img2D, mask_subtract_img2D = inv_transform_masks(ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D)
 
@@ -415,28 +428,32 @@ def subtract_class_ctf(class_img2D, ctf_a, ctf_s, ctf_r, ptcl_star, mask_align_i
     class_fft2D = correct_fft_ctf(class_fft2D, class_ctf)
 
     # Create frc coefficients
-    frc_coeff   = np.ones(class_fft2D.shape)
-    ccc_coeff   = 1.0
+    fft_coeff   = np.ones(class_fft2D.shape)
+    real_coeff  = 1.0
 
     if norm_method == 'frc':
         ptcl_fft2D = fft_img2D(ptcl_img2D) 
-        frc_coeff  = calc_frc(ptcl_fft2D, class_fft2D,  ctf_r)
+        fft_coeff  = calc_frc(ptcl_fft2D, class_fft2D,  ctf_r)
     elif norm_method == 'ccc':
         masked_class_img2D = ifft_img2D(class_fft2D)
-        ccc_coeff = calc_dot(ptcl_img2D, masked_class_img2D)
+        real_coeff = calc_dot(ptcl_img2D, masked_class_img2D)
+    elif norm_method == 'intensity':
+        masked_class_img2D = ifft_img2D(class_fft2D)
+        real_coeff = calc_intensity_ratio(ptcl_img2D, masked_class_img2D)
 
-    ptcl_img2D  = subtract_class_from_ptcl(class_img2D, class_ctf, ptcl_img2D, mask_subtract_img2D, frc_coeff, ccc_coeff)
+
+    ptcl_img2D  = subtract_class_from_ptcl(class_img2D, class_ctf, ptcl_img2D, mask_subtract_img2D, fft_coeff, real_coeff)
 
     return ptcl_img2D
 
 
-def crop_class_ctf(class_img2D, ctf_a, ctf_s, ctf_r, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D, subtract_bg, norm_method):
+def crop_class_ctf(class_img2D, ctf_a, ctf_s, ctf_r, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D, subtract_bg, norm_method, do_intact_until_first_peak):
     '''
     Subtract class
     '''
 
     ptcl_img2D  = read_ptcl_mrc(ptcl_star)
-    class_ctf   = eval_ptcl_ctf(ctf_s, ctf_a, ptcl_star)
+    class_ctf   = eval_ptcl_ctf(ctf_s, ctf_a, ptcl_star, 0, do_intact_until_first_peak)
     mask_align_img2D, mask_structure_img2D, mask_subtract_img2D = inv_transform_masks(ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D)
     
     class_img2D = generate_noise(class_img2D)
@@ -454,7 +471,7 @@ def crop_class_ctf(class_img2D, ctf_a, ctf_s, ctf_r, ptcl_star, mask_align_img2D
     return ptcl_img2D
 
 
-def crop_class(class_img2D, ctf_a, ctf_s, ctf_r, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D, subtract_bg, norm_method):
+def crop_class(class_img2D, ctf_a, ctf_s, ctf_r, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D, subtract_bg, norm_method, do_intact_until_first_peak):
     '''
     Crop class with no ctf correction
     '''
@@ -606,7 +623,7 @@ def norm_intensity_noise_img(class_img2D, ptcl_img2D, mask_align_img2D, mask_str
     return class_img2D
 
 
-def subtract_class_from_ptcl(class_img2D, class_ctf, ptcl_img2D, mask_subtract_img2D, frc_coeff, ccc_coeff):
+def subtract_class_from_ptcl(class_img2D, class_ctf, ptcl_img2D, mask_subtract_img2D, fft_coeff, real_coeff):
     '''
     Subtract class from ptcl
     '''
@@ -615,10 +632,10 @@ def subtract_class_from_ptcl(class_img2D, class_ctf, ptcl_img2D, mask_subtract_i
     class_fft2D = fft_img2D(class_img2D, mask_subtract_img2D)
 
     # CTF correct class image
-    class_fft2D = frc_coeff*correct_fft_ctf(class_fft2D, class_ctf)
+    class_fft2D = fft_coeff*correct_fft_ctf(class_fft2D, class_ctf)
 
     # Take inverse FFT
-    class_img2D = ccc_coeff*ifft_img2D(class_fft2D)
+    class_img2D = real_coeff*ifft_img2D(class_fft2D)
 
     # Subtract the class image from ptcl image
     return ptcl_img2D - class_img2D

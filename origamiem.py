@@ -1422,7 +1422,7 @@ class ProjectSubtract2D(Project):
         if self.threshold_mask is None:
             self.threshold_mask = class_mrc.make_threshold_mask(threshold_high=threshold_high, threshold_low=threshold_low)
 
-    def subtract_class_mrc(self, threshold_val=0.05, max_ptcl=None, batch_size=100, subtract_func='subctf', subtract_bg=False, norm_method='frc'):
+    def subtract_class_mrc(self, threshold_val=0.05, max_ptcl=None, batch_size=100, subtract_func='subctf', subtract_bg=False, norm_method='ccc', skip_to_firstpeak=True):
         '''
         Subtract class mrc file
         '''
@@ -1476,7 +1476,13 @@ class ProjectSubtract2D(Project):
             if self.mask_structure_mrc_file is None:
                 self.mask_structure_mrc = MRC()
                 self.mask_structure_mrc.set_img2D(self.threshold_mask)
-                self.mask_structure_mrc.store_from_original()
+                self.mask_structure_mrc.store_to_original()
+
+            # If structure maks not defined, assign to structure mask
+            if self.mask_subtract_mrc_file is None:
+                self.mask_subtract_mrc = MRC()
+                self.mask_subtract_mrc.set_img2D(self.mask_structure_mrc.get_img2D())
+                self.mask_subtract_mrc.store_to_original()
 
             for ptcl_index, ptcl_row in particle_data.iterrows():
                 # Update particle counter
@@ -1514,7 +1520,8 @@ class ProjectSubtract2D(Project):
                                                                                          mask_structure_img2D,
                                                                                          mask_subtract_img2D,
                                                                                          pl_subtract_bg,
-                                                                                         norm_method))
+                                                                                         norm_method,
+                                                                                         skip_to_firstpeak))
 
                 self.subtraction_results.append([worker_result, ptcl_index])
 
@@ -1555,13 +1562,9 @@ class ProjectSubtract2D(Project):
         # 3. Subtract mask - mask used for subtraction
         if self.mask_subtract_mrc_file is not None:
             self.mask_subtract_mrc = MRC(self.mask_subtract_mrc_file)
-        else:
-            self.mask_subtract_mrc = MRC()
-            self.mask_subtract_mrc.set_img2D(np.zeros(self.circular_mask.shape))
 
         # Store the originals of masks
         self.mask_align_mrc.store_to_original()
-        self.mask_subtract_mrc.store_to_original()
 
     def prepare_project(self):
         '''
@@ -2333,6 +2336,9 @@ class MRC:
         '''
         Rotation based on ptcl data
         '''
+        if not 'rlnOriginPsi' in ptcl_star:
+            return
+
         psi = ptcl_star['rlnAnglePsi']
         self.rotate_img2D(psi)
 
@@ -2340,6 +2346,9 @@ class MRC:
         '''
         Shift based on ptcl data
         '''
+        if not 'rlnOriginX' in ptcl_star or not 'rlnOriginY' in ptcl_star:
+            return
+
         originX = ptcl_star['rlnOriginX']
         originY = ptcl_star['rlnOriginY']
 
@@ -2424,7 +2433,7 @@ class MRC:
         # k paramaters
         k1 = np.pi / 2. * 2 * lamb
         k2 = np.pi / 2. * cs * lamb**3
-        k3 = np.atan(ac/np.sqrt(1 - ac**2))
+        k3 = np.arctan(ac/np.sqrt(1 - ac**2))
         k4 = bf / 4.                # B-factor, follows RELION convention.
         k5 = np.deg2rad(phaseShift)  # Phase shift.
 

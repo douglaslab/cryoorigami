@@ -16,18 +16,19 @@ def main():
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument("-i",            "--input",         type=str,     help="Particle star file")
-    parser.add_argument("-refclass",     "--refclass",      type=str,     help="Class star file")
-    parser.add_argument("-o",            "--output",        type=str,     help="Output directory", default=None)
-    parser.add_argument("-diameter",     "--diameter",      type=float,   help="Particle diameter in Angstroms", default=None)
-    parser.add_argument("-maskalign",    "--maskalign",     type=str,     help="Mask used for 2D classification", default=None)
-    parser.add_argument("-masksub",      "--masksub",       type=str,     help="Mask used for the subtraction", default=None)
-    parser.add_argument("-maskstruct",   "--maskstruct",    type=str,     help="Maks that defines the boundaries of structure", default=None)
-    parser.add_argument("-batch",        "--batch",         type=int,     help="Particle batch size", default=100)
-    parser.add_argument("-maxptcl",      "--maxptcl",       type=int,     help="Maximum number of particles to write", default=None)
-    parser.add_argument("-method",       "--method",        type=str,     help="Particle subtraction method", choices=['subctf', 'cropctf', 'crop'], default='subctf')
-    parser.add_argument("-norm",         "--norm",          type=str,     help="Normalization method for subtraction", choices=['frc', 'ccc'], default=None)
-    parser.add_argument("-subtractbg",   "--subtractbg",    action='store_true', help="Subtract background (~subtracture mask)")
+    parser.add_argument("-i",             "--input",         type=str,     help="Particle star file")
+    parser.add_argument("-refclass",      "--refclass",      type=str,     help="Class star file")
+    parser.add_argument("-o",             "--output",        type=str,     help="Output directory", default=None)
+    parser.add_argument("-diameter",      "--diameter",      type=float,   help="Particle diameter in Angstroms", default=None)
+    parser.add_argument("-maskalign",     "--maskalign",     type=str,     help="Mask used for 2D classification", default=None)
+    parser.add_argument("-masksub",       "--masksub",       type=str,     help="Mask used for the subtraction", default=None)
+    parser.add_argument("-maskstruct",    "--maskstruct",    type=str,     help="Maks that defines the boundaries of structure", default=None)
+    parser.add_argument("-batch",         "--batch",         type=int,     help="Particle batch size", default=100)
+    parser.add_argument("-maxptcl",       "--maxptcl",       type=int,     help="Maximum number of particles to write", default=None)
+    parser.add_argument("-method",        "--method",        type=str,     help="Particle subtraction method", choices=['subctf', 'cropctf', 'crop'], default='subctf')
+    parser.add_argument("-norm",          "--norm",          type=str,     help="Normalization method for subtraction", choices=['ccc', 'intensity', 'frc'], default='ccc')
+    parser.add_argument("-subtractbg",    "--subtractbg",    action='store_true', help="Subtract background. For crop methods only.")
+    parser.add_argument("-incfirstpeak",  "--incfirstpeak",  action='store_true', help="Apply CTF including the first peak.")
 
     args = parser.parse_args()
 
@@ -43,7 +44,8 @@ def main():
                  'maxptcl':       args.maxptcl,
                  'method':        args.method,
                  'norm':          args.norm,
-                 'subtractbg':    args.subtractbg
+                 'subtractbg':    args.subtractbg,
+                 'incfirstpeak':  args.incfirstpeak
                  }
 
     # Check if the input file exists
@@ -97,7 +99,8 @@ def main():
                                    batch_size=args_dict['batch'],
                                    subtract_func=args_dict['method'],
                                    subtract_bg=args_dict['subtractbg'],
-                                   norm_method=args_dict['norm'])
+                                   norm_method=args_dict['norm'],
+                                   skip_to_firstpeak=not args_dict['incfirstpeak'])
 
     # Write output files
     new_project.write_output_files()
