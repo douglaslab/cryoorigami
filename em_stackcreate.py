@@ -23,6 +23,7 @@ def main():
     parser.add_argument("-hp",           "--highpass",      type=float, help="Highpass filter in Angstrom units", default=None)
     parser.add_argument("-lp",           "--lowpass",       type=float, help="Lowpass filter in Angstrom units", default=None)
     parser.add_argument("-clip",         "--clip",          type=int,   help="Clip images to new box size", default=None)
+    parser.add_argument("-diameter",     "--diameter",      type=int,   help="Particle diameter for normalization. If provided, perform normalization", default=None)
 
     args = parser.parse_args()
 
@@ -33,7 +34,8 @@ def main():
                  'transform':     args.transform,
                  'highpass':      args.highpass,
                  'lowpass':       args.lowpass,
-                 'clip':          args.clip
+                 'clip':          args.clip,
+                 'diameter':      args.diameter
                  }
 
     # Check if the input file exists

@@ -300,37 +300,72 @@ def eval_ctf(ctf_s, ctf_a, defU, defV, defA=0, phaseShift=0, kv=300, ac=0.1, cs=
 
     return img2D_ctf
 
-def calc_frc(current_fft, other_fft, ctf_r):
+def calc_frc(current_fft, ref_fft, ctf_r):
     '''
     Compute frc between two ft
     '''
     frc2D = np.ones(current_fft.shape, dtype=np.float32)
     rbins = np.sort(np.unique(ctf_r))
+    nbins = len(rbins)
+    max_r = np.max(rbins)
 
     # Get cross correlations
-    cross_cc = current_fft*np.conj(other_fft)
-    self1_cc = np.abs(current_fft)**2
-    self2_cc = np.abs(other_fft)**2
-
-    # Quarter of  the number of bins 
-    # Merge two bins to single bin and work on half the fourier space
-    half_nbins = len(rbins)//4
+    cross_cc = current_fft*np.conj(ref_fft)
+    ref_cc   = np.abs(ref_fft)**2
 
     # Calculate for half the FFT
-    for i in range(half_nbins):
-        mask = (ctf_r == rbins[2*i]) | (ctf_r == rbins[2*i+1])
+    for i in range(nbins-1):
+        mask  = ctf_r == rbins[i]
         corr  = np.sum(cross_cc[mask])
-        norm1 = np.sum(self1_cc[mask])
-        norm2 = np.sum(self2_cc[mask])
+        norm  = np.sum(ref_cc[mask])
 
-        frc2D[mask] = np.abs(corr/np.sqrt(norm1*norm2))
+        frc2D[mask] = np.abs(corr/norm)
 
-    # For the rest assign it to 0
-    mask = ctf_r >= rbins[2*half_nbins]
+    # For the rest assign it to 1
+    mask = ctf_r == max_r
     frc2D[mask] = 1.0
     
     return frc2D
 
+@jit(nopython=True)
+def calc_frc_numba(current_fft, ref_fft, ctf_r):
+    '''
+    Compute frc between two ft
+    '''
+    frc2D = np.ones(current_fft.shape)
+    max_r = np.max(ctf_r)
+
+    # Initialize arrays
+    corr_sum = np.zeros(max_r+1)
+    self_sum = np.zeros(max_r+1) 
+
+    # Get cross correlations
+    cross_cc = np.abs(current_fft*np.conj(ref_fft))
+    ref_cc   = np.abs(ref_fft)**2
+
+    # Calculate for half the FFT
+    for i in range(frc2D.shape[0]):
+        for j in range(frc2D.shape[1]):
+            r = ctf_r[i ,j]
+            corr_sum[r] += cross_cc[i, j]
+            self_sum[r] += ref_cc[i, j]
+
+    # Assign to final bin 
+    corr_sum[max_r] = 1.0
+    self_sum[max_r] = 1.0
+
+    # Determine norm sums
+    norm_sum = corr_sum/self_sum
+
+    # Assign values
+    for i in range(frc2D.shape[0]):
+        for j in range(frc2D.shape[1]):
+            r = ctf_r[i,j]
+            
+            # Assign the new value
+            frc2D[i,j] = norm_sum[r]
+    
+    return frc2D
 
 def normalize_frc(img2D_fft, frc2D):
     '''
@@ -383,7 +418,6 @@ def calc_mean_std_intensity(img2D, mask):
         std_intensity  = np.std(img2D)
 
     return mean_intensity, std_intensity
-
 
 def threshold_above(img2D, threshold=1.0):
     '''
@@ -439,7 +473,6 @@ def subtract_class_ctf(class_img2D, ctf_a, ctf_s, ctf_r, ptcl_star, mask_align_i
     elif norm_method == 'intensity':
         masked_class_img2D = ifft_img2D(class_fft2D)
         real_coeff = calc_intensity_ratio(ptcl_img2D, masked_class_img2D)
-
 
     ptcl_img2D  = subtract_class_from_ptcl(class_img2D, class_ctf, ptcl_img2D, mask_subtract_img2D, fft_coeff, real_coeff)
 

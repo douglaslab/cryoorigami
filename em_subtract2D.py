@@ -29,6 +29,7 @@ def main():
     parser.add_argument("-norm",          "--norm",          type=str,     help="Normalization method for subtraction", choices=['ccc', 'intensity', 'frc'], default='ccc')
     parser.add_argument("-subtractbg",    "--subtractbg",    action='store_true', help="Subtract background. For crop methods only.")
     parser.add_argument("-incfirstpeak",  "--incfirstpeak",  action='store_true', help="Apply CTF including the first peak.")
+    parser.add_argument("-innerdiameter", "--innerdiameter", type=float,   help="Inner diameter for the region of interest", default=None)
 
     args = parser.parse_args()
 
@@ -45,7 +46,8 @@ def main():
                  'method':        args.method,
                  'norm':          args.norm,
                  'subtractbg':    args.subtractbg,
-                 'incfirstpeak':  args.incfirstpeak
+                 'incfirstpeak':  args.incfirstpeak,
+                 'innerdiameter': args.innerdiameter
                  }
 
     # Check if the input file exists
@@ -90,6 +92,9 @@ def main():
 
     # Set alignment reference
     new_project.set_structure_mask(args_dict['maskstruct'])
+
+    # Set inner diameter
+    new_project.set_inner_diameter(args_dict['innerdiameter'])
 
     # Prepare project files
     new_project.prepare_project()

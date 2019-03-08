@@ -1373,6 +1373,11 @@ class ProjectSubtract2D(Project):
                           'cropctf': parallelem.crop_class_ctf,
                           'crop':    parallelem.crop_class}
 
+        # Other mask parameters
+        self.inner_diameter   = None
+        self.inner_radius_pix = None
+        self.inner_mask       = None
+
     def write_results(self):
         '''
         Write results
@@ -1482,6 +1487,11 @@ class ProjectSubtract2D(Project):
             if self.mask_subtract_mrc_file is None:
                 self.mask_subtract_mrc = MRC()
                 self.mask_subtract_mrc.set_img2D(self.mask_structure_mrc.get_img2D())
+
+                # If inner mask exists, use that to create subtract mask
+                if self.inner_mask is not None:
+                    self.mask_subtract_mrc.apply_mask(1-self.inner_mask)
+
                 self.mask_subtract_mrc.store_to_original()
 
             for ptcl_index, ptcl_row in particle_data.iterrows():
@@ -1566,6 +1576,12 @@ class ProjectSubtract2D(Project):
         # Store the originals of masks
         self.mask_align_mrc.store_to_original()
 
+    def set_inner_diameter(self, inner_diameter):
+        '''
+        Set inner diameter
+        '''
+        self.inner_diameter = inner_diameter
+
     def prepare_project(self):
         '''
         Prepare project
@@ -1610,6 +1626,17 @@ class ProjectSubtract2D(Project):
             # Make the mask soft
             self.circular_mask = scipy.ndimage.filters.gaussian_filter(self.circular_mask, sigma)
 
+    def create_inner_mask(self):
+        '''
+        Use inner diameter to create an outer mask
+        '''
+        if self.inner_diameter is not None:
+            self.inner_radius_pix = int(0.5*self.inner_diameter/self.particle_apix)
+
+            # Create inner mask
+            self.inner_mask = util.circular_mask(self.first_particle_mrc.img2D.shape,
+                                                 center=None,
+                                                 radius=self.inner_radius_pix)
 
     def prepare_meta_objects(self):
         '''
@@ -1619,6 +1646,7 @@ class ProjectSubtract2D(Project):
         self.create_output_subtract_mrc()
         self.create_output_subtract_star()
         self.create_circular_mask()
+        self.create_inner_mask()
 
 
 class ProjectGroup(Project):
@@ -2257,7 +2285,15 @@ class MRC:
 
             # Determine r
             spacing = 1.0/(self.img2D.shape[0]*apix)
-            self.ctf_r  = np.round(self.ctf_s/spacing)*spacing
+            self.ctf_r = np.round(self.ctf_s/spacing)
+
+            # Get half bin number
+            quart_n = self.img2D.shape[0] // 4
+            mask    = self.ctf_r > quart_n
+            self.ctf_r[mask] = quart_n + 1 
+
+            # Change ctf_r data dtype
+            self.ctf_r = np.array(self.ctf_r, dtype=int)
 
     def get_ctf_r(self):
         '''
