@@ -1167,6 +1167,19 @@ class ProjectStack(Project):
         # Fft grid parameters
         self.fft_r           = None
 
+        # For normalization
+        self.background_mask = None
+
+    def prepare_background_mask(self, clipbox=None):
+        '''
+        Prepare background maks
+        '''
+        self.background_mask = utilities.circular_mask(self.first_particle_mrc.get_img2D().shape, radius=self.particle_radius_pix)
+
+        # If clip is no
+        if clipbox is not None:
+            self.background_mask = parallem.clip_img2D(self.background_mask, clipbox)
+
     def prepare_output_files(self):
         '''
         Create output files
@@ -1183,12 +1196,15 @@ class ProjectStack(Project):
         Prepare meta objects using reference class avarages
         '''
         self.read_particle_apix()
+        self.set_particle_radius()
         self.read_first_particle_mrc()
         self.eval_fft_grid()
         self.make_filter_mask(highpass, lowpass)
         self.prepare_output_files()
         self.create_output_stack_mrc()
         self.create_output_stack_star()
+        self.prepare_background_mask(clipbox)
+
 
     def eval_fft_grid(self):
         '''
@@ -1298,7 +1314,7 @@ class ProjectStack(Project):
                                                       100.0*(ptcl_index+1)/num_ptcls))
 
             # Create a new process
-            worker_result = mp_pool.apply_async(parallelem.read_ptcl_mrc, args=(ptcl_row, transform, self.fft_mask, clipbox))
+            worker_result = mp_pool.apply_async(parallelem.read_ptcl_mrc, args=(ptcl_row, transform, self.fft_mask, clipbox, self.background_mask))
 
             self.stack_results.append([worker_result, ptcl_index])
 

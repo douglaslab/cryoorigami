@@ -55,6 +55,9 @@ def main():
     new_project.read_particles(args_dict['input'])
     print('Read particle star file {}'.format(args_dict['input']))
 
+    # Read particle diameter
+    new_project.set_particle_diameter(args_dict['diameter'])
+
     # Prepare project
     new_project.prepare_project(args_dict['highpass'], args_dict['lowpass'], args_dict['clip'])
 
