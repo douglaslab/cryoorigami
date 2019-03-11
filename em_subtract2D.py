@@ -26,7 +26,7 @@ def main():
     parser.add_argument("-batch",         "--batch",         type=int,     help="Particle batch size", default=100)
     parser.add_argument("-maxptcl",       "--maxptcl",       type=int,     help="Maximum number of particles to write", default=None)
     parser.add_argument("-method",        "--method",        type=str,     help="Particle subtraction method", choices=['subctf', 'cropctf', 'crop'], default='subctf')
-    parser.add_argument("-norm",          "--norm",          type=str,     help="Normalization method for subtraction", choices=['ccc', 'intensity', 'frc'], default='ccc')
+    parser.add_argument("-norm",          "--norm",          type=str,     help="Normalization method for subtraction", choices=['ccc', 'intensity', 'frc'], default='frc')
     parser.add_argument("-subtractbg",    "--subtractbg",    action='store_true', help="Subtract background. For crop methods only.")
     parser.add_argument("-incfirstpeak",  "--incfirstpeak",  action='store_true', help="Apply CTF including the first peak.")
     parser.add_argument("-innerdiameter", "--innerdiameter", type=float,   help="Inner diameter for the region of interest", default=None)

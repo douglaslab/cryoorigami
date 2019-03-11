@@ -127,6 +127,10 @@ class Project:
         # Barcode functions
         self.barcode_funcs = {'Frame': barcode.Frame_angle}
 
+        # Star files to merge
+        self.particle_star_files = []
+        self.other_star          = None
+
     def group_ptcls(method='defocus'):
         '''
         Grouping method
@@ -328,12 +332,47 @@ class Project:
         if new_classids:
             self.ref_class_star.num2className()
 
+    def read_particle_stars(self, files):
+        '''
+        Read a batch of star files to process
+        '''
+        # Count number of files
+        file_counter = 0
+        for file in files:
+            glob_files = glob.glob(file)
+
+            # Iterate over glob files
+            for glob_file in glob_files:
+
+                # Get the file extension
+                head, ext = os.path.splitext(glob_file)
+                if os.path.isfile(glob_file) and ext == '.star':
+                    # Read the first file
+                    if file_counter == 0:
+                        self.read_particles(glob_file)
+                    else:
+                        self.read_other_particles(glob_file)
+
+                    # Update file counter
+                    file_counter +=1 
+
+                    # Merge the star files
+                    self.particle_star.merge_star(self.other_star)
+
+
     def read_particles(self, file):
         '''
         Read particle star
         '''
         self.particle_star_file = os.path.abspath(file)
         self.particle_star = Star(file)
+
+    def read_other_particles(self, file):
+        '''
+        Read other star
+        '''
+        self.other_star_file = os.path.abspath(file)
+        self.other_star      = Star(file)
 
     def read_micrographs(self, file):
         '''
@@ -583,6 +622,7 @@ class Project:
 
         if self.ref_class_star_file is not None:
             head, tail = os.path.split(self.ref_class_star_file)
+            root, ext  = os.path.splitext(tail)
             copyfile(self.ref_class_star_file, self.output_directory+'/class2D_input'+ext)
             self.ref_class_out_file = self.output_directory+'/class2D_output'+ext
 
@@ -1854,6 +1894,14 @@ class ProjectAlign2D(Project):
         self.set_relion_stack_create_exe()
         self.read_first_ref_class_mrc()
 
+
+    def set_params(self, apix, diameter):
+        '''
+        Set particle apix and diamter
+        '''
+        self.particle_apix       = apix
+        self.particle_diameter_A = diameter
+
     def create_output_transformed_mrc(self):
         '''
         Create output subtract mrc object and file
@@ -2032,10 +2080,13 @@ class ProjectAlign2D(Project):
                                    '--tau2_fudge', '2',
                                    '--particle_diameter', str(self.particle_diameter_A),
                                    '--K', '1',
-                                   '--gpu', str(gpu),
                                    '--angpix', str(self.particle_apix),
                                    '--firstiter_cc']
         
+        # GPU option
+        if gpu is not None:
+            self.relion_refine_args+=['--gpu', str(gpu)]
+
         # Check rotation option for 2D class alignment
         if skip_rotate:
             self.relion_refine_args.append('--skip_rotate')
@@ -3633,6 +3684,13 @@ class Star(EMfile):
 
         # Normalize psi
         self.normalize_psi()
+
+    def merge_star(self, other_star):
+        '''
+        Merge with the current star
+        '''
+        if other_star is not None and self.data_block is not None:
+            self.data_block = self.data_block.append(other_star.data_block, ignore_index=True)
 
     def normalize_psi(self):
         '''
