@@ -1210,14 +1210,17 @@ class ProjectStack(Project):
         # For normalization
         self.background_mask = None
 
+        # Original micrograph apix
+        self.orig_apix       = None
+
     def prepare_background_mask(self, clipbox=None):
         '''
         Prepare background maks
         '''
-        self.background_mask = utilities.circular_mask(self.first_particle_mrc.get_img2D().shape, radius=self.particle_radius_pix)
+        if self.particle_diameter_A is not None:
+            self.background_mask = util.circular_mask(self.first_particle_mrc.get_img2D().shape, radius=self.particle_radius_pix)
 
-        # If clip is no
-        if clipbox is not None:
+        if clipbox is not None and self.background_mask is not None:
             self.background_mask = parallem.clip_img2D(self.background_mask, clipbox)
 
     def prepare_output_files(self):
@@ -1241,10 +1244,9 @@ class ProjectStack(Project):
         self.eval_fft_grid()
         self.make_filter_mask(highpass, lowpass)
         self.prepare_output_files()
-        self.create_output_stack_mrc()
+        self.create_output_stack_mrc(clipbox)
         self.create_output_stack_star()
         self.prepare_background_mask(clipbox)
-
 
     def eval_fft_grid(self):
         '''
@@ -1331,11 +1333,42 @@ class ProjectStack(Project):
         # Reset the containers
         self.stack_results = []
 
-    def create_stack(self, batch_size=100, transform=False, clipbox=None):
+    def set_orig_apix(self, apix):
+        '''
+        Set original apix
+        '''
+        self.orig_apix = apix
+
+    def center_stack_star(self):
+        '''
+        Center stack star
+        '''
+        data_block = self.stack_star.get_data_block()
+
+        # Get the origin
+        fracOX, intOX = np.modf(data_block['rlnOriginX'].values)
+        fracOY, intOY = np.modf(data_block['rlnOriginY'].values)
+
+        # Leav only the fractions
+        self.stack_star.data_block['rlnOriginX'] =  fracOX
+        self.stack_star.data_block['rlnOriginY'] =  fracOY
+
+        # Adjust coordinates
+        fracCX, intCX = np.modf(intOX*self.particle_apix/self.orig_apix)
+        fracCY, intCY = np.modf(intOY*self.particle_apix/self.orig_apix)
+
+        self.stack_star.data_block['rlnCoordinateX'] += intCX
+        self.stack_star.data_block['rlnCoordinateY'] += intCY
+
+        # Add the leftovers to origins
+        self.stack_star.data_block['rlnOriginX'] += fracCX*self.orig_apix/self.particle_apix
+        self.stack_star.data_block['rlnOriginY'] += fracCY*self.orig_apix/self.particle_apix
+
+    def create_stack(self, batch_size=100, transform=False, clipbox=None, recenter=False):
         '''
         Flip particles
         '''
-        particle_data_block = self.particle_star.get_data_block()
+        particle_data_block = self.stack_star.get_data_block()
 
         # Create a pool
         mp_pool = multiprocessing.Pool(multiprocessing.cpu_count())
@@ -1354,7 +1387,7 @@ class ProjectStack(Project):
                                                       100.0*(ptcl_index+1)/num_ptcls))
 
             # Create a new process
-            worker_result = mp_pool.apply_async(parallelem.read_ptcl_mrc, args=(ptcl_row, transform, self.fft_mask, clipbox, self.background_mask))
+            worker_result = mp_pool.apply_async(parallelem.read_ptcl_mrc, args=(ptcl_row, transform, self.fft_mask, clipbox, self.background_mask, recenter))
 
             self.stack_results.append([worker_result, ptcl_index])
 
@@ -1369,6 +1402,10 @@ class ProjectStack(Project):
         if transform:
             self.stack_star.reset_offsets()
 
+        # If recentter only fix the coordinates
+        if recenter:
+            self.center_stack_star()
+        
         # Close the output files and write
         self.stack_star.write(self.stack_star_file)
         self.stack_mrc.close()

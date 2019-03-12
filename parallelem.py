@@ -7,6 +7,7 @@
 
 import mrcfile
 import numpy as np
+import math
 import scipy.ndimage
 from numba import jit
 
@@ -75,27 +76,30 @@ def generate_noise(img2D, mask=None, noise_mean=0.0, noise_std=1.0, sigma=0):
     except IndexError:
         return None
 
-def clip_img2D(img2D, clipbox=None):
+def clip_img2D(img2D, clipbox=None, origin=[0, 0]):
     '''
     Clip img2D
     '''
     # Check for clip
-    if clipbox is not None and clipbox < img2D.shape[0] and clipbox.img2D.shape[1]:
+    if clipbox is not None and clipbox < img2D.shape[0] and clipbox < img2D.shape[1]:
         
+        # Get the origin
+        originX, originY = origin
+
         # Get the img center
-        centerY = img2D.shape[0] // 2
-        centerX = img2D.shape[1] // 2
+        centerY = img2D.shape[0] // 2 + int(originY)
+        centerX = img2D.shape[1] // 2 + int(originX)
 
         # Determine halfbox size
         halfbox = clipbox // 2 
 
         # Clip image
-        img2D = img2D[centerY-halfbox:centerY+halfbox+1, centerX-halfbox:centerX+halfbox+1]
+        img2D = img2D[centerY-halfbox:centerY+halfbox, centerX-halfbox:centerX+halfbox]
 
     return img2D
 
 
-def read_ptcl_mrc(ptcl_star, transform=False, fft_mask=None, clipbox=None, background_mask=None):
+def read_ptcl_mrc(ptcl_star, transform=False, fft_mask=None, clipbox=None, background_mask=None, recenter=False):
     '''
     Particle mrc data
     '''
@@ -117,8 +121,17 @@ def read_ptcl_mrc(ptcl_star, transform=False, fft_mask=None, clipbox=None, backg
         if fft_mask is not None:
             img2D = fft_filter(img2D, fft_mask)
 
+        # Get img center
+        img_origin = [0, 0]
+
+        # If recenter option is on
+        if recenter:
+            fracX, intX = math.modf(ptcl_star['rlnOriginX'])
+            fracY, intY = math.modf(ptcl_star['rlnOriginY'])
+            img_origin  = [intX, intY]
+
         # Check for clip
-        img2D = clip_img2D(img2D, clipbox)
+        img2D = clip_img2D(img2D, clipbox, origin=img_origin)
 
         # Normalize using the background mask
         if background_mask is not None:

@@ -19,10 +19,12 @@ def main():
     parser.add_argument("-i",            "--input",         type=str,   help="Particle star file")
     parser.add_argument("-o",            "--output",        type=str,   help="Output directory", default=None)
     parser.add_argument("-batch",        "--batch",         type=int,   help="Particle batch size", default=100)
-    parser.add_argument("-transform",    "--transform", action='store_true', help='Transform the images before writing the stacks')
+    parser.add_argument("-transform",    "--transform", action='store_true',  help='Transform the images before writing the stacks')
     parser.add_argument("-hp",           "--highpass",      type=float, help="Highpass filter in Angstrom units", default=None)
     parser.add_argument("-lp",           "--lowpass",       type=float, help="Lowpass filter in Angstrom units", default=None)
     parser.add_argument("-clip",         "--clip",          type=int,   help="Clip images to new box size", default=None)
+    parser.add_argument("-origapix",     "--origapix",      type=float, help="Original micrograph pixel size (A)", default=1.82)
+    parser.add_argument("-recenter",     "--recenter",   action='store_true', help="Recenter the images prior to clipping. Use with clip option only.", default=None)
     parser.add_argument("-diameter",     "--diameter",      type=int,   help="Particle diameter for normalization. If provided, perform normalization", default=None)
 
     args = parser.parse_args()
@@ -35,7 +37,9 @@ def main():
                  'highpass':      args.highpass,
                  'lowpass':       args.lowpass,
                  'clip':          args.clip,
-                 'diameter':      args.diameter
+                 'diameter':      args.diameter,
+                 'recenter':      args.recenter,
+                 'origapix':      args.origapix
                  }
 
     # Check if the input file exists
@@ -56,13 +60,16 @@ def main():
     print('Read particle star file {}'.format(args_dict['input']))
 
     # Read particle diameter
+    new_project.set_orig_apix(args_dict['origapix'])
+
+    # Read particle diameter
     new_project.set_particle_diameter(args_dict['diameter'])
 
     # Prepare project
     new_project.prepare_project(args_dict['highpass'], args_dict['lowpass'], args_dict['clip'])
 
     # Flip particles
-    new_project.create_stack(args_dict['batch'], args_dict['transform'], args_dict['clip'])
+    new_project.create_stack(args_dict['batch'], args_dict['transform'], args_dict['clip'], args_dict['recenter'])
 
 
 if __name__ == "__main__":
