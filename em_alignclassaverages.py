@@ -21,6 +21,7 @@ def main():
     parser.add_argument("-unmasked","--unmasked", action='store_true', help='Use unmasked classes for alignment')
     parser.add_argument("-apix",    "--apix",     type=float, help='Pixel size in anstroms', default=1.82)
     parser.add_argument("-diameter","--diameter", type=float, help='Particle diameter in Anstroms', default=1000)
+    parser.add_argument("-numiter", "--numiter",  type=int,   help='Number of iterations', default=20)
 
     args = parser.parse_args()
 
@@ -29,7 +30,8 @@ def main():
                  'output':      args.output,
                  'unmasked':    args.unmasked,
                  'apix':        args.apix,
-                 'diameter':    args.diameter
+                 'diameter':    args.diameter,
+                 'numiter':     args.numiter
                  }
 
     # Check if the input file exists
@@ -62,8 +64,14 @@ def main():
     new_project.normalize_class_refs()
 
     # Run relion
-    new_project.set_relion_refine_args()
+    new_project.set_relion_refine_args(offset_range=10, num_iter=args_dict['numiter'], firstiter_cc=False, T=8)
     new_project.run_refine2D()
+
+    # Process 2D refine files
+    new_project.prepare_refine2D()
+
+    # Make transformed class stacks
+    new_project.create_transformed_class_stacks()
 
 
 if __name__ == "__main__":

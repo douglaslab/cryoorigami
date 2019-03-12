@@ -1880,6 +1880,9 @@ class ProjectAlign2D(Project):
         self.ref_class_transformed_star      = None
         self.ref_class_transformed_mrc       = None
 
+        # Relion refine2D parameters
+        self.relion_num_iter                 = 1
+
     def prepare_project(self, use_unmasked_classes=False):
         '''
         Prepare project
@@ -2028,7 +2031,7 @@ class ProjectAlign2D(Project):
         Set Refine 2D files
         '''
         self.refine2D_it0_star_file = self.output_directory + '/' + 'run_it000_data.star'
-        self.refine2D_it1_star_file = self.output_directory + '/' + 'run_it001_data.star'
+        self.refine2D_it1_star_file = self.output_directory + '/' + 'run_it%03d_data.star' %(self.relion_num_iter)
 
     def read_refine2D_files(self):
         '''
@@ -2056,10 +2059,20 @@ class ProjectAlign2D(Project):
         '''
         self.ref_class_star.write(self.ref_class_tmp_star_file)
 
-    def set_relion_refine_args(self, skip_rotate=False, sigma_psi=-1, offset_range=100, offset_step=1, psi_step=1, gpu=0):
+    def set_relion_refine_args(self, skip_rotate=False, sigma_psi=-1, offset_range=10, offset_step=1, psi_step=1, gpu=0, num_refs=1, num_iter=1, firstiter_cc=True, T=2):
+
+        # Check if reference file exists
+        if self.ref_align_mrc_file is None:
+            self.ref_align_mrc_file = self.first_ref_class_mrc_file
+
+        # Set number of iterations
+        self.relion_num_iter = num_iter
 
         # Get the maximum offset range possible
-        offset_range_max = int(self.first_ref_class_mrc.img2D.shape[0]//2)
+        if offset_range is None:
+            offset_range_max = int(self.first_ref_class_mrc.img2D.shape[0]//2)
+        else:
+            offset_range_max = offset_range
 
         self.relion_refine_args = [self.relion_refine_exe,
                                    '--i', self.ref_class_tmp_star_norm_file,
@@ -2073,16 +2086,19 @@ class ProjectAlign2D(Project):
                                    '--offset_step',  str(offset_step),
                                    '--offset_range', str(offset_range_max),
                                    '--psi_step',     str(psi_step),
-                                   '--j', '1',
-                                   '--pool', '3',
+                                   '--j', '3',
+                                   '--pool', '50',
                                    '--pad', '2',
-                                   '--iter', '1',
-                                   '--tau2_fudge', '2',
+                                   '--iter', str(num_iter),
+                                   '--tau2_fudge', str(T),
                                    '--particle_diameter', str(self.particle_diameter_A),
-                                   '--K', '1',
                                    '--angpix', str(self.particle_apix),
-                                   '--firstiter_cc']
+                                   '--K', str(num_refs)]
         
+        # First itercc
+        if firstiter_cc:
+            self.relion_refine_args.append('--firstiter_cc')
+
         # GPU option
         if gpu is not None:
             self.relion_refine_args+=['--gpu', str(gpu)]
@@ -2439,8 +2455,9 @@ class MRC:
         '''
         Rotation based on ptcl data
         '''
-        if not 'rlnOriginPsi' in ptcl_star:
+        if not 'rlnAnglePsi' in ptcl_star:
             return
+
 
         psi = ptcl_star['rlnAnglePsi']
         self.rotate_img2D(psi)
@@ -2452,6 +2469,7 @@ class MRC:
         if not 'rlnOriginX' in ptcl_star or not 'rlnOriginY' in ptcl_star:
             return
 
+       
         originX = ptcl_star['rlnOriginX']
         originY = ptcl_star['rlnOriginY']
 
