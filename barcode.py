@@ -46,8 +46,8 @@ def Frame_ptcl_angle(ptcl_star):
 	tilt_angle = 90.0 
 
 	# Result dictionary
-	result_dict = {'rlnAngleTilt': tilt_angle,
-				   'rlnAngleRot': rot_angle}
+	result_dict = {'rlnAngleTiltPrior': tilt_angle,
+				   'rlnAngleRotPrior': rot_angle}
 
 	return result_dict
 
@@ -64,12 +64,12 @@ def Frame_angle(data_star):
 	for ptcl_index, ptcl_row in data_star.iterrows():
 
 		barcode_dict = Frame_ptcl_angle(ptcl_row)
-		tilt_angle_list.append(barcode_dict['rlnAngleTilt'])
-		rot_angle_list.append(barcode_dict['rlnAngleRot'])
+		tilt_angle_list.append(barcode_dict['rlnAngleTiltPrior'])
+		rot_angle_list.append(barcode_dict['rlnAngleRotPrior'])
 
 	# Assign the new values
-	data_star['rlnAngleTilt'] = np.array(tilt_angle_list)
-	data_star['rlnAngleRot']  = np.array(rot_angle_list)
+	data_star['rlnAngleTiltPrior'] = np.array(tilt_angle_list)
+	data_star['rlnAngleRotPrior']  = np.array(rot_angle_list)
 
 	return data_star
 
