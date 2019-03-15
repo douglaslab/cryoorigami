@@ -3926,6 +3926,12 @@ class Cistem(Project):
         self.sigmacutoff = sigmacutoff
         self.mlcutoff    = mlcutoff 
 
+    def sort_images(self):
+        '''
+        Sort based on the image name
+        '''
+        self.particle_star.sort('rlnImageName')
+
     def read_par(self, fname):
         '''
         Read par file from Cistem
@@ -3967,8 +3973,8 @@ class Cistem(Project):
         # Save file
         # Print particle number info
         if verbose:
-            print('Writing %d particles in %s' % (self.par_data.shape[0], self.particle_out_file))
-        np.savetxt(self.particle_out_file, self.par_data.values, fmt=self.write_formatter, header=self.write_header, comments='')
+            print('Writing %d particles in %s' % (self.par_data.shape[0], self.particle_par_file))
+        np.savetxt(self.particle_par_file, self.par_data.values, fmt=self.write_formatter, header=self.write_header, comments='')
 
     def write_star_file(self):
         if self.particle_star is not None:
@@ -3988,7 +3994,8 @@ class Cistem(Project):
             head, tail = os.path.split(self.particle_star_file)
             root, ext  = os.path.splitext(tail)
             copyfile(self.particle_star_file, self.output_directory+'/particle_input'+ext)
-            self.particle_out_file = self.output_directory+'/particle_output.par'
+            self.particle_par_file = self.output_directory+'/particle_output.par'
+            self.particle_out_file = self.output_directory+'/particle_output.star'
 
             # Make symlink
             self.make_symlink2parent(self.particle_star_file)

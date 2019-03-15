@@ -46,6 +46,9 @@ def main():
     new_project.read_particles(args_dict['input'])
     print('Read particle star file {}'.format(args_dict['input']))
 
+    # Sort particles based on imagename
+    new_project.sort_images()
+
     # Prepare project
     new_project.prepare_project()
 
@@ -62,6 +65,9 @@ def main():
 
     # Write output file
     new_project.write_output_file()
+
+    # Write also star file
+    new_project.write_star_file()
 
 
 if __name__ == "__main__":
