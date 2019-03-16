@@ -42,7 +42,7 @@ def main():
         sys.exit('Input file does not exist!')
 
     # Check if the reference file exists
-    if args_dict['reference'] is None and not os.path.isfile(args_dict['reference']):
+    if args_dict['reference'] is None or not os.path.isfile(args_dict['reference']):
         parser.print_help()
         sys.exit('Reference file does not exist!')
 
