@@ -41,11 +41,6 @@ def main():
         parser.print_help()
         sys.exit('Input file does not exist!')
 
-    # Check if the reference file exists
-    if args_dict['reference'] is None or not os.path.isfile(args_dict['reference']):
-        parser.print_help()
-        sys.exit('Reference file does not exist!')
-
     # Create an EM project object
     new_project = em.ProjectGroup(name='EMGroup')
     new_project.set_output_directory(args_dict['output'], project_root='.')
@@ -58,21 +53,27 @@ def main():
     new_project.read_particles(args_dict['input'])
     print('Read particle star file {}'.format(args_dict['input']))
 
-    # Read particles
-    new_project.read_micrographs(args_dict['reference'])
-    print('Read micrographs star file {}'.format(args_dict['reference']))
-
     # Set project parameters
     new_project.set_params(maxmics=args_dict['maxmics'], threshdef=args_dict['thresholddefocus'], threshint=args_dict['thresholdintensity'])
 
     # Prepare input and output files
     new_project.prepare_io_files_star()
 
-    # Group particles based on a method
-    new_project.group_micrographs()
+    # Read micrographs
+    if args_dict['reference'] is not None and os.path.isfile(args_dict['reference']):
+        new_project.read_micrographs(args_dict['reference'])
+        print('Read micrographs star file {}'.format(args_dict['reference']))
 
-    # Assign the groups
-    new_project.assign_groups()
+        # Group particles based on a method
+        new_project.group_micrographs()
+
+        # Assign the groups
+        new_project.assign_groups()
+    
+    else:
+        print('Reference file does not exist!')
+        new_project.group_particles()
+
 
     # Write output files
     new_project.write_output_files()

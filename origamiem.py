@@ -1804,6 +1804,42 @@ class ProjectGroup(Project):
         # Set the group name in reference star
         self.micrograph_star.data_block['rlnGroupName'] = np.array(group_name_list)
 
+    def group_particles(self):
+        '''
+        Group particles
+        '''
+        # If the micrograph star is not compatible, skip
+        if self.particle_star is None or not self.particle_star.has_label(self.cmp_column):
+            return
+
+        # Sort groups based on defocus groups
+        self.particle_star.sort(self.cmp_column)
+
+        # Group names
+        group_name_list    = []
+        current_group_name = 1
+
+        # Get the first defocus value
+        previous_defocus = self.particle_star.data_block[self.cmp_column].values.tolist()[0]
+
+        # Iterate through the list
+        for ptcl_index, ptcl_row in self.particle_star.data_block.iterrows():
+            if ptcl_row[self.cmp_column] - previous_defocus > self.thresholddef:
+                # Set the new group name
+                current_group_name += 1
+
+                # Set the previous defocus
+                previous_defocus = ptcl_row[self.cmp_column]
+
+            # Add the group name
+            group_name_list.append(str(current_group_name))
+
+        # Set the group name in reference star
+        self.particle_star.data_block['rlnGroupName'] = np.array(group_name_list)
+
+        # Finally sort particles based on rlnImageName
+        self.particle_star.sort('rlnImageName')
+
     def assign_groups(self):
         '''
         Assign groups to particles
