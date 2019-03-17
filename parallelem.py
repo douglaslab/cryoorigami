@@ -31,7 +31,7 @@ def flipX_ptcl(ptcl_star):
     Flip particle
     '''
     img2D = read_ptcl_mrc(ptcl_star)
-    img2D = flipX(img2D, ptcl_star)
+    img2D = flipX_img2D(img2D, ptcl_star)
 
     return img2D
 
