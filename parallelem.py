@@ -32,7 +32,7 @@ def fibonacci_sphere(num_points=1, randomize=True):
     points_list = np.arange(num_points)
 
     # Y coordinate
-    points_y = points_list*offset - 1 + 0.5*points_list
+    points_y = points_list*offset - 1 + 0.5*offset
 
     # Get distance from center
     points_r = np.sqrt(1.0-points_y**2)
@@ -370,44 +370,45 @@ def eval_ctf(ctf_s, ctf_a, defU, defV, defA=0, phaseShift=0, kv=300, ac=0.1, cs=
     return img2D_ctf
 
 
-def calc_fcc(current_fft, ref_fft, fft_r, fft_x, fft_y, fft_z, cone_point, angle):
+def calc_fcc(current_fft, ref_fft, fft_r, fft_s, fft_x, fft_y, fft_z, cone_point, angle):
     '''
     Calculate fcc for a cone point
     '''
 
     # Determine the cone mask
-    cone_mask = create_fft_cone_mask(fft_r, fft_x, fft_y, fft_z, cone_point, angle)
+    cone_mask = create_fft_cone_mask(fft_s, fft_x, fft_y, fft_z, cone_point, angle)
 
     # Calc fsc
     fsc3D = calc_fsc(current_fft, ref_fft, fft_r, cone_mask)
 
-    return fsc3D
+    return fsc3D, cone_mask
 
 
-def create_fft_cone_mask(fft_r, fft_x, fft_y, fft_z, cone_point, angle=10):
+def create_fft_cone_mask(fft_s, fft_x, fft_y, fft_z, cone_point, angle=10):
     '''
     Create cone mask
     '''
     # Initialize the mask
-    cone_mask = np.zeros(fft_r.shape)
+    cone_mask = np.zeros(fft_s.shape)
     cone_mask = fft_x*cone_point[0] + fft_y*cone_point[1] + fft_z*cone_point[2]
 
     # Get nonzero r-values
-    nonzero_r = fft_r > 0
-    zero_r    = fft_r == 0
+    nonzero_r = fft_s > 0
+    zero_r    = fft_s == 0
 
     # Get cone length
     cone_len = np.sqrt(np.sum(cone_point**2))
 
     # Assign the normalized values
-    cone_mask[nonzero_r] = cone_mask[nonzero_r]/(fft_r[nonzero_r]*cone_len)
+    cone_mask[nonzero_r] = cone_mask[nonzero_r]/(fft_s[nonzero_r]*cone_len)
 
     # Determine the cosangle threshold
     cosangle_thresh = np.cos(angle/180.0*np.pi)
 
     # Make values higher than the threshold  1
     valid = cone_mask >= cosangle_thresh
-    cone_mask = np.zeros(fft_r.shape)
+
+    cone_mask = np.zeros(fft_s.shape)
 
     # Assign 1 to valid entries
     cone_mask[valid]  = 1
@@ -434,10 +435,13 @@ def calc_fsc(current_fft, ref_fft, fft_r, fft_mask=None):
         # Incorporate fft_mask
         if fft_mask is not None:
             mask *= (fft_mask > 0)
+
         corr  = np.sum(cross_cc[mask])
         norm  = np.sum(ref_cc[mask])
 
-        fsc3D[mask] = np.abs(corr/norm)
+        # Make the assignment only if mask has positive elements
+        if np.sum(mask) > 0:
+            fsc3D[mask] = np.abs(corr/norm)
 
     return fsc3D
 
@@ -448,7 +452,7 @@ def calc_fsc_numba(current_fft, ref_fft, fft_r, fft_mask=None):
     Compute frc between two ft
     '''
     fsc3D = np.zeros(current_fft.shape)
-    max_r = np.max(fft_r)
+    max_r = int(np.max(fft_r))
 
     # Initialize arrays
     corr_sum = np.zeros(max_r+1)
@@ -462,12 +466,14 @@ def calc_fsc_numba(current_fft, ref_fft, fft_r, fft_mask=None):
     for i in range(fsc3D.shape[0]):
         for j in range(fsc3D.shape[1]):
             for k in range(fsc3D.shape[2]):
-                r = fft_r[i, j, k]
+                r = int(fft_r[i, j, k])
+
                 # Determine mask coef
                 if fft_mask is not None:
                     mask_coef = fft_mask[i, j, k]
                 else:
                     mask_coef = 1.0
+
                 corr_sum[r] += mask_coef*cross_cc[i, j, k]
                 self_sum[r] += mask_coef*ref_cc[i, j, k]
 

@@ -16,12 +16,14 @@ def main():
 
     parser.add_argument('-half1',   "--half1",   type=str, help='Half map 1')
     parser.add_argument('-half2',   "--half2",   type=str, help='Half map 2')
-    parser.add_argument('-whole',   "--whole",   type=str, help='Whole map')
-    parser.add_argument('-mask',    "--mask",    type=str,   default='',  help='Mask for FSC calculation')
-    parser.add_argument('-apix',    "--apix",    type=float, default='',  help='Pixel size (Angstroms)')
-    parser.add_argument('-bfactor', "--bfactor", type=float, default='',  help='B-factor for global sharpening (Negative)')
+    parser.add_argument("-o",       "--output",  type=str,   help="Output directory", default=None)
+    parser.add_argument('-whole',   "--whole",   type=str,   default=None,help='Whole map')
+    parser.add_argument('-mask',    "--mask",    type=str,   default=None,help='Mask for FSC calculation')
+    parser.add_argument('-apix',    "--apix",    type=float, default=1.82,help='Pixel size (Angstroms)')
+    parser.add_argument('-bfactor', "--bfactor", type=float, default=None,help='B-factor for global sharpening (Negative)')
     parser.add_argument('-ncones',  "--ncones",  type=int,   default=500, help='Number of cones to use for dFSC calculation')
-    parser.add_argument('-angle',   "--angle",   type=float, default=20,  help='Apex angle of cones for dFSC calculation')
+    parser.add_argument('-angle',   "--angle",   type=float, default=7.5, help='Half apex angle of cones for dFSC calculation')
+    parser.add_argument('-batch',   "--batch",   type=int,   default=10,  help='Batch size')
 
     args = parser.parse_args()
 
@@ -33,7 +35,9 @@ def main():
                  'apix':      args.apix,
                  'bfactor':   args.bfactor,
                  'ncones':    args.ncones,
-                 'angle':     args.angle}
+                 'angle':     args.angle,
+                 'output':    args.output,
+                 'batch':     args.batch}
 
     # Create an EM project object
     new_project = em.ProjectFsc(name='EMFsc')
@@ -45,13 +49,17 @@ def main():
 
     # Set parameters
     new_project.set_params(args_dict['half1'], args_dict['half2'], args_dict['whole'], args_dict['mask'],
-                           args_dict['apix'], args_dict['bfactor'], args_dict['ncones'], args_dict['angle'])
+                           args_dict['apix'], args_dict['bfactor'], args_dict['ncones'], args_dict['angle'],
+                           args_dict['batch'])
 
     # Prepare project
     new_project.prepare_project()
 
     # Prepare io files
     new_project.prepare_io_files()
+
+    # Run the project
+    new_project.run()
 
     # Write output files
     new_project.write_output_files()

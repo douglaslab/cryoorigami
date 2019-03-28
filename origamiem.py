@@ -21,6 +21,7 @@ import shutil
 import matplotlib.pyplot as py
 import barcode
 
+from mpl_toolkits.mplot3d import Axes3D
 from shutil import copyfile
 
 
@@ -917,6 +918,7 @@ class ProjectFsc(Project):
         self.bfactor   = None
         self.ncones    = None
         self.angle     = None
+        self.batch     = None
 
         # Fibonacci points
         self.fib_points = None
@@ -925,7 +927,7 @@ class ProjectFsc(Project):
         self.fcc_img3D = None
         self.fcc_map   = None
 
-    def set_params(self, half_map1, half_map2, whole_map, mask, apix, bfactor, ncones, angle):
+    def set_params(self, half_map1, half_map2, whole_map, mask, apix, bfactor, ncones, angle, batch):
         '''
         Set project parameters
         '''
@@ -938,6 +940,7 @@ class ProjectFsc(Project):
         self.bfactor = bfactor
         self.ncones  = ncones
         self.angle   = angle
+        self.batch   = batch
 
     def prepare_project(self):
         '''
@@ -945,8 +948,10 @@ class ProjectFsc(Project):
         '''
         self.half_map1 = Map(self.half_map1_file)
         self.half_map2 = Map(self.half_map2_file)
-        self.whole_map = Map(self.whole_map_file)
-        self.mask      = Map(self.mask_file)
+        if self.whole_map_file is not None:
+            self.whole_map = Map(self.whole_map_file)
+        if self.mask_file is not None:
+            self.mask      = Map(self.mask_file)
 
         # Get fibonacci points
         self.fib_points = parallelem.fibonacci_sphere(self.ncones)
@@ -982,14 +987,17 @@ class ProjectFsc(Project):
             copyfile(self.mask_file, self.output_directory+'/'+file)
 
         # Fcc output file
-        self.fcc_out_file = self.output_directory+'/fcc.mrc'
+        self.fcc_out_file = self.output_directory+'/dfsc.mrc'
 
     def prepare_ffts(self):
         '''
         Prepare ffts
         '''
         self.half_map1.take_fft()
+        self.half_map1.center_fft()
+
         self.half_map2.take_fft()
+        self.half_map2.center_fft()
 
     def prepare_fft_grid(self):
         '''
@@ -998,25 +1006,37 @@ class ProjectFsc(Project):
         # Get map dimensions
         ydim, xdim, zdim = self.half_map1.get_map_dimensions()
 
-        xfreq   = np.fft.fftfreq(ydim, self.apix)
-        yfreq   = np.fft.fftfreq(xdim, self.apix)
-        zfreq   = np.fft.fftfreq(zdim, self.apix)
+        xfreq   = np.fft.fftshift(np.fft.fftfreq(ydim, self.apix))
+        yfreq   = np.fft.fftshift(np.fft.fftfreq(xdim, self.apix))
+        zfreq   = np.fft.fftshift(np.fft.fftfreq(zdim, self.apix))
 
         self.fft_sx, self.fft_sy, self.fft_sz = np.meshgrid(xfreq, yfreq, zfreq)
         self.fft_s                = np.sqrt(self.fft_sx**2 + self.fft_sy**2 + self.fft_sz**2)
 
         # Determine r
-        spacing = 1.0/(self.img2D.shape[0]*self.apix)
+        spacing = 1.0/(xdim*self.apix)
         self.fft_r = np.round(self.fft_s/spacing)
+
+        self.fft_r = self.fft_r.astype(int)
 
     def apply_mask(self):
         '''
         Apply mask on the maps
         '''
         if self.mask is not None:
-            self.half_map1.apply_mask(self.mask)
-            self.half_map2.apply_mask(self.mask)
-            self.whole_map.apply_mask(self.mask)
+            if self.half_map1 is not None:
+                self.half_map1.apply_map_mask(self.mask)
+            if self.half_map2 is not None:
+                self.half_map2.apply_map_mask(self.mask)
+            if self.whole_map is not None:
+                self.whole_map.apply_map_mask(self.mask)
+
+    def init_results(self):
+        '''
+        Initialize the results
+        '''
+        self.fcc_img3D   = np.zeros(self.half_map1.get_fft().shape)
+        self.count_img3D = np.zeros(self.half_map1.get_fft().shape)
 
     def run(self):
         '''
@@ -1028,15 +1048,26 @@ class ProjectFsc(Project):
         # Fcc results
         self.pool_results = []
 
+        # Initialize the results
+        self.init_results()
+
         # Get ffts
         half_map1_fft = self.half_map1.get_fft()
         half_map2_fft = self.half_map2.get_fft()
 
-        for cone_point in self.fib_points:
+        for i in range(self.fib_points.shape[0]):
+
+            # Determine cone point
+            cone_point = self.fib_points[i,:]
+
+            print('Calculating FSC for cone %d/%d %d/100' % (i+1,
+                                                      self.ncones,
+                                                      100.0*(i+1)/self.ncones))
             # Create a new process
             worker_result = mp_pool.apply_async(parallelem.calc_fcc, args=(half_map1_fft,
                                                                            half_map2_fft,
                                                                            self.fft_r,
+                                                                           self.fft_s,
                                                                            self.fft_sx,
                                                                            self.fft_sy,
                                                                            self.fft_sz,
@@ -1045,21 +1076,40 @@ class ProjectFsc(Project):
 
             self.pool_results.append(worker_result)
 
+            if len(self.pool_results) == self.batch:
+                self.process_results()
+
         # Process results
         self.process_results()
+
+        # Normalize results
+        self.normalize_results()
 
     def process_results(self):
         '''
         Process results
         '''
-        self.fcc_img3D = np.zeros(self.half_map1.get_fft().shape)
 
         # Iterate over the results
         for result in self.pool_results:
-            self.fcc_img3D += result.get()
+            fcc_img3D, count_img3D = result.get()
 
+            self.fcc_img3D   += fcc_img3D
+            self.count_img3D += count_img3D.astype(int)
+
+        self.pool_results = []
+
+    def center_results(self):
+        '''
+        Center results
+        '''
+        self.ffc_img3D = np.fft.fftshift(self.fcc_img3D)
+
+    def normalize_results(self):
         # Normalize the results by number of cones
-        self.fcc_img3D /= self.ncones
+        # Get only the non-zero values
+        valid = self.count_img3D > 0
+        self.fcc_img3D[valid] /= self.count_img3D[valid]
 
     def write_output_files(self):
         '''
@@ -1067,7 +1117,7 @@ class ProjectFsc(Project):
         '''
         self.fcc_map = Map()
         self.fcc_map.set_img3D(self.fcc_img3D)
-        self.fcc_map.write_img3D(self.fcc_out_file)
+        self.fcc_map.write_img3D(self.fcc_out_file, self.apix)
 
 
 class Map:
@@ -1084,20 +1134,26 @@ class Map:
         if self.map_file is not None:
             self.read_map(self.map_file)
 
-    def write_img3D(self, fname):
+    def write_img3D(self, fname, pixel_size):
         '''
         Write img3D
         '''
-
-        self.img3D_mrc = MRC(file=fname, shape=self.img3D.shape)
-        with mrcfile.mmap(fname, mode='w+') as mrc:
-            mrc.data = self.img3D
+        mrc = mrcfile.new(fname, overwrite=True)
+        mrc.set_data(self.img3D)
+        mrc.voxel_size = pixel_size
+        mrc.close()
 
     def take_fft(self):
         '''
         Take fft
         '''
         self.fft3D = np.fft.fftn(self.img3D)
+
+    def center_fft(self):
+        '''
+        Center fft
+        '''
+        self.fft3D = np.fft.fftshift(self.fft3D)
 
     def get_fft(self):
         '''
@@ -1109,7 +1165,7 @@ class Map:
         '''
         Set img3D
         '''
-        self.img3D = img3D.copy()
+        self.img3D = np.array(img3D.copy(), dtype=np.float32)
 
     def read_map(self, file):
         '''
@@ -1130,12 +1186,12 @@ class Map:
         else:
             return None
 
-    def apply_mask(self, mask):
+    def apply_map_mask(self, mask):
         '''
         Apply mask
         '''
-        if mask is not None and self.img3D.shape == mask.shape:
-            self.img3D = self.img3D*mask
+        if mask is not None and self.img3D.shape == mask.img3D.shape:
+            self.img3D = self.img3D*mask.img3D
 
 
 class ProjectFlip(Project):
