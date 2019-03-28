@@ -9,7 +9,46 @@ import mrcfile
 import numpy as np
 import math
 import scipy.ndimage
+import random
 from numba import jit
+
+
+def fibonacci_sphere(num_points=1, randomize=True):
+    '''
+    Get points from a fibonacci sphere
+    '''
+
+    random_num = 1.0
+    if randomize:
+        random_num = random.random()*num_points
+
+    # The offset for sampling
+    offset = 2./num_points
+
+    # The increment
+    increment = math.pi*(3.-math.sqrt(5.))
+
+    # Points list
+    points_list = np.arange(num_points)
+
+    # Y coordinate
+    points_y = points_list*offset - 1 + 0.5*points_list
+
+    # Get distance from center
+    points_r = np.sqrt(1.0-points_y**2)
+
+    # Get the phi angle
+    points_phi = ((points_list+random_num) % num_points)*increment
+
+    # X-Z coordinates
+    points_x = np.cos(points_phi)*points_r
+    points_z = np.sin(points_phi)*points_r
+
+    # Stack the x,y,z coordinates
+    points_coor = np.hstack((np.vstack(points_x), np.vstack(points_y), np.vstack(points_z)))
+
+    return points_coor
+
 
 def calc_ccc(current_img2D, other_img2D, mask=None):
     '''
@@ -76,13 +115,14 @@ def generate_noise(img2D, mask=None, noise_mean=0.0, noise_std=1.0, sigma=0):
     except IndexError:
         return None
 
+
 def clip_img2D(img2D, clipbox=None, origin=[0, 0]):
     '''
     Clip img2D
     '''
     # Check for clip
     if clipbox is not None and clipbox < img2D.shape[0] and clipbox < img2D.shape[1]:
-        
+
         # Get the origin
         originX, originY = origin
 
@@ -91,7 +131,7 @@ def clip_img2D(img2D, clipbox=None, origin=[0, 0]):
         centerX = img2D.shape[1] // 2 + int(originX)
 
         # Determine halfbox size
-        halfbox = clipbox // 2 
+        halfbox = clipbox // 2
 
         # Clip image
         img2D = img2D[centerY-halfbox:centerY+halfbox, centerX-halfbox:centerX+halfbox]
@@ -139,6 +179,7 @@ def read_ptcl_mrc(ptcl_star, transform=False, fft_mask=None, clipbox=None, backg
 
     return np.copy(img2D)
 
+
 def fft_filter(img2D, fft_mask):
     '''
     Perform highpass and/or lowpass filter on the image
@@ -148,6 +189,7 @@ def fft_filter(img2D, fft_mask):
     fft_img2D       = np.fft.ifftshift(fft_img2D_shift*fft_mask)
 
     return np.real(np.fft.ifft2(fft_img2D))
+
 
 def write_img2D(img2D, ptcl_mrc, ptcl_index):
     '''
@@ -270,6 +312,7 @@ def correct_fft_ctf(fft2D, ctf):
     '''
     return fft2D*ctf
 
+
 @jit(nopython=True)
 def eval_ctf(ctf_s, ctf_a, defU, defV, defA=0, phaseShift=0, kv=300, ac=0.1, cs=2.0, bf=0, do_intact_until_first_peak=False):
     '''
@@ -313,11 +356,11 @@ def eval_ctf(ctf_s, ctf_a, defU, defV, defA=0, phaseShift=0, kv=300, ac=0.1, cs=
 
     # Do intact until first peak
     if do_intact_until_first_peak:
-        
+
         # Loop for the numba jit
         for i in range(gamma.shape[0]):
             for j in range(gamma.shape[1]):
-                if np.abs(gamma[i,j]) < np.pi/2: 
+                if np.abs(gamma[i, j]) < np.pi/2:
                     img2D_ctf[i, j] = 1.0
 
     # Enforce envelope
@@ -325,6 +368,127 @@ def eval_ctf(ctf_s, ctf_a, defU, defV, defA=0, phaseShift=0, kv=300, ac=0.1, cs=
         img2D_ctf *= np.exp(-k4 * s2)
 
     return img2D_ctf
+
+
+def calc_fcc(current_fft, ref_fft, fft_r, fft_x, fft_y, fft_z, cone_point, angle):
+    '''
+    Calculate fcc for a cone point
+    '''
+
+    # Determine the cone mask
+    cone_mask = create_fft_cone_mask(fft_r, fft_x, fft_y, fft_z, cone_point, angle)
+
+    # Calc fsc
+    fsc3D = calc_fsc(current_fft, ref_fft, fft_r, cone_mask)
+
+    return fsc3D
+
+
+def create_fft_cone_mask(fft_r, fft_x, fft_y, fft_z, cone_point, angle=10):
+    '''
+    Create cone mask
+    '''
+    # Initialize the mask
+    cone_mask = np.zeros(fft_r.shape)
+    cone_mask = fft_x*cone_point[0] + fft_y*cone_point[1] + fft_z*cone_point[2]
+
+    # Get nonzero r-values
+    nonzero_r = fft_r > 0
+    zero_r    = fft_r == 0
+
+    # Get cone length
+    cone_len = np.sqrt(np.sum(cone_point**2))
+
+    # Assign the normalized values
+    cone_mask[nonzero_r] = cone_mask[nonzero_r]/(fft_r[nonzero_r]*cone_len)
+
+    # Determine the cosangle threshold
+    cosangle_thresh = np.cos(angle/180.0*np.pi)
+
+    # Make values higher than the threshold  1
+    valid = cone_mask >= cosangle_thresh
+    cone_mask = np.zeros(fft_r.shape)
+
+    # Assign 1 to valid entries
+    cone_mask[valid]  = 1
+    cone_mask[zero_r] = 1
+
+    return cone_mask
+
+
+def calc_fsc(current_fft, ref_fft, fft_r, fft_mask=None):
+    '''
+    Compute frc between two ft
+    '''
+    fsc3D = np.zeros(current_fft.shape, dtype=np.float32)
+    rbins = np.sort(np.unique(fft_r))
+    nbins = len(rbins)
+
+    # Get cross correlations
+    cross_cc = current_fft*np.conj(ref_fft)
+    ref_cc   = np.abs(ref_fft)**2
+
+    # Calculate for half the FFT
+    for i in range(nbins):
+        mask  = fft_r == rbins[i]
+        # Incorporate fft_mask
+        if fft_mask is not None:
+            mask *= (fft_mask > 0)
+        corr  = np.sum(cross_cc[mask])
+        norm  = np.sum(ref_cc[mask])
+
+        fsc3D[mask] = np.abs(corr/norm)
+
+    return fsc3D
+
+
+@jit(nopython=True)
+def calc_fsc_numba(current_fft, ref_fft, fft_r, fft_mask=None):
+    '''
+    Compute frc between two ft
+    '''
+    fsc3D = np.zeros(current_fft.shape)
+    max_r = np.max(fft_r)
+
+    # Initialize arrays
+    corr_sum = np.zeros(max_r+1)
+    self_sum = np.zeros(max_r+1)
+
+    # Get cross correlations
+    cross_cc = np.abs(current_fft*np.conj(ref_fft))
+    ref_cc   = np.abs(ref_fft)**2
+
+    # Calculate for half the FFT
+    for i in range(fsc3D.shape[0]):
+        for j in range(fsc3D.shape[1]):
+            for k in range(fsc3D.shape[2]):
+                r = fft_r[i, j, k]
+                # Determine mask coef
+                if fft_mask is not None:
+                    mask_coef = fft_mask[i, j, k]
+                else:
+                    mask_coef = 1.0
+                corr_sum[r] += mask_coef*cross_cc[i, j, k]
+                self_sum[r] += mask_coef*ref_cc[i, j, k]
+
+    # Assign to final bin
+    corr_sum[max_r] = 1.0
+    self_sum[max_r] = 1.0
+
+    # Determine norm sums
+    norm_sum = corr_sum/self_sum
+
+    # Assign values
+    for i in range(fsc3D.shape[0]):
+        for j in range(fsc3D.shape[1]):
+            for k in range(fsc3D.shape[2]):
+                r = fft_r[i, j, k]
+
+                # Assign the new value
+                fsc3D[i, j, k] = norm_sum[r]
+
+    return fsc3D
+
 
 def calc_frc(current_fft, ref_fft, ctf_r):
     '''
@@ -350,8 +514,9 @@ def calc_frc(current_fft, ref_fft, ctf_r):
     # For the rest assign it to 1
     mask = ctf_r == max_r
     frc2D[mask] = 1.0
-    
+
     return frc2D
+
 
 @jit(nopython=True)
 def calc_frc_numba(current_fft, ref_fft, ctf_r):
@@ -363,7 +528,7 @@ def calc_frc_numba(current_fft, ref_fft, ctf_r):
 
     # Initialize arrays
     corr_sum = np.zeros(max_r+1)
-    self_sum = np.zeros(max_r+1) 
+    self_sum = np.zeros(max_r+1)
 
     # Get cross correlations
     cross_cc = np.abs(current_fft*np.conj(ref_fft))
@@ -372,11 +537,11 @@ def calc_frc_numba(current_fft, ref_fft, ctf_r):
     # Calculate for half the FFT
     for i in range(frc2D.shape[0]):
         for j in range(frc2D.shape[1]):
-            r = ctf_r[i ,j]
+            r = ctf_r[i, j]
             corr_sum[r] += cross_cc[i, j]
             self_sum[r] += ref_cc[i, j]
 
-    # Assign to final bin 
+    # Assign to final bin
     corr_sum[max_r] = 1.0
     self_sum[max_r] = 1.0
 
@@ -386,25 +551,27 @@ def calc_frc_numba(current_fft, ref_fft, ctf_r):
     # Assign values
     for i in range(frc2D.shape[0]):
         for j in range(frc2D.shape[1]):
-            r = ctf_r[i,j]
-            
+            r = ctf_r[i, j]
+
             # Assign the new value
-            frc2D[i,j] = norm_sum[r]
-    
+            frc2D[i, j] = norm_sum[r]
+
     return frc2D
+
 
 def normalize_frc(img2D_fft, frc2D):
     '''
     Normalize frc
     '''
-    
+
     return img2D_fft*frc2D
+
 
 def calc_dot(current_img2D, ref_img2D, mask=None):
     '''
     Calc img dot
     '''
-    if mask is not None and mask.shape == img2D.shape:
+    if mask is not None and mask.shape == current_img2D.shape:
         cross_cc = np.average(current_img2D*ref_img2D, weights=mask)
         self_cc  = np.average(ref_img2D*ref_img2D, weights=mask)
     else:
@@ -412,6 +579,7 @@ def calc_dot(current_img2D, ref_img2D, mask=None):
         self_cc  = np.mean(ref_img2D*ref_img2D)
 
     return cross_cc/self_cc
+
 
 def calc_intensity_ratio(current_img2D, ref_img2D, mask=None):
     '''
@@ -426,11 +594,13 @@ def calc_intensity_ratio(current_img2D, ref_img2D, mask=None):
 
     return 1.0*current_mean/ref_mean
 
+
 def normalize_dot(img2D, scale):
     '''
     Normalize by dot
     '''
     return scale*img2D
+
 
 def calc_mean_std_intensity(img2D, mask):
     '''
@@ -445,6 +615,7 @@ def calc_mean_std_intensity(img2D, mask):
 
     return mean_intensity, std_intensity
 
+
 def threshold_above(img2D, threshold=1.0):
     '''
     Threshold function
@@ -453,6 +624,7 @@ def threshold_above(img2D, threshold=1.0):
 
     return img2D
 
+
 def threshold_below(img2D, threshold=0.0):
     '''
     Threshold function
@@ -460,6 +632,7 @@ def threshold_below(img2D, threshold=0.0):
     img2D[img2D < 0.0] = 0.0
 
     return img2D
+
 
 def create_bg_mask(mask_align_img2D, mask_subtract_img2D):
     '''
@@ -470,6 +643,7 @@ def create_bg_mask(mask_align_img2D, mask_subtract_img2D):
     mask_bg_img2D = threshold_below(mask_bg_img2D)
 
     return mask_bg_img2D
+
 
 def subtract_class_ctf(class_img2D, ctf_a, ctf_s, ctf_r, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D, subtract_bg, norm_method, do_intact_until_first_peak):
     '''
@@ -513,7 +687,7 @@ def crop_class_ctf(class_img2D, ctf_a, ctf_s, ctf_r, ptcl_star, mask_align_img2D
     ptcl_img2D  = read_ptcl_mrc(ptcl_star)
     class_ctf   = eval_ptcl_ctf(ctf_s, ctf_a, ptcl_star, 0, do_intact_until_first_peak)
     mask_align_img2D, mask_structure_img2D, mask_subtract_img2D = inv_transform_masks(ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D)
-    
+
     class_img2D = generate_noise(class_img2D)
     class_img2D = ctf_correct_class_img(class_img2D, class_ctf)
     class_img2D = norm_intensity_noise_img(class_img2D, ptcl_img2D, mask_align_img2D, mask_structure_img2D)
@@ -561,6 +735,7 @@ def inv_transform_imgs(class_img2D, ptcl_star):
     class_img2D = inv_transform_ptcl_img2D(class_img2D, ptcl_star)
 
     return class_img2D
+
 
 def inv_transform_masks(ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D):
     '''

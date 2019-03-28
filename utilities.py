@@ -32,6 +32,7 @@ def convert_dict2str(dictionary={}):
 
     return conversion_str
 
+
 def parse_star_parameters(parameter_input):
     '''
     Parse  parameter input

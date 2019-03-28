@@ -138,7 +138,6 @@ class Project:
 
         # Sort particles using defocus or intensity scale
 
-
     def invert_psi(self):
         '''
         Invert psi angle
@@ -195,7 +194,6 @@ class Project:
         Select by barcode
         '''
         self.particle_star.select_by_barcode(barcode_list)
-
 
     def apply_barcode(self, barcode_func):
         '''
@@ -354,11 +352,10 @@ class Project:
                         self.read_other_particles(glob_file)
 
                     # Update file counter
-                    file_counter +=1 
+                    file_counter += 1
 
                     # Merge the star files
                     self.particle_star.merge_star(self.other_star)
-
 
     def read_particles(self, file):
         '''
@@ -468,7 +465,7 @@ class Project:
                          'rlnAnglePsiPrior',
                          'rlnAngleRotPrior',
                          'rlnAngleTiltPrior']
-        
+
         for label in prior_columns:
             self.particle_star.delete_column(label)
 
@@ -563,7 +560,7 @@ class Project:
         else:
             # Get project root
             head = project_root
-            
+
             # List existing output directories
             potential_directories = list(filter(lambda x: os.path.isdir(x),
                                          glob.glob(head+'/'+self.name+'_em_[0-9][0-9][0-9]')))
@@ -710,7 +707,7 @@ class Project:
             self.ref_class_cs.convert2star()
             self.ref_class_cs.convert_idx_to_classnumber()
             self.ref_class_cs.rename_star_columns(columns={'rlnImageName': 'rlnReferenceImage'})
-            
+
             # Convert template mrc file to mrcs
             self.ref_class_cs.get_ref_mrc_file()
             self.ref_class_cs.convert_ref_mrc_to_mrcs()
@@ -885,7 +882,6 @@ class Project:
         '''
         Make symlink to input file folder
         '''
-        
         # Split input file
         head, tail = os.path.split(input_file)
 
@@ -897,6 +893,249 @@ class Project:
 
         # Create symlink
         os.symlink(relative_input_dir, relative_output_dir)
+
+
+class ProjectFsc(Project):
+    '''
+    Particle flip project
+    '''
+    def __init__(self, name='EMFsc'):
+        super().__init__(name)
+
+        self.half_map1_file = None
+        self.half_map2_file = None
+        self.whole_map_file = None
+        self.mask_file      = None
+
+        # Map objects
+        self.half_map1 = None
+        self.half_map2 = None
+        self.whole_map = None
+        self.mask      = None
+
+        self.apix      = None
+        self.bfactor   = None
+        self.ncones    = None
+        self.angle     = None
+
+        # Fibonacci points
+        self.fib_points = None
+
+        # Final map
+        self.fcc_img3D = None
+        self.fcc_map   = None
+
+    def set_params(self, half_map1, half_map2, whole_map, mask, apix, bfactor, ncones, angle):
+        '''
+        Set project parameters
+        '''
+        self.half_map1_file = half_map1
+        self.half_map2_file = half_map2
+        self.whole_map_file = whole_map
+        self.mask_file      = mask
+
+        self.apix    = apix
+        self.bfactor = bfactor
+        self.ncones  = ncones
+        self.angle   = angle
+
+    def prepare_project(self):
+        '''
+        Read the maps and take ffts
+        '''
+        self.half_map1 = Map(self.half_map1_file)
+        self.half_map2 = Map(self.half_map2_file)
+        self.whole_map = Map(self.whole_map_file)
+        self.mask      = Map(self.mask_file)
+
+        # Get fibonacci points
+        self.fib_points = parallelem.fibonacci_sphere(self.ncones)
+
+        # Apply mask
+        self.apply_mask()
+
+        # Prepare ffts
+        self.prepare_ffts()
+
+        # Prepare fft grid
+        self.prepare_fft_grid()
+
+    def prepare_io_files(self):
+        '''
+        Prepare io files
+        '''
+        # Copy input files
+        root, file = os.path.split(self.half_map1_file)
+        copyfile(self.half_map1_file, self.output_directory+'/'+file)
+
+        root, file = os.path.split(self.half_map2_file)
+        copyfile(self.half_map2_file, self.output_directory+'/'+file)
+
+        # Copy whole map
+        if self.whole_map_file is not None:
+            root, file = os.path.split(self.whole_map_file)
+            copyfile(self.whole_map_file, self.output_directory+'/'+file)
+
+        # Copy mask
+        if self.mask_file is not None:
+            root, file = os.path.split(self.mask_file)
+            copyfile(self.mask_file, self.output_directory+'/'+file)
+
+        # Fcc output file
+        self.fcc_out_file = self.output_directory+'/fcc.mrc'
+
+    def prepare_ffts(self):
+        '''
+        Prepare ffts
+        '''
+        self.half_map1.take_fft()
+        self.half_map2.take_fft()
+
+    def prepare_fft_grid(self):
+        '''
+        Prepare fft grid
+        '''
+        # Get map dimensions
+        ydim, xdim, zdim = self.half_map1.get_map_dimensions()
+
+        xfreq   = np.fft.fftfreq(ydim, self.apix)
+        yfreq   = np.fft.fftfreq(xdim, self.apix)
+        zfreq   = np.fft.fftfreq(zdim, self.apix)
+
+        self.fft_sx, self.fft_sy, self.fft_sz = np.meshgrid(xfreq, yfreq, zfreq)
+        self.fft_s                = np.sqrt(self.fft_sx**2 + self.fft_sy**2 + self.fft_sz**2)
+
+        # Determine r
+        spacing = 1.0/(self.img2D.shape[0]*self.apix)
+        self.fft_r = np.round(self.fft_s/spacing)
+
+    def apply_mask(self):
+        '''
+        Apply mask on the maps
+        '''
+        if self.mask is not None:
+            self.half_map1.apply_mask(self.mask)
+            self.half_map2.apply_mask(self.mask)
+            self.whole_map.apply_mask(self.mask)
+
+    def run(self):
+        '''
+        Run the computation
+        '''
+        # Create a pool
+        mp_pool = multiprocessing.Pool(multiprocessing.cpu_count())
+
+        # Fcc results
+        self.pool_results = []
+
+        # Get ffts
+        half_map1_fft = self.half_map1.get_fft()
+        half_map2_fft = self.half_map2.get_fft()
+
+        for cone_point in self.fib_points:
+            # Create a new process
+            worker_result = mp_pool.apply_async(parallelem.calc_fcc, args=(half_map1_fft,
+                                                                           half_map2_fft,
+                                                                           self.fft_r,
+                                                                           self.fft_sx,
+                                                                           self.fft_sy,
+                                                                           self.fft_sz,
+                                                                           cone_point,
+                                                                           self.angle))
+
+            self.pool_results.append(worker_result)
+
+        # Process results
+        self.process_results()
+
+    def process_results(self):
+        '''
+        Process results
+        '''
+        self.fcc_img3D = np.zeros(self.half_map1.get_fft().shape)
+
+        # Iterate over the results
+        for result in self.pool_results:
+            self.fcc_img3D += result.get()
+
+        # Normalize the results by number of cones
+        self.fcc_img3D /= self.ncones
+
+    def write_output_files(self):
+        '''
+        Write output files
+        '''
+        self.fcc_map = Map()
+        self.fcc_map.set_img3D(self.fcc_img3D)
+        self.fcc_map.write_img3D(self.fcc_out_file)
+
+
+class Map:
+    '''
+    3D Map object
+    '''
+    def __init__(self, file=None):
+        self.map_file = file
+        self.map_mrc  = None
+        self.img3D    = None
+        self.fft3D    = None
+
+        # Rad the file
+        if self.map_file is not None:
+            self.read_map(self.map_file)
+
+    def write_img3D(self, fname):
+        '''
+        Write img3D
+        '''
+
+        self.img3D_mrc = MRC(file=fname, shape=self.img3D.shape)
+        with mrcfile.mmap(fname, mode='w+') as mrc:
+            mrc.data = self.img3D
+
+    def take_fft(self):
+        '''
+        Take fft
+        '''
+        self.fft3D = np.fft.fftn(self.img3D)
+
+    def get_fft(self):
+        '''
+        Get fft
+        '''
+        return self.fft3D
+
+    def set_img3D(self, img3D):
+        '''
+        Set img3D
+        '''
+        self.img3D = img3D.copy()
+
+    def read_map(self, file):
+        '''
+        Read map
+        '''
+        self.map_mrc = MRC(file)
+
+        # Assign Img3D
+        if self.map_mrc.img3D is not None:
+            self.img3D = self.map_mrc.img3D
+
+    def get_map_dimensions(self):
+        '''
+        Get 3D map dimensions
+        '''
+        if self.img3D is not None:
+            return self.img3D.shape
+        else:
+            return None
+
+    def apply_mask(self, mask):
+        '''
+        Apply mask
+        '''
+        if mask is not None and self.img3D.shape == mask.shape:
+            self.img3D = self.img3D*mask
 
 
 class ProjectFlip(Project):
@@ -1221,7 +1460,7 @@ class ProjectStack(Project):
             self.background_mask = util.circular_mask(self.first_particle_mrc.get_img2D().shape, radius=self.particle_radius_pix)
 
         if clipbox is not None and self.background_mask is not None:
-            self.background_mask = parallem.clip_img2D(self.background_mask, clipbox)
+            self.background_mask = parallelem.clip_img2D(self.background_mask, clipbox)
 
     def prepare_output_files(self):
         '''
@@ -1259,7 +1498,7 @@ class ProjectStack(Project):
         '''
         Make filter pass - centered at 0 frequency
         '''
-        #Shift fft_r grid
+        # Shift fft_r grid
         self.fft_r_shift = np.fft.fftshift(self.fft_r)
 
         lowpass_mask  = np.ones(self.fft_r_shift.shape, dtype=bool)
@@ -1273,7 +1512,7 @@ class ProjectStack(Project):
 
         # Get the combination of two masks
         self.fft_mask = np.logical_or(highpass_mask, lowpass_mask)
-        
+
         # Apply gaussian filter to smooth the mask
         self.fft_mask = scipy.ndimage.filters.gaussian_filter(self.fft_mask, sigma)
 
@@ -1293,12 +1532,12 @@ class ProjectStack(Project):
             # Determine shape parameters
             num_particles = self.particle_star.data_block.shape[0]
             NY, NX        = self.first_particle_mrc.img2D.shape
-            
+
             # Check the clip box size
             if clipbox is not None and clipbox < NY and clipbox < NX:
                 NX = clipbox
                 NY = clipbox
-    
+
             # Create output MRC file
             self.stack_mrc = MRC(file=self.stack_mrc_file, shape=(num_particles, NY, NX))
 
@@ -1383,8 +1622,8 @@ class ProjectStack(Project):
         for ptcl_index, ptcl_row in particle_data_block.iterrows():
 
             print('Writing Particle %d/%d %d/100' % (ptcl_index+1,
-                                                      num_ptcls,
-                                                      100.0*(ptcl_index+1)/num_ptcls))
+                                                     num_ptcls,
+                                                     100.0*(ptcl_index+1)/num_ptcls))
 
             # Create a new process
             worker_result = mp_pool.apply_async(parallelem.read_ptcl_mrc, args=(ptcl_row, transform, self.fft_mask, clipbox, self.background_mask, recenter))
@@ -1405,10 +1644,11 @@ class ProjectStack(Project):
         # If recentter only fix the coordinates
         if recenter:
             self.center_stack_star()
-        
+
         # Close the output files and write
         self.stack_star.write(self.stack_star_file)
         self.stack_mrc.close()
+
 
 class ProjectSubtract2D(Project):
     '''
@@ -1569,7 +1809,7 @@ class ProjectSubtract2D(Project):
 
             # Make threshold mask
             self.threshold_mask = self.class_mrc.make_threshold_mask(threshold_high=threshold_val, threshold_low=-threshold_val)
-            
+
             # If stucture mask is not provided, assign to threshold mask
             if self.mask_structure_mrc_file is None:
                 self.mask_structure_mrc = MRC()
@@ -1876,7 +2116,6 @@ class ProjectIntersect(Project):
         self.stars = []
         self.files = []
 
-
     def set_star_files(self, star_files):
         '''
         Set star files
@@ -1901,7 +2140,7 @@ class ProjectIntersect(Project):
             for i in range(1, len(self.files)):
 
                 print('Reading star file:%d %s' % (i, self.files[i]))
-                
+
                 # Read new star file
                 current_star = Star(self.files[i])
 
@@ -1922,7 +2161,6 @@ class ProjectPlot(Project):
     '''
     Plotting project
     '''
-
 
 
 class ProjectAlign2D(Project):
@@ -1969,7 +2207,6 @@ class ProjectAlign2D(Project):
         self.set_relion_norm_exe()
         self.set_relion_stack_create_exe()
         self.read_first_ref_class_mrc()
-
 
     def set_params(self, apix, diameter):
         '''
@@ -2167,7 +2404,7 @@ class ProjectAlign2D(Project):
                                    '--particle_diameter', str(self.particle_diameter_A),
                                    '--angpix', str(self.particle_apix),
                                    '--K', str(num_refs)]
-        
+
         # First itercc
         if firstiter_cc:
             self.relion_refine_args.append('--firstiter_cc')
@@ -2183,7 +2420,6 @@ class ProjectAlign2D(Project):
         # Sigma psi option to limit psi search
         if sigma_psi > 0:
             self.relion_refine_args += ['--sigma_psi', str(sigma_psi)]
-
 
         if self.ref_align_mrc_file is not None:
             self.relion_refine_args += ['--ref', self.ref_align_mrc_file]
@@ -2528,9 +2764,8 @@ class MRC:
         '''
         Rotation based on ptcl data
         '''
-        if not 'rlnAnglePsi' in ptcl_star:
+        if 'rlnAnglePsi' not in ptcl_star:
             return
-
 
         psi = ptcl_star['rlnAnglePsi']
         self.rotate_img2D(psi)
@@ -2539,10 +2774,9 @@ class MRC:
         '''
         Shift based on ptcl data
         '''
-        if not 'rlnOriginX' in ptcl_star or not 'rlnOriginY' in ptcl_star:
+        if 'rlnOriginX' not in ptcl_star or 'rlnOriginY' not in ptcl_star:
             return
 
-       
         originX = ptcl_star['rlnOriginX']
         originY = ptcl_star['rlnOriginY']
 
@@ -2632,11 +2866,11 @@ class MRC:
         k5 = np.deg2rad(phaseShift)  # Phase shift.
 
         # Assign s grid
-        s = ctf_s
+        s = self.ctf_s
 
         s2 = s**2
         s4 = s2**2
-        dZ = def_avg + def_dev * (np.cos(2 * (ctf_a - defA)))
+        dZ = def_avg + def_dev * (np.cos(2 * (self.ctf_a - defA)))
         gamma = (k1 * dZ * s2) + (k2 * s4) - k5 - k3
 
         # Determine ctf
@@ -2644,7 +2878,7 @@ class MRC:
 
         # Do intact until first peak
         if do_intact_until_first_peak:
-            
+
             # Mask for low angles
             low_mask = np.abs(gamma) < np.pi/2
 
@@ -2811,9 +3045,8 @@ class MRC:
                 self.img2D = np.copy(self.img3D[image_num])
 
             # Store an original copy of img2D
-            self.img2D_original = np.copy(self.img2D)
-
-
+            if self.img2D is not None:
+                self.img2D_original = np.copy(self.img2D)
 
     def store_from_original(self):
         '''
@@ -3124,7 +3357,7 @@ class Star(EMfile):
         if self.has_label('rlnParticleName'):
             barcode_str = self.data_block.loc[ptcl_index, 'rlnParticleName']
             current_barcode = util.parse_star_parameters(barcode_str.split(','))
-        
+
         # Update new barcode
         new_barcode = {**current_barcode, **barcode}
 
@@ -3223,16 +3456,16 @@ class Star(EMfile):
         Reset all the offsets and the classification angles
         '''
         offset_params = ['rlnOriginX',
-                             'rlnOriginY',
-                             'rlnAnglePsi',
-                             'rlnAngleRot',
-                             'rlnAngleTilt']
-            
-        prior_params = [ 'rlnOriginXPrior',
-                         'rlnOriginYPrior',
-                         'rlnAnglePsiPrior',
-                         'rlnAngleRotPrior',
-                         'rlnAngleTiltPrior']
+                         'rlnOriginY',
+                         'rlnAnglePsi',
+                         'rlnAngleRot',
+                         'rlnAngleTilt']
+
+        prior_params = ['rlnOriginXPrior',
+                        'rlnOriginYPrior',
+                        'rlnAnglePsiPrior',
+                        'rlnAngleRotPrior',
+                        'rlnAngleTiltPrior']
 
         # Set offsets to 0
         for param in offset_params:
@@ -3241,7 +3474,6 @@ class Star(EMfile):
         # Delete the prior columns
         for param in prior_params:
             self.delete_column(param)
-
 
     def flipX(self):
         '''
@@ -3996,14 +4228,14 @@ class Cistem(Project):
         Create write formatter
         '''
         self.par_skip_rows   = 1
-        self.header_list     = ('C', 'PSI','THETA','PHI', 'SHX', 'SHY', 'MAG', 'INCLUDE', 'DF1', 'DF2', 'ANGAST', 'PSHIFT','OCC','LogP', 'SIGMA', 'SCORE', 'CHANGE')
-        self.data_formats    = ('i4', 'f4','f4','f4', 'f4', 'f4', 'i4', 'i4', 'f4', 'f4', 'f4', 'f4','f4','i4', 'f4', 'f4', 'f4')
+        self.header_list     = ('C', 'PSI', 'THETA', 'PHI', 'SHX', 'SHY', 'MAG', 'INCLUDE', 'DF1', 'DF2', 'ANGAST', 'PSHIFT','OCC', 'LogP', 'SIGMA', 'SCORE', 'CHANGE')
+        self.data_formats    = ('i4', 'f4', 'f4', 'f4', 'f4', 'f4', 'i4', 'i4', 'f4', 'f4', 'f4', 'f4', 'f4', 'i4', 'f4', 'f4', 'f4')
         self.write_header    = "%-7s%8s%8s%8s%10s%10s%8s%9s%6s%9s%8s%8s%8s%10s%11s%8s%8s" % self.header_list
         self.write_formatter = "%7d%8.2f%8.2f%8.2f%10.2f%10.2f%8d%6d%9.1f%9.1f%8.2f%8.2f%8.2f%10d%11.4f%8.2f%8.2f"
 
         # Par data types
         self.par_dtypes   = {'names': self.header_list,
-                            'formats': self.data_formats}
+                             'formats': self.data_formats}
 
     def write_output_file(self, verbose=True):
         # Save file
@@ -4151,7 +4383,6 @@ class CryoSparc(EMfile):
         self.ref_mrc_file           = None
         self.ref_mrcs_file          = None
 
-
     def set_relion_image_handler_exe(self):
         '''
         Set relion image handler exe
@@ -4187,7 +4418,6 @@ class CryoSparc(EMfile):
         if self.star is not None and self.star.has_label('rlnReferenceImage'):
             ref_index, self.ref_mrc_file = self.star.data_block['rlnReferenceImage'][0].split('@')
 
-
     def merge_with_original_star(self, restore_offsets=False):
         '''
         Merge with original star
@@ -4202,7 +4432,7 @@ class CryoSparc(EMfile):
 
         # Candidate column list
         candidate_list = ['shortImageName', 'rlnCoordinateX','rlnCoordinateY', 'rlnImageName', 'rlnMicrographName', 'rlnIsFlip', 'rlnParticleName']
-        
+
         # Comparison list
         cmp_list = ['shortImageName', 'rlnCoordinateX', 'rlnCoordinateY']
 
@@ -4213,8 +4443,8 @@ class CryoSparc(EMfile):
                              'rlnAnglePsi',
                              'rlnAngleRot',
                              'rlnAngleTilt']
-            
-            prior_params = [ 'rlnOriginXPrior',
+
+            prior_params =  ['rlnOriginXPrior',
                              'rlnOriginYPrior',
                              'rlnAnglePsiPrior',
                              'rlnAngleRotPrior',
@@ -4234,7 +4464,7 @@ class CryoSparc(EMfile):
 
         # Get particle data block
         ptcl_block = self.star.get_data_block()
-        
+
         # Merge star with original
         intersected_block = pd.merge(ptcl_block, original_block, on=cmp_list, how='inner')
 
@@ -4243,7 +4473,6 @@ class CryoSparc(EMfile):
 
         # Finally remove shortImageName
         self.star.delete_column('shortImageName')
-
 
     def convert_ref_mrc_to_mrcs(self):
         '''
@@ -4255,11 +4484,11 @@ class CryoSparc(EMfile):
         if self.ref_mrc_file is not None:
             mrc_file, ext = os.path.splitext(self.ref_mrc_file)
             if os.path.isfile(self.ref_mrc_file) and ext == '.mrc':
-                
+
                 # Define the new files
                 self.ref_mrcs_file        = mrc_file + '.mrcs'
                 self.ref_mrcs_flipXY_file = mrc_file + '_flipXY.mrcs'
-                
+
                 # Make an mrcs copy of the mrc file
                 shutil.copy(self.ref_mrc_file, self.ref_mrcs_file)
 
@@ -4328,7 +4557,7 @@ class CryoSparc(EMfile):
         Set project path
         '''
         if len(project_path) > 0:
-            self.project_path = project_path + '/' 
+            self.project_path = project_path + '/'
         else:
             self.project_path = ''
 
