@@ -16,15 +16,16 @@ def main():
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument("-i",           "--input",         type=str,   help="Particle star file")
-    parser.add_argument("-refclass",    "--refclass",      type=str,   help="Class star file")
-    parser.add_argument("-o",           "--output",        type=str,   help="Output directory", default=None)
-    parser.add_argument("-diameter",    "--diameter",      type=float, help="Particle diameter in Angstroms", default=None)
-    parser.add_argument("-maskalign",   "--maskalign",     type=str,   help="Mask used for 2D classification", default=None)
-    parser.add_argument("-refalign",    "--refalign",      type=str,   help="Reference mrc file used for alignment", default=None)
-    parser.add_argument("-skip-rotate", "--skiprotate",    action='store_true',   help="Skip rotation in alignment of class averages to reference")
-    parser.add_argument("-use-unmasked","--useunmasked",   action='store_true',   help="Use unmasked classes for alignment of classes")
-    parser.add_argument("-sigma-psi",   "--sigmapsi",      type=float, help="Sigma-psi for alignment of classes", default=-1)
+    parser.add_argument("-i",             "--input",         type=str,   help="Particle star file")
+    parser.add_argument("-refclass",      "--refclass",      type=str,   help="Class star file")
+    parser.add_argument("-o",             "--output",        type=str,   help="Output directory", default=None)
+    parser.add_argument("-diameter",      "--diameter",      type=float, help="Particle diameter in Angstroms", default=None)
+    parser.add_argument("-maskalign",     "--maskalign",     type=str,   help="Mask used for 2D classification", default=None)
+    parser.add_argument("-refalign",      "--refalign",      type=str,   help="Reference mrc file used for alignment", default=None)
+    parser.add_argument("-skip-rotate",   "--skiprotate",    action='store_true',   help="Skip rotation in alignment of class averages to reference")
+    parser.add_argument("-use-unmasked",  "--useunmasked",   action='store_true',   help="Use unmasked classes for alignment of classes")
+    parser.add_argument("-sigma-psi",     "--sigmapsi",      type=float, help="Sigma-psi for alignment of classes", default=-1)
+    parser.add_argument("-skip-particles","--skipparticles", action='store_true',   help="Skip particle alignment")
 
     args = parser.parse_args()
 
@@ -37,7 +38,8 @@ def main():
                  'refalign':      args.refalign,
                  'skiprotate':    args.skiprotate,
                  'useunmasked':   args.useunmasked,
-                 'sigmapsi':      args.sigmapsi
+                 'sigmapsi':      args.sigmapsi,
+                 'skipparticles': args.skipparticles
                  }
 
     # Check if the input file exists
@@ -93,11 +95,13 @@ def main():
     # Process 2D refine files
     new_project.prepare_refine2D()
 
-    # Transform particles
-    new_project.transform_particles()
+    # Check if we skip particle alignment
+    if not args_dict['skipparticles']:
+        # Transform particles
+        new_project.transform_particles()
 
-    # Write output files
-    new_project.write_output_files()
+        # Write output files
+        new_project.write_output_files()
 
     # Make transformed class stacks
     new_project.create_transformed_class_stacks()
