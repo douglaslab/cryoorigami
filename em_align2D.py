@@ -25,6 +25,7 @@ def main():
     parser.add_argument("-skip-rotate",   "--skiprotate",    action='store_true',   help="Skip rotation in alignment of class averages to reference")
     parser.add_argument("-use-unmasked",  "--useunmasked",   action='store_true',   help="Use unmasked classes for alignment of classes")
     parser.add_argument("-sigma-psi",     "--sigmapsi",      type=float, help="Sigma-psi for alignment of classes", default=-1)
+    parser.add_argument("-offset-range",  "--offsetrange",   type=int,   help="Offset range for alignment of classes", default=10)
     parser.add_argument("-skip-particles","--skipparticles", action='store_true',   help="Skip particle alignment")
 
     args = parser.parse_args()
@@ -39,7 +40,8 @@ def main():
                  'skiprotate':    args.skiprotate,
                  'useunmasked':   args.useunmasked,
                  'sigmapsi':      args.sigmapsi,
-                 'skipparticles': args.skipparticles
+                 'skipparticles': args.skipparticles,
+                 'offsetrange':   args.offsetrange
                  }
 
     # Check if the input file exists
@@ -89,7 +91,8 @@ def main():
     new_project.normalize_class_refs()
 
     # Run relion
-    new_project.set_relion_refine_args(skip_rotate=args_dict['skiprotate'], sigma_psi=args_dict['sigmapsi'])
+    new_project.set_relion_refine_args(skip_rotate=args_dict['skiprotate'], sigma_psi=args_dict['sigmapsi'],
+                                       offset_range=args_dict['offsetrange'])
     new_project.run_refine2D()
 
     # Process 2D refine files

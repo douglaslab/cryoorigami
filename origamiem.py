@@ -896,6 +896,75 @@ class Project:
         os.symlink(relative_input_dir, relative_output_dir)
 
 
+class ProjectScale(Project):
+    '''
+    Star scale project with new set of micrographs
+    '''
+    def __init__(self, name='EMScale'):
+        super().__init__(name)
+
+        self.new_micrograph_star      = None
+        self.new_micrograph_star_file = None
+
+    def read_new_micrographs(self, file):
+        '''
+        Read micrograph star file
+        '''
+        self.new_micrograph_star_file = os.path.abspath(file)
+        self.new_micrograph_star      = Star(file)
+
+    def read_new_mic_apix(self):
+        '''
+        Read and set micrograph apix
+        '''
+        self.new_micrograph_star.determine_star_apix()
+        self.set_new_mic_apix(self.new_micrograph_star.get_star_apix())
+
+    def set_new_mic_apix(self, apix=1.82):
+        '''
+        Set micrograph apix
+        '''
+        self.new_mic_apix = apix
+
+    def scale_particle_star(self):
+        '''
+        Scale particle star
+        '''
+        self.coor_scale_ratio   = 1.0*self.mic_apix/self.nex_mic_apix
+
+        # Scale the coordinates first
+        if self.particle_star.has_label('rlnCoordinateX'):
+            self.particle_star.data_block['rlnCoordinateX'] =  np.round(self.particle_star.data_block['rlnCoordinateX']*self.coor_scale_ratio)
+
+        if self.particle_star.has_label('rlnCoordinateY'):
+            self.particle_star.data_block['rlnCoordinateY'] =  np.round(self.particle_star.data_block['rlnCoordinateY']*self.coor_scale_ratio)
+
+    def rename_micrographs(self):
+        '''
+        Rename micrograph names in particle star
+        '''
+        if self.particle_star.has_label('rlnMicrographName'):
+            # Split head and tail for micrograph name
+            ori_head, ori_tail = os.path.split(self.particle_star.data_block['rlnMicrographName'][0])
+
+            # New head and new tail
+            new_head, new_tail = os.path.split(self.new_micrograph_star.data_block['rlnMicrographName'][0])
+
+            # Determine deletion and replace strings
+            del_str = ori_head+'/'
+            new_str = new_head+'/'
+
+            # Replace the Micrographs folder
+            self.particle_star.data_block['rlnMicrographName'] = self.particle_star.data_block.rlnMicrographName.replace({del_str: new_str}, regex=False)
+
+    def run(self):
+        '''
+        Run the project
+        '''
+        self.scale_particle_star()
+        self.rename_micrographs()
+
+
 class ProjectFsc(Project):
     '''
     Particle flip project
