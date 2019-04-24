@@ -16,9 +16,9 @@ def main():
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument("-i",        "--input",       type=str, help="Particle star file")
-    parser.add_argument("-ref",      "--reference",   type=str, help="Template star file", default=None)
-    parser.add_argument("-pass",     "--passthrough", type=str, help="Passthrough file from cryosparc", default=None)
+    parser.add_argument("-i",        "--input",       type=str, help="Particle cs file")
+    parser.add_argument("-ref",      "--reference",   type=str, help="Template cs file", default=None)
+    parser.add_argument("-pass",     "--passthrough", type=str, help="Passthrough cs file from cryosparc", default=None)
     parser.add_argument("-o",        "--output",      type=str, help="Output directory", default=None)
     parser.add_argument("-orig",     "--original",    type=str, help="Original star file", default=None)
     parser.add_argument("-micpath",  "--micpath",     type=str, help="Micrographs path", default="Micrographs")
@@ -26,6 +26,7 @@ def main():
     parser.add_argument("-delclass", "--delclass",    type=int, nargs='+', help="Classes to delete", default=[])
     parser.add_argument("-delstr",   "--delstr",      type=str, help="String to delete from Micrograph name", default='')
     parser.add_argument("-restore-offsets", "--restoreoffsets", action='store_true', help="Restore offsets from original star file")
+    parser.add_argument("-merge-orig", "--mergeoriginal", action='store_true', help="Merge with original star file")
 
     args = parser.parse_args()
 
@@ -39,7 +40,8 @@ def main():
                  'projpath':       args.projpath,
                  'delclass':       args.delclass,
                  'delstr':         args.delstr,
-                 'restoreoffsets': args.restoreoffsets
+                 'restoreoffsets': args.restoreoffsets,
+                 'mergeoriginal':  args.mergeoriginal
                  }
 
     # Check if the input file exists
@@ -68,7 +70,8 @@ def main():
     new_project.prepare_io_files_cs()
 
     # Conert cs to star
-    new_project.convert_cs2star(args_dict['micpath'], args_dict['projpath'], args_dict['delclass'], args_dict['delstr'], args_dict['restoreoffsets'])
+    new_project.convert_cs2star(args_dict['micpath'], args_dict['projpath'], args_dict['delclass'], args_dict['delstr'],
+                                args_dict['restoreoffsets'], args_dict['mergeoriginal'])
 
     # Write output files
     new_project.write_output_files()

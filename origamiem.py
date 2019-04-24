@@ -688,7 +688,7 @@ class Project:
             self.ref_class_cs = CryoSparc()
             self.ref_class_cs.read_blob(self.ref_class_cs_file)
 
-    def convert_cs2star(self, mic_path='Micrographs', proj_path='', del_classes=[], del_str='', restore_offsets=False):
+    def convert_cs2star(self, mic_path='Micrographs', proj_path='', del_classes=[], del_str='', restore_offsets=False, merge_original=False):
         '''
         Convert to cs to star file
         '''
@@ -718,7 +718,7 @@ class Project:
             self.ref_class_cs.delete_classes(del_classes)
 
         # Merge the data from original star file
-        if self.particle_cs.original_star is not None:
+        if self.particle_cs.original_star is not None and merge_original:
             self.particle_cs.merge_with_original_star(restore_offsets)
 
     def read_particle_mrc(self, particle_id=0):

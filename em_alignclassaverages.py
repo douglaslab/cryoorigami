@@ -16,12 +16,12 @@ def main():
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument("-i",       "--input",    type=str,  help="Class reference star file")
-    parser.add_argument("-o",       "--output",   type=str,  help="Output directory", default=None)
-    parser.add_argument("-unmasked","--unmasked", action='store_true', help='Use unmasked classes for alignment')
-    parser.add_argument("-apix",    "--apix",     type=float, help='Pixel size in anstroms', default=1.82)
-    parser.add_argument("-diameter","--diameter", type=float, help='Particle diameter in Anstroms', default=1000)
-    parser.add_argument("-numiter", "--numiter",  type=int,   help='Number of iterations', default=20)
+    parser.add_argument("-i",            "--input",        type=str,  help="Class reference star file")
+    parser.add_argument("-o",            "--output",       type=str,  help="Output directory", default=None)
+    parser.add_argument("-unmasked",     "--unmasked",     action='store_true', help='Use unmasked classes for alignment')
+    parser.add_argument("-apix",         "--apix",         type=float, help='Pixel size in anstroms', default=1.82)
+    parser.add_argument("-diameter",     "--diameter",     type=float, help='Particle diameter in Anstroms', default=1000)
+    parser.add_argument("-numiter",      "--numiter",      type=int,   help='Number of iterations', default=20)
 
     args = parser.parse_args()
 
