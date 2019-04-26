@@ -11,65 +11,65 @@ import numpy as np
 
 # Barcode functions for DNA origami assisted cryo-EM
 
+
 def parse_barcode(ptcl_star):
-	'''
-	Parse barcode
-	'''
-	barcode_dict = {}
-	if 'rlnParticleName' in ptcl_star:
-		barcode_arr = ptcl_star['rlnParticleName'].strip().split(',')
+    '''
+    Parse barcode
+    '''
+    barcode_dict = {}
+    if 'rlnParticleName' in ptcl_star:
+        barcode_arr = ptcl_star['rlnParticleName'].strip().split(',')
 
-		# Get barcode dictionary
-		barcode_dict = util.parse_star_parameters(barcode_arr)
+        # Get barcode dictionary
+        barcode_dict = util.parse_star_parameters(barcode_arr)
 
-	return barcode_dict
+    return barcode_dict
 
 
 def Frame_ptcl_angle(ptcl_star):
-	'''
-	Frame v3-7 barcode function
-	'''
-	barcode_dict = parse_barcode(ptcl_star)
+    '''
+    Frame v3-7 barcode function
+    '''
+    barcode_dict = parse_barcode(ptcl_star)
 
-	# Get bottom code
-	# The code is in reverse order compared to the DNA origami design (e.g. 0 is actually 6, 6 is actually 0)
+    # Get bottom code
+    # The code is in reverse order compared to the DNA origami design (e.g. 0 is actually 6, 6 is actually 0)
 
-	bottom_code  = 6-int(barcode_dict['bottom'])
+    bottom_code  = 6-int(barcode_dict['bottom'])
 
-	# Rotation angle pitch
-	angle_pitch = 34.28
+    # Rotation angle pitch
+    angle_pitch = 34.28
 
-	# Rotation angle (The signing of the rot angle provies right handedness)
-	rot_angle  = -bottom_code*angle_pitch if bottom_code < 4 else (bottom_code-3)*34.28 
+    # Rotation angle (The signing of the rot angle provides right handedness)
+    rot_angle  = -bottom_code*angle_pitch if bottom_code < 4 else (bottom_code-3)*34.28 
 
-	# Tilt angle
-	tilt_angle = 90.0 
+    # Tilt angle
+    tilt_angle = 90.0 
 
-	# Result dictionary
-	result_dict = {'rlnAngleTiltPrior': tilt_angle,
-				   'rlnAngleRotPrior': rot_angle}
+    # Result dictionary
+    result_dict = {'rlnAngleTiltPrior': tilt_angle,
+                   'rlnAngleRotPrior': rot_angle}
 
-	return result_dict
+    return result_dict
 
 
 def Frame_angle(data_star):
-	'''
-	Frame v3-7 barcode function for data star
-	'''
-	
-	# Start with empty lists
-	tilt_angle_list = []
-	rot_angle_list  = []
+    '''
+    Frame v3-7 barcode function for data star
+    '''
 
-	for ptcl_index, ptcl_row in data_star.iterrows():
+    # Start with empty lists
+    tilt_angle_list = []
+    rot_angle_list  = []
 
-		barcode_dict = Frame_ptcl_angle(ptcl_row)
-		tilt_angle_list.append(barcode_dict['rlnAngleTiltPrior'])
-		rot_angle_list.append(barcode_dict['rlnAngleRotPrior'])
+    for ptcl_index, ptcl_row in data_star.iterrows():
 
-	# Assign the new values
-	data_star['rlnAngleTiltPrior'] = np.array(tilt_angle_list)
-	data_star['rlnAngleRotPrior']  = np.array(rot_angle_list)
+        barcode_dict = Frame_ptcl_angle(ptcl_row)
+        tilt_angle_list.append(barcode_dict['rlnAngleTiltPrior'])
+        rot_angle_list.append(barcode_dict['rlnAngleRotPrior'])
 
-	return data_star
+    # Assign the new values
+    data_star['rlnAngleTiltPrior'] = np.array(tilt_angle_list)
+    data_star['rlnAngleRotPrior']  = np.array(rot_angle_list)
 
+    return data_star

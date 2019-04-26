@@ -25,7 +25,7 @@ def main():
     parser.add_argument("-skip-rotate",   "--skiprotate",    action='store_true',   help="Skip rotation in alignment of class averages to reference")
     parser.add_argument("-use-unmasked",  "--useunmasked",   action='store_true',   help="Use unmasked classes for alignment of classes")
     parser.add_argument("-sigma-psi",     "--sigmapsi",      type=float, help="Sigma-psi for alignment of classes", default=-1)
-    parser.add_argument("-offset-range",  "--offsetrange",   type=int,   help="Offset range for alignment of classes", default=10)
+    parser.add_argument("-offset-range",  "--offsetrange",   type=int,   help="Offset range for alignment of classes", default=20)
     parser.add_argument("-skip-particles","--skipparticles", action='store_true',   help="Skip particle alignment")
 
     args = parser.parse_args()
