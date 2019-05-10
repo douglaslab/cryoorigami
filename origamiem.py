@@ -688,7 +688,7 @@ class Project:
             self.ref_class_cs = CryoSparc()
             self.ref_class_cs.read_blob(self.ref_class_cs_file)
 
-    def convert_cs2star(self, mic_path='Micrographs', proj_path='', del_classes=[], del_str='', restore_offsets=False, merge_original=False):
+    def convert_cs2star(self, mic_path='Micrographs', proj_path='', del_classes=[], del_str='', restore_offsets=False, merge_original=False, reset_classes=True):
         '''
         Convert to cs to star file
         '''
@@ -699,6 +699,10 @@ class Project:
 
         # Delete classes
         self.particle_cs.delete_classes(del_classes)
+
+        # Reset class names
+        if reset_classes:
+            self.particle_cs.reset_class_numbers()
 
         # Remove a string from micrographs name
         self.particle_cs.remove_str_from_micrograph_names(del_str)
@@ -716,6 +720,10 @@ class Project:
 
             # Delete unwanted classes
             self.ref_class_cs.delete_classes(del_classes)
+
+            # Reset class names
+            if reset_classes:
+                self.ref_class_cs.reset_class_numbers()
 
         # Merge the data from original star file
         if self.particle_cs.original_star is not None and merge_original:
@@ -819,6 +827,12 @@ class Project:
         '''
         self.mask_structure_mrc_file = mask_file
 
+    def set_ref_class_num(self, num=1):
+        '''
+        Set ref class number
+        '''
+        self.ref_class_number = num
+
     def set_alignment_mask(self, mask_file):
         '''
         Set alignment mask
@@ -848,19 +862,36 @@ class Project:
             # Read image
             self.first_particle_mrc = MRC(image_name, int(image_num)-1)
 
-    def read_first_ref_class_mrc(self):
+    def read_first_ref_class_mrc(self, ref_num=1, write_ref=True):
         '''
         Read first particle mrc
         '''
         if self.ref_class_star is not None:
             # Get first particle image to determine shape parameters
-            image_num, image_name = self.ref_class_star.get_image_num_name(0)
+            image_num, image_name = self.ref_class_star.get_image_num_name(ref_num-1)
 
             # Read image
             self.first_ref_class_mrc = MRC(image_name, int(image_num)-1)
 
-            # Get the reference mrc file name
-            self.first_ref_class_mrc_file = image_name
+            if write_ref:
+                # Write first ref class image
+                self.write_first_ref_class_mrc(image_name, image_num)
+
+    def write_first_ref_class_mrc(self, ref_image_name, ref_image_num):
+        '''
+        Write first ref class mrc
+        '''
+        if self.first_ref_class_mrc is not None:
+            head, ext = os.path.splitext(ref_image_name)
+
+            # Set 2D data to 3D
+            self.first_ref_class_mrc.set_img3D(self.first_ref_class_mrc.get_img2D())
+
+            # Define first class mrc filename
+            self.first_ref_class_mrc_file = head+'_%03d.mrcs' % (ref_image_num)
+
+            # Write image
+            self.first_ref_class_mrc.write_img(fname=self.first_ref_class_mrc_file, apix=self.particle_apix)
 
     def read_ptcl_mrc(self, ptcl_star):
 
@@ -2331,7 +2362,7 @@ class ProjectAlign2D(Project):
         self.set_relion_refine_exe()
         self.set_relion_norm_exe()
         self.set_relion_stack_create_exe()
-        self.read_first_ref_class_mrc()
+        self.read_first_ref_class_mrc(self.ref_class_number, write_ref=True)
 
     def set_params(self, apix, diameter):
         '''
@@ -2346,7 +2377,7 @@ class ProjectAlign2D(Project):
         '''
 
         # Read first ref class mrc file
-        self.read_first_ref_class_mrc()
+        self.read_first_ref_class_mrc(write_ref=False)
 
         # Determine the output transformed mrcs and star files
         self.ref_class_transformed_mrc_file  = os.path.relpath(os.path.abspath(self.output_directory+'/Class2D_output_transformed.mrcs'))
@@ -3103,6 +3134,12 @@ class MRC:
         Set img2D
         '''
         self.img2D = np.copy(data)
+
+    def set_img3D(self, data):
+        '''
+        Set img3D
+        '''
+        self.img3D = np.copy(data)
 
     def set_apix(self, apix):
         '''
@@ -4529,6 +4566,36 @@ class CryoSparc(EMfile):
         if self.star.has_label('rlnClassNumber'):
             self.star.data_block['rlnClassNumber'] += 1
 
+    def reset_class_numbers(self):
+        '''
+        Reset class numbers
+        '''
+        if self.star.has_label('rlnClassNumber'):
+            # Get class number list
+            prev_class_number_list = self.star.data_block['rlnClassNumber'].tolist()
+
+            # Get previous numbers
+            prev_class_numbers = np.sort(np.unique(prev_class_number_list))
+
+            # New class numbers
+            new_class_numbers = np.arange(1, len(prev_class_numbers)+1)
+
+            # Blank class list
+            blank_class_list  = np.zeros(len(prev_class_number_list))
+
+            # Iterate over all the classes
+            for i in range(len(prev_class_numbers)):
+                prev_class_number = prev_class_numbers[i]
+
+                # Get valid class numbers
+                valid = prev_class_number_list == prev_class_number
+
+                # Assign new class number
+                blank_class_list[valid] = new_class_numbers[i]
+
+            # Assign the list
+            self.star.data_block.loc[:, 'rlnClassNumber'] = blank_class_list
+
     def delete_classes(self, del_classes=[]):
         '''
         Delete classes
@@ -4721,6 +4788,13 @@ class CryoSparc(EMfile):
                 self.data_block_dict['rlnImageName'] = np.array(new_data_column,
                                                                 dtype=self.star.PARAMETERS['rlnImageName']['nptype'])
 
+            # rlnClassNumber
+            if self.has_label_blob('alignments2D/class'):
+                self.data_block_dict['rlnClassNumber'] = np.array(self.data_block_blob['alignments2D/class'],
+                                                                  dtype=self.star.PARAMETERS['rlnClassNumber']['nptype'])
+            if self.has_label_passthrough('alignments2D/class'):
+                self.data_block_dict['rlnClassNumber'] = np.array(self.data_block_passthrough['alignments2D/class'],
+                                                                  dtype=self.star.PARAMETERS['rlnClassNumber']['nptype'])
             # rlnOriginX/Y
             if self.has_label_passthrough('alignments2D/shift'):
                 self.data_block_dict['rlnOriginX'] = np.array(self.data_block_passthrough['alignments2D/shift'][:, 0],

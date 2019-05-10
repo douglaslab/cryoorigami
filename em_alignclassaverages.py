@@ -18,7 +18,7 @@ def main():
 
     parser.add_argument("-i",            "--input",        type=str,  help="Class reference star file")
     parser.add_argument("-o",            "--output",       type=str,  help="Output directory", default=None)
-    parser.add_argument("-unmasked",     "--unmasked",     action='store_true', help='Use unmasked classes for alignment')
+    parser.add_argument("-use-unmasked", "--useunmasked",  action='store_true', help='Use unmasked classes for alignment')
     parser.add_argument("-apix",         "--apix",         type=float, help='Pixel size in anstroms', default=1.82)
     parser.add_argument("-diameter",     "--diameter",     type=float, help='Particle diameter in Anstroms', default=1000)
     parser.add_argument("-numiter",      "--numiter",      type=int,   help='Number of iterations', default=20)
@@ -28,7 +28,7 @@ def main():
     # Prepare args dict
     args_dict = {'input':       args.input,
                  'output':      args.output,
-                 'unmasked':    args.unmasked,
+                 'useunmasked': args.useunmasked,
                  'apix':        args.apix,
                  'diameter':    args.diameter,
                  'numiter':     args.numiter
@@ -58,13 +58,13 @@ def main():
     new_project.set_params(args_dict['apix'], args_dict['diameter'])
 
     # Prepare project files
-    new_project.prepare_project(use_unmasked_classes=args_dict['unmasked'])
+    new_project.prepare_project(use_unmasked_classes=args_dict['useunmasked'])
 
     # Normalize class averages
     new_project.normalize_class_refs()
 
     # Run relion
-    new_project.set_relion_refine_args(offset_range=10, num_iter=args_dict['numiter'], firstiter_cc=False, T=8)
+    new_project.set_relion_refine_args(offset_range=5, num_iter=args_dict['numiter'], firstiter_cc=False, T=4)
     new_project.run_refine2D()
 
     # Process 2D refine files
