@@ -35,16 +35,25 @@ def Frame_ptcl_angle(ptcl_star):
     # Get bottom code
     # The code is in reverse order compared to the DNA origami design (e.g. 0 is actually 6, 6 is actually 0)
 
-    bottom_code  = 6-int(barcode_dict['bottom'])
+    bottom_code  = int(barcode_dict['bottom'])
 
     # Rotation angle pitch
     angle_pitch = 34.28
 
+    # rotation angle map
+    rot_angle_map = {0:  0,
+                     +1: -1*angle_pitch,
+                     +2: -2*angle_pitch,
+                     +3: -3*angle_pitch,
+                     -1:  1*angle_pitch,
+                     -2:  2*angle_pitch,
+                     -3:  3*angle_pitch}
+
     # Rotation angle (The signing of the rot angle provides right handedness)
-    rot_angle  = -bottom_code*angle_pitch if bottom_code < 4 else (bottom_code-3)*34.28 
+    rot_angle  = rot_angle_map[bottom_code]
 
     # Tilt angle
-    tilt_angle = 90.0 
+    tilt_angle = 90.0
 
     # Result dictionary
     result_dict = {'rlnAngleTiltPrior': tilt_angle,
