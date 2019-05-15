@@ -18,7 +18,7 @@ def main():
 
     parser.add_argument("-i",        "--input",       type=str, help="Particle star file")
     parser.add_argument("-o",        "--output",      type=str, help="Output directory", default=None)
-    parser.add_argument("-barcode",  "--barcode",     type=str, help="Barcode to select", nargs='*', default={})
+    parser.add_argument("-barcode",  "--barcode",     type=str, help="Barcode to delete", nargs='*', default={})
 
     args = parser.parse_args()
 
@@ -55,7 +55,7 @@ def main():
     new_project.prepare_io_files_star()
 
     # Add new columns
-    new_project.select_by_barcode(args_dict['barcode'])
+    new_project.delete_by_barcode(args_dict['barcode'])
 
     # Write output files
     new_project.write_output_files(write_ref_class_star=False)

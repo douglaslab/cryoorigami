@@ -197,6 +197,12 @@ class Project:
         '''
         self.particle_star.select_by_barcode(barcode_list)
 
+    def delete_by_barcode(self, barcode_list):
+        '''
+        Select by barcode
+        '''
+        self.particle_star.delete_by_barcode(barcode_list)
+
     def apply_barcode(self, barcode_func):
         '''
         Apply barcode on particle star
@@ -3526,6 +3532,30 @@ class Star(EMfile):
         new_barcode = {**current_barcode, **barcode}
 
         return new_barcode
+
+    def delete_by_barcode(self, select_barcode_list):
+        '''
+        Select ptcls by barcode
+        '''
+
+        if not self.has_label('rlnParticleName'):
+            return
+
+        selected_ptcls = []
+
+        for ptcl_index, ptcl_row in self.data_block.iterrows():
+            ptcl_barcode_list = ptcl_row['rlnParticleName'].strip().split(',')
+
+            # Get intersection elements
+            intersect = [barcode for barcode in select_barcode_list if barcode in ptcl_barcode_list]
+
+            if len(intersect) != len(select_barcode_list):
+                selected_ptcls.append(ptcl_index)
+
+        # Make list numpy array
+        selected_ptcls = np.array(selected_ptcls)
+
+        self.data_block = self.data_block.loc[selected_ptcls, :]
 
     def select_by_barcode(self, select_barcode_list):
         '''
