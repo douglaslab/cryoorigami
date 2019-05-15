@@ -126,7 +126,8 @@ class Project:
         self.class3Ds  = []
 
         # Barcode functions
-        self.barcode_funcs = {'Frame': barcode.Frame_angle}
+        self.barcode_funcs = {'Frame': barcode.Frame,
+                              'Framerev': barcode.Framerev}
 
         # Star files to merge
         self.particle_star_files = []
@@ -201,7 +202,8 @@ class Project:
         Apply barcode on particle star
         '''
         if barcode_func in self.barcode_funcs:
-            new_data_block = self.barcode_funcs[barcode_func](self.particle_star.get_data_block())
+            new_data_block = barcode.Frame_angle(self.particle_star.get_data_block(),
+                                                 self.barcode_funcs[barcode_func])
             self.particle_star.set_data_block(new_data_block)
 
     def append_particle_barcode(self, barcode={}):
