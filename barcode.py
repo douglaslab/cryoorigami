@@ -28,7 +28,7 @@ def Frame(barcode_num):
     if barcode_num in rot_angle_map:
         rot_angle = rot_angle_map[barcode_num]
     else:
-        rot_angle = 0.0
+        rot_angle = -360
 
     return tilt_angle, rot_angle
 
@@ -50,7 +50,7 @@ def Framerev(barcode_num):
     if barcode_num in rot_angle_map:
         rot_angle = rot_angle_map[barcode_num]
     else:
-        rot_angle = 0.0
+        rot_angle = -360
 
     return tilt_angle, rot_angle
 
