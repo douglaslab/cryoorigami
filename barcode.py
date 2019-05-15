@@ -9,7 +9,28 @@
 import utilities as util
 import numpy as np
 
+
 # Barcode functions for DNA origami assisted cryo-EM
+def Frame_map(barcode_num):
+    # Rotation angle pitch
+    angle_pitch = 34.28
+
+    rot_angle_map = {1:  0,
+                     2: -1*angle_pitch,
+                     3: -2*angle_pitch,
+                     4: -3*angle_pitch,
+                     5:  1*angle_pitch,
+                     6:  2*angle_pitch,
+                     7:  3*angle_pitch}
+    # Tilt angle
+    tilt_angle = 90.0
+
+    if barcode_num in rot_angle_map:
+        rot_angle = rot_angle_map[barcode_num]
+    else:
+        rot_angle = 0.0
+
+    return tilt_angle, rot_angle
 
 
 def parse_barcode(ptcl_star):
@@ -37,23 +58,7 @@ def Frame_ptcl_angle(ptcl_star):
 
     bottom_code  = int(barcode_dict['rot'])
 
-    # Rotation angle pitch
-    angle_pitch = 34.28
-
-    # rotation angle map
-    rot_angle_map = {1:  0,
-                     2: -1*angle_pitch,
-                     3: -2*angle_pitch,
-                     4: -3*angle_pitch,
-                     5:  1*angle_pitch,
-                     6:  2*angle_pitch,
-                     7:  3*angle_pitch}
-
-    # Rotation angle (The signing of the rot angle provides right handedness)
-    rot_angle  = rot_angle_map[bottom_code]
-
-    # Tilt angle
-    tilt_angle = 90.0
+    tilt_angle, rot_angle = Frame_map(bottom_code)
 
     # Result dictionary
     result_dict = {'rlnAngleTiltPrior': tilt_angle,
