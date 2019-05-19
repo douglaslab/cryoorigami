@@ -591,7 +591,7 @@ def calc_intensity_ratio(current_img2D, ref_img2D, mask=None):
     '''
     Calc the mean intensity ratio between the images
     '''
-    if mask is not None and mask.shape == img2D.shape:
+    if mask is not None and mask.shape == current_img2D.shape:
         current_mean = np.average(current_img2D, weights=mask)
         ref_mean     = np.average(ref_img2D, weights=mask)
     else:
@@ -671,7 +671,7 @@ def subtract_class_ctf(class_img2D, ctf_a, ctf_s, ctf_r, ptcl_star, mask_align_i
     real_coeff  = 1.0
 
     if norm_method == 'frc':
-        ptcl_fft2D = fft_img2D(ptcl_img2D) 
+        ptcl_fft2D = fft_img2D(ptcl_img2D)
         fft_coeff  = calc_frc(ptcl_fft2D, class_fft2D,  ctf_r)
     elif norm_method == 'ccc':
         masked_class_img2D = ifft_img2D(class_fft2D)
@@ -837,7 +837,7 @@ def norm_intensity_class_img(class_img2D, class_ctf, ptcl_img2D, mask_align_img2
     subtract_mean, subtract_std     = calc_mean_std_intensity(ptcl_img2D, mask_subtract_img2D)
 
     # Set background intensity to particle background mean intensity
-    class_img2D = norm_intensity_bg_and_area(class_img2D, mask_background_img2D, background_mean, mask_subtract_img2D, subtract_mean)
+    class_img2D = norm_intensity_bg_and_area(class_img2D, mask_background_img2D, background_mean, mask_structure_img2D, structure_mean)
 
     # Store the original class mrc
     class_img2D = subtract_ctf(class_img2D, class_ctf)
