@@ -28,6 +28,7 @@ def main():
     parser.add_argument("-sigma-psi",     "--sigmapsi",      type=float, help="Sigma-psi for alignment of classes", default=-1)
     parser.add_argument("-offset-range",  "--offsetrange",   type=int,   help="Offset range for alignment of classes", default=20)
     parser.add_argument("-skip-particles","--skipparticles", action='store_true',   help="Skip particle alignment")
+    parser.add_argument("-final-offset",  "--finaloffset",   type=float, nargs=2, help="Final offset", default=[0,0])
 
     args = parser.parse_args()
 
@@ -43,7 +44,8 @@ def main():
                  'useunmasked':   args.useunmasked,
                  'sigmapsi':      args.sigmapsi,
                  'skipparticles': args.skipparticles,
-                 'offsetrange':   args.offsetrange
+                 'offsetrange':   args.offsetrange,
+                 'finaloffset':   args.finaloffset
                  }
 
     # Check if the input file exists
@@ -106,7 +108,7 @@ def main():
     # Check if we skip particle alignment
     if not args_dict['skipparticles']:
         # Transform particles
-        new_project.transform_particles()
+        new_project.transform_particles(final_offset=args_dict['finaloffset'])
 
         # Write output files
         new_project.write_output_files()
