@@ -670,15 +670,18 @@ def subtract_class_ctf(class_img2D, ctf_a, ctf_s, ctf_r, ptcl_star, mask_align_i
     fft_coeff   = np.ones(class_fft2D.shape)
     real_coeff  = 1.0
 
+    # Masked ptcl img2D
+    masked_ptcl_img2D = ptcl_img2D*mask_align_img2D
+
     if norm_method == 'frc':
-        ptcl_fft2D = fft_img2D(ptcl_img2D)
+        ptcl_fft2D = fft_img2D(masked_ptcl_img2D)
         fft_coeff  = calc_frc(ptcl_fft2D, class_fft2D,  ctf_r)
     elif norm_method == 'ccc':
         masked_class_img2D = ifft_img2D(class_fft2D)
-        real_coeff = calc_dot(ptcl_img2D, masked_class_img2D)
+        real_coeff = calc_dot(masked_ptcl_img2D, masked_class_img2D)
     elif norm_method == 'intensity':
         masked_class_img2D = ifft_img2D(class_fft2D)
-        real_coeff = calc_intensity_ratio(ptcl_img2D, masked_class_img2D)
+        real_coeff = calc_intensity_ratio(masked_ptcl_img2D, masked_class_img2D)
 
     ptcl_img2D  = subtract_class_from_ptcl(class_img2D, class_ctf, ptcl_img2D, mask_subtract_img2D, fft_coeff, real_coeff)
 

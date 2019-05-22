@@ -1974,13 +1974,13 @@ class ProjectSubtract2D(Project):
             # Make threshold mask
             self.threshold_mask = self.class_mrc.make_threshold_mask(threshold_high=threshold_val, threshold_low=-threshold_val)
 
-            # If stucture mask is not provided, assign to threshold mask
+            # If stucture mask is not provided, assign to circular mask
             if self.mask_structure_mrc_file is None:
                 self.mask_structure_mrc = MRC()
-                self.mask_structure_mrc.set_img2D(self.threshold_mask)
+                self.mask_structure_mrc.set_img2D(self.circular_mask)
                 self.mask_structure_mrc.store_to_original()
 
-            # If structure maks not defined, assign to structure mask
+            # If subtraction mask is not defined, assign structure mask to it
             if self.mask_subtract_mrc_file is None:
                 self.mask_subtract_mrc = MRC()
                 self.mask_subtract_mrc.set_img2D(self.mask_structure_mrc.get_img2D())
@@ -2015,7 +2015,7 @@ class ProjectSubtract2D(Project):
                 pl_ctf_grid_s         = self.class_mrc.ctf_s
                 pl_ctf_grid_r         = self.class_mrc.ctf_r
                 pl_ptcl_star          = ptcl_row
-                pl_subtract_bg        = subtract_bg 
+                pl_subtract_bg        = subtract_bg
 
                 # Create a new process
                 worker_result = mp_pool.apply_async(self.sub_funcs[subtract_func], args=(pl_class_img2D,
