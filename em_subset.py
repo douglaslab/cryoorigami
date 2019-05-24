@@ -18,6 +18,7 @@ def main():
 
     parser.add_argument("-i",     "--input",       type=str, help="Particle star file")
     parser.add_argument("-n",     "--numptcls",    type=int, help="Number of ptcls in the subset", default=100000)
+    parser.add_argument("-r",     "--randseed",    type=int, help="Random seed", default=1)
     parser.add_argument("-o",     "--output",      type=str, help="Output directory", default=None)
 
     args = parser.parse_args()
@@ -25,6 +26,7 @@ def main():
     # Prepare args dict
     args_dict = {'input':       args.input,
                  'numptcls':    args.numptcls,
+                 'randseed':    args.randseed,
                  'output':      args.output
                  }
 
@@ -49,7 +51,7 @@ def main():
     new_project.prepare_io_files_star()
 
     # Add new columns
-    new_project.pick_random_set(args_dict['numptcls'])
+    new_project.pick_random_set(args_dict['numptcls'], args_dict['randseed'])
 
     # Write output files
     new_project.write_output_files()

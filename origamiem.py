@@ -140,11 +140,11 @@ class Project:
 
         # Sort particles using defocus or intensity scale
 
-    def pick_random_set(self, num_ptcls):
+    def pick_random_set(self, num_ptcls, rand_seed=1):
         '''
         Pick random subset of the particles
         '''
-        self.particle_star.pick_random_set(num_ptcls)
+        self.particle_star.pick_random_set(num_ptcls, rand_seed)
 
     def invert_psi(self):
         '''
@@ -3456,14 +3456,14 @@ class Star(EMfile):
         if file is not None and os.path.isfile(file):
             self.read(file)
 
-    def pick_random_set(self, num_ptcls):
+    def pick_random_set(self, num_ptcls, rand_seed=1):
         '''
         Pick random set of ptcls
         '''
         total_ptcls = len(self.data_block.index)
 
         if num_ptcls < total_ptcls:
-            self.data_block = self.data_block.sample(n=num_ptcls)
+            self.data_block = self.data_block.sample(n=num_ptcls, random_state=rand_seed)
 
     def create_shortImageName(self):
         '''
