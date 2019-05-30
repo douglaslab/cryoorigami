@@ -136,7 +136,7 @@ def close_plot():
 
 ### MASK utilities ###
 
-def circular_mask(shape, center=None, radius=None):
+def circular_mask(shape, center=None, radius=None, soft_edge=None):
 
     # Determine the radius
     radius = int(radius)
@@ -153,6 +153,11 @@ def circular_mask(shape, center=None, radius=None):
     dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
 
     mask = dist_from_center <= radius
+
+    # Check for the soft edge width
+    if soft_edge is not None:
+        mask = scipy.ndimage.filters.gaussian_filter(mask, soft_edge)
+
     return np.array(mask, dtype='float32')
 
 
