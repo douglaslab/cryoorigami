@@ -20,10 +20,24 @@ def main():
     parser.add_argument("-o",            "--output",        type=str,     help="Output directory", default=None)
     parser.add_argument("-cols",         "--columns",       type=str,     nargs='+', default=['rlnDefocusU',
                                                                                               'rlnDefocusV',
+                                                                                              'rlnDefocusAngle',
                                                                                               'rlnMaxValueProbDistribution',
-                                                                                              'rlnNrOfSignificantSamples'])
+                                                                                              'rlnNrOfSignificantSamples',
+                                                                                              'rlnAngleRot',
+                                                                                              'rlnAngleTilt',
+                                                                                              'rlnAnglePsi',
+                                                                                              'rlnOriginX',
+                                                                                              'rlnOriginY'])
+
+    parser.add_argument("-pairs",        "--pairs",         type=str,     nargs='+', default=['rlnAngleTilt:rlnAngleRot',
+                                                                                              'rlnMaxValueProbDistribution:rlnNrOfSignificantSamples',
+                                                                                              'rlnOriginX:rlnOriginY',
+                                                                                              'rlnAngleRot:rlnAngleRotPrior',
+                                                                                              'rlnAngleTilt:rlnAngleTiltPrior',
+                                                                                              'rlnAnglePsi:rlnAnglePsiPrior'])
 
     parser.add_argument("-nbins",        "--nbins",         type=int,     default=20)
+    parser.add_argument("-format",       "--format",        type=str,     default='svg', choices=['png','svg'])
 
     args = parser.parse_args()
 
@@ -31,7 +45,9 @@ def main():
     args_dict = {'input':         args.input,
                  'output':        args.output,
                  'columns':       args.columns,
-                 'nbins':         args.nbins}
+                 'pairs':         args.pairs,
+                 'nbins':         args.nbins,
+                 'format':        args.format}
 
     # Create an EM project object
     new_project = em.ProjectPlot(name='EMPlot')
@@ -45,11 +61,14 @@ def main():
     new_project.read_particles(args_dict['input'])
     print('Read particle star file {}'.format(args_dict['input']))
 
+    # Prepare io files
+    new_project.prepare_io_files(args_dict['format'])
+
     # Run the project
-    new_project.run(args_dict['columns'], args_dict['nbins'])
+    new_project.run(args_dict['columns'], args_dict['pairs'], args_dict['nbins'])
 
     # Write output files
-    new_project.write_output_files()
+    new_project.write_output_files(args_dict['format'])
 
 
 if __name__ == "__main__":

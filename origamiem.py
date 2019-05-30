@@ -2335,6 +2335,7 @@ class ProjectPlot(Project):
         super().__init__(name)
 
         self.column_names = []
+        self.column_pairs = []
 
     def plot_hist(self, column_name, nbins):
         '''
@@ -2344,31 +2345,86 @@ class ProjectPlot(Project):
             py.hist(self.particle_star.data_block[column_name], density=True, bins=nbins)
             py.xlabel(column_name)
 
-    def run(self, column_names, nbins=20):
+    def plot_scatter(self, column_pair):
+        '''
+        Plot histogram
+        '''
+        if len(column_pair) != 2:
+            return
+
+        # Get column names
+        column1, column2 = column_pair
+        if self.particle_star.has_label(column1) and self.particle_star.has_label(column2):
+            py.plot(self.particle_star.data_block[column1], self.particle_star.data_block[column2],'k*')
+            py.xlabel(column1)
+            py.xlabel(column2)
+
+    def plot_hist2D(self, column_pair, nbins=20):
+        '''
+        Plot histogram
+        '''
+        if len(column_pair) != 2:
+            return
+
+        # Get column names
+        column1, column2 = column_pair
+        if self.particle_star.has_label(column1) and self.particle_star.has_label(column2):
+            py.hist2d(self.particle_star.data_block[column1], self.particle_star.data_block[column2],bins=nbins**2)
+            py.xlabel(column1)
+            py.xlabel(column2)
+
+    def run(self, column_names, column_pairs, nbins=20):
         '''
         Plot the columns
         '''
         self.column_names = column_names
 
+        # Get column pairs
+        self.column_pairs = [pair.split(':') for pair in column_pairs]
+
         # Get the dimensions of plot canvas
         num_columns = len(self.column_names)
 
+        # Get number of pairs
+        num_pairs = len(self.column_pairs)
+
         # Determine number of rows and columns
-        num_rows = int(np.sqrt(num_columns)) + 1
+        num_rows = int(np.sqrt(num_columns+num_pairs)) + 1
+
+        # Create figure
+        py.figure(figsize=(10,10))
 
         # Plot histograms for each column
         for i in range(num_columns):
             py.subplot(num_rows, num_rows, i+1)
             self.plot_hist(self.column_names[i], nbins)
 
-        # Show plots 
-        py.show()
+        # Plot scatter plots
+        for i in range(num_pairs):
+            py.subplot(num_rows, num_rows, num_columns+i+1)
+            self.plot_hist2D(self.column_pairs[i], nbins)
 
-    def write_output_files(self):
+        # Tight layout
+        py.tight_layout()
+
+    def prepare_io_files(self, output_format='svg'):
+        '''
+        Prepare output files
+        '''
+        
+        head, tail = os.path.split(self.particle_star_file)
+        root, ext  = os.path.splitext(tail)
+        copyfile(self.particle_star_file, self.output_directory+'/particle_input'+ext)
+        self.particle_plot_file = self.output_directory+'/particle_output.'+output_format
+
+        # Make symlink
+        self.make_symlink2parent(self.particle_star_file)
+
+    def write_output_files(self,output_format='svg'):
         '''
         Write output files
         '''
-        
+        py.savefig(self.particle_plot_file, dpi=100,transparent=True, format=output_format)
 
 
 class ProjectAlign2D(Project):
