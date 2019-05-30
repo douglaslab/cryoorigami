@@ -2355,9 +2355,9 @@ class ProjectPlot(Project):
         # Get column names
         column1, column2 = column_pair
         if self.particle_star.has_label(column1) and self.particle_star.has_label(column2):
-            py.plot(self.particle_star.data_block[column1], self.particle_star.data_block[column2],'k*')
+            py.plot(self.particle_star.data_block[column1], self.particle_star.data_block[column2],'*')
             py.xlabel(column1)
-            py.xlabel(column2)
+            py.ylabel(column2)
 
     def plot_hist2D(self, column_pair, nbins=20):
         '''
@@ -2369,9 +2369,9 @@ class ProjectPlot(Project):
         # Get column names
         column1, column2 = column_pair
         if self.particle_star.has_label(column1) and self.particle_star.has_label(column2):
-            py.hist2d(self.particle_star.data_block[column1], self.particle_star.data_block[column2],bins=nbins**2)
+            py.hist2d(self.particle_star.data_block[column1], self.particle_star.data_block[column2],bins=nbins**2, cmap=py.cm.Blues)
             py.xlabel(column1)
-            py.xlabel(column2)
+            py.ylabel(column2)
 
     def run(self, column_names, column_pairs, nbins=20):
         '''
@@ -2392,7 +2392,7 @@ class ProjectPlot(Project):
         num_rows = int(np.sqrt(num_columns+num_pairs)) + 1
 
         # Create figure
-        py.figure(figsize=(10,10))
+        py.figure(figsize=(20,20))
 
         # Plot histograms for each column
         for i in range(num_columns):
@@ -2424,7 +2424,7 @@ class ProjectPlot(Project):
         '''
         Write output files
         '''
-        py.savefig(self.particle_plot_file, dpi=100,transparent=True, format=output_format)
+        py.savefig(self.particle_plot_file, dpi=100,transparent=False, format=output_format)
 
 
 class ProjectAlign2D(Project):
