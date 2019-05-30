@@ -2331,6 +2331,44 @@ class ProjectPlot(Project):
     '''
     Plotting project
     '''
+    def __init__(self, name='EMPlot'):
+        super().__init__(name)
+
+        self.column_names = []
+
+    def plot_hist(self, column_name, nbins):
+        '''
+        Plot histogram
+        '''
+        if self.particle_star.has_label(column_name):
+            py.hist(self.particle_star.data_block[column_name], density=True, bins=nbins)
+            py.xlabel(column_name)
+
+    def run(self, column_names, nbins=20):
+        '''
+        Plot the columns
+        '''
+        self.column_names = column_names
+
+        # Get the dimensions of plot canvas
+        num_columns = len(self.column_names)
+
+        # Determine number of rows and columns
+        num_rows = int(np.sqrt(num_columns)) + 1
+
+        # Plot histograms for each column
+        for i in range(num_columns):
+            py.subplot(num_rows, num_rows, i+1)
+            self.plot_hist(self.column_names[i], nbins)
+
+        # Show plots 
+        py.show()
+
+    def write_output_files(self):
+        '''
+        Write output files
+        '''
+        
 
 
 class ProjectAlign2D(Project):
