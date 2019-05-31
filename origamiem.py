@@ -2957,10 +2957,12 @@ class MRC:
             spacing = 1.0/(self.img2D.shape[0]*apix)
             self.ctf_r = np.round(self.ctf_s/spacing)
 
-            # Get half bin number
-            quart_n = self.img2D.shape[0] // 4
-            mask    = self.ctf_r > quart_n
-            self.ctf_r[mask] = quart_n + 1 
+            print(self.img2D.shape, self.ctf_r.shape)
+            # Determine r-cutoff
+            r_cutoff = self.img2D.shape[0] // 2
+            mask     = self.ctf_r >= r_cutoff
+
+            self.ctf_r[mask] = r_cutoff 
 
             # Change ctf_r data dtype
             self.ctf_r = np.array(self.ctf_r, dtype=int)

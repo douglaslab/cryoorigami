@@ -496,7 +496,7 @@ def calc_fsc_numba(current_fft, ref_fft, fft_r, fft_mask=None):
     return fsc3D
 
 
-def calc_frc(current_fft, ref_fft, ctf_r):
+def calc_frc_original(current_fft, ref_fft, ctf_r):
     '''
     Compute frc between two ft
     '''
@@ -905,3 +905,6 @@ def crop_class_from_ptcl(class_img2D, ptcl_img2D, mask_subtract_img2D):
     ptcl_img2D = ptcl_img2D*mask_background_img2D + class_img2D*mask_subtract_img2D
 
     return ptcl_img2D
+
+# Set calcfrc 
+calc_frc = calc_frc_original
