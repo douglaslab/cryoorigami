@@ -152,13 +152,13 @@ def circular_mask(shape, center=None, radius=None, soft_edge=None):
     Y, X = np.ogrid[:shape[0], :shape[1]]
     dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
 
-    mask = dist_from_center <= radius
+    mask = np.array(dist_from_center <= radius, dtype=np.float32)
 
     # Check for the soft edge width
     if soft_edge is not None:
         mask = scipy.ndimage.filters.gaussian_filter(mask, soft_edge)
 
-    return np.array(mask, dtype='float32')
+    return mask
 
 
 def threshold_mask(data, threshold_high=0.05, threshold_low=None, erode=2, dilate=5):
