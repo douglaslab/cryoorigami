@@ -651,7 +651,7 @@ def create_bg_mask(mask_align_img2D, mask_subtract_img2D):
     return mask_bg_img2D
 
 
-def subtract_class_ctf(class_img2D, ctf_a, ctf_s, ctf_r, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D, subtract_bg, norm_method, do_intact_until_first_peak):
+def subtract_class_ctf(class_img2D, ctf_a, ctf_s, ctf_r, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D, subtract_bg, norm_method, do_intact_until_first_peak, clip_box):
     '''
     Subtract class
     '''
@@ -685,10 +685,14 @@ def subtract_class_ctf(class_img2D, ctf_a, ctf_s, ctf_r, ptcl_star, mask_align_i
 
     ptcl_img2D  = subtract_class_from_ptcl(class_img2D, class_ctf, ptcl_img2D, mask_subtract_img2D, fft_coeff, real_coeff)
 
+    # Clip img
+    if clip_box is not None:
+        ptcl_img2D = clip_img2D(ptcl_img2D, clipbox=clip_box)
+
     return ptcl_img2D
 
 
-def crop_class_ctf(class_img2D, ctf_a, ctf_s, ctf_r, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D, subtract_bg, norm_method, do_intact_until_first_peak):
+def crop_class_ctf(class_img2D, ctf_a, ctf_s, ctf_r, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D, subtract_bg, norm_method, do_intact_until_first_peak, clip_box):
     '''
     Subtract class
     '''
@@ -709,10 +713,14 @@ def crop_class_ctf(class_img2D, ctf_a, ctf_s, ctf_r, ptcl_star, mask_align_img2D
 
     ptcl_img2D  = crop_class_from_ptcl(class_img2D, ptcl_img2D, mask_bg_img2D)
 
+    # Clip img
+    if clip_box is not None:
+        ptcl_img2D = clip_img2D(ptcl_img2D, clipbox=clip_box)
+
     return ptcl_img2D
 
 
-def crop_class(class_img2D, ctf_a, ctf_s, ctf_r, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D, subtract_bg, norm_method, do_intact_until_first_peak):
+def crop_class(class_img2D, ctf_a, ctf_s, ctf_r, ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D, subtract_bg, norm_method, do_intact_until_first_peak, clip_box):
     '''
     Crop class with no ctf correction
     '''
@@ -731,6 +739,10 @@ def crop_class(class_img2D, ctf_a, ctf_s, ctf_r, ptcl_star, mask_align_img2D, ma
         mask_bg_img2D = mask_subtract_img2D
 
     ptcl_img2D = generate_noise(ptcl_img2D, mask_bg_img2D, background_mean, background_std)
+
+    # Clip img
+    if clip_box is not None:
+        ptcl_img2D = clip_img2D(ptcl_img2D, clipbox=clip_box)
 
     return ptcl_img2D
 

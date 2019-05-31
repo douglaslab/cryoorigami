@@ -1881,6 +1881,9 @@ class ProjectSubtract2D(Project):
         self.inner_radius_pix = None
         self.inner_mask       = None
 
+        # Clip size in pixels
+        self.clip_box         = None
+
     def write_results(self):
         '''
         Write results
@@ -2034,7 +2037,8 @@ class ProjectSubtract2D(Project):
                                                                                          mask_subtract_img2D,
                                                                                          pl_subtract_bg,
                                                                                          norm_method,
-                                                                                         skip_to_firstpeak))
+                                                                                         skip_to_firstpeak,
+                                                                                         self.clip_box))
 
                 self.subtraction_results.append([worker_result, ptcl_index])
 
@@ -2111,6 +2115,10 @@ class ProjectSubtract2D(Project):
             num_particles = self.particle_star.data_block.shape[0]
             NY, NX        = self.first_particle_mrc.img2D.shape
 
+            if self.clip_box is not None and self.clip_box < NY and self.clip_box < NX:
+                NX = self.clip_box
+                NY = self.clip_box
+
             # Create output MRC file
             self.subtracted_mrc = MRC(file=self.subtracted_mrc_file, shape=(num_particles, NY, NX))
 
@@ -2140,6 +2148,12 @@ class ProjectSubtract2D(Project):
             self.inner_mask = util.circular_mask(self.first_particle_mrc.img2D.shape,
                                                  center=None,
                                                  radius=self.inner_radius_pix)
+
+    def set_clip_box(self, clipbox):
+        '''
+        Set clip box
+        '''
+        self.clip_box = clipbox
 
     def prepare_meta_objects(self):
         '''

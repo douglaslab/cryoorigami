@@ -30,6 +30,7 @@ def main():
     parser.add_argument("-subtractbg",    "--subtractbg",    action='store_true', help="Subtract background. For crop methods only.")
     parser.add_argument("-skipfirstpeak", "--skipfirstpeak", action='store_true', help="Skip first peak in CTF.")
     parser.add_argument("-innerdiameter", "--innerdiameter", type=float,   help="Inner diameter for the region of interest", default=None)
+    parser.add_argument("-clip",          "--clip",          type=int,     help="Clip box size in pixels", default=None)
 
     args = parser.parse_args()
 
@@ -47,7 +48,8 @@ def main():
                  'norm':          args.norm,
                  'subtractbg':    args.subtractbg,
                  'skipfirstpeak': args.skipfirstpeak,
-                 'innerdiameter': args.innerdiameter
+                 'innerdiameter': args.innerdiameter,
+                 'clip':          args.clip
                  }
 
     # Check if the input file exists
@@ -95,6 +97,9 @@ def main():
 
     # Set inner diameter
     new_project.set_inner_diameter(args_dict['innerdiameter'])
+
+    # Set clip box
+    new_project.set_clip_box(args_dict['clip'])
 
     # Prepare project files
     new_project.prepare_project()
