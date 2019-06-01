@@ -2166,6 +2166,61 @@ class ProjectSubtract2D(Project):
         self.create_inner_mask()
 
 
+class ProjectImgName(Project):
+    '''
+    Intersection project
+    '''
+    def __init__(self, name='EMReplaceImgName'):
+        super().__init__(name)
+
+        self.particle_star        = None
+        self.particle_star_file   = None
+
+        self.ref_star             = None
+        self.ref_star_file        = None
+
+        self.replace_str          = None
+        self.ref_img_name         = None
+
+    def read_reference(self, file):
+        '''
+        Read ref star file
+        '''
+        self.ref_star_file = os.path.abspath(file)
+        self.ref_star = Star(file)
+
+    def get_reference_img(self):
+        '''
+        Get reference img path
+        '''
+        if not self.ref_star.has_label('rlnImageName'):
+            sys.exit('Reference star doesnt have rlnImageName column')
+
+        # Get image name
+        img_num, img_name = self.ref_star.data_block['rlnImageName'][0].split('@')
+
+        self.ref_img_name = img_name
+
+        return img_name
+
+    def replace_particle_img(self):
+        '''
+        Replace particle img name
+        '''
+        
+        # Get reference image name
+        self.get_reference_img()
+
+        orig_img_names = self.particle_star.data_block['rlnImageName'].tolist()
+
+        # Convert image names
+        new_img_names = list(map(lambda x: x.split('@')[0]+'@'+self.ref_img_name, orig_img_names))
+
+        # Assign new image names
+        self.particle_star.data_block['rlnImageName'] = new_img_names
+
+
+
 class ProjectGroup(Project):
     '''
     Intersection project
@@ -2957,7 +3012,6 @@ class MRC:
             spacing = 1.0/(self.img2D.shape[0]*apix)
             self.ctf_r = np.round(self.ctf_s/spacing)
 
-            print(self.img2D.shape, self.ctf_r.shape)
             # Determine r-cutoff
             r_cutoff = self.img2D.shape[0] // 2
             mask     = self.ctf_r >= r_cutoff
