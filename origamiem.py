@@ -4911,7 +4911,7 @@ class CryoSparc(EMfile):
         if self.ref_mrc_file is not None:
             mrc_file, ext = os.path.splitext(self.ref_mrc_file)
             if os.path.isfile(self.ref_mrc_file) and ext == '.mrc':
-                self.star.data_block.loc[:,'rlnReferenceImage'] = self.star.data_block.rlnReferenceImage.replace({".mrc": "_flipXY.mrcs"},regex=True)
+                self.star.data_block.loc[:,'rlnReferenceImage'] = self.star.data_block.rlnReferenceImage.replace({".mrc": ".mrcs"},regex=True)
 
     def read_blob(self, file):
         '''
