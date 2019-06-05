@@ -19,9 +19,8 @@ def main():
     parser.add_argument("-i",        "--input",       type=str, help="Particle star file")
     parser.add_argument("-o",        "--output",      type=str, help="Output directory", default=None)
     parser.add_argument("-ref",      "--reference",   type=str, help="Reference class star file")
-    parser.add_argument("-cols",     "--columns",     type=str, help="Columns to copy", nargs='*', default=None)
-    parser.add_argument("-prox",     "--proximity",   type=int, help="Use distance proximity to copy (Angstrom)",
-                        default=None)
+    parser.add_argument("-cols",     "--columns",     type=str, help="Columns to copy", nargs='+')
+    parser.add_argument("-comp",     "--compare",     type=str, help="Criteria to compare", choices=['img','mic'], default='img')
 
     args = parser.parse_args()
 
@@ -30,7 +29,7 @@ def main():
                  'output':      args.output,
                  'reference':   args.reference,
                  'columns':     args.columns,
-                 'proximity':   args.proximity
+                 'compare':     args.compare
                  }
 
     # Check if the input file exists
@@ -42,20 +41,6 @@ def main():
     if args_dict['reference'] is None and not os.path.isfile(args_dict['reference']):
         parser.print_help()
         sys.exit('Reference file file does not exist!')
-
-    # Get the new column parameters
-    if args_dict['columns'] is not None:
-        new_column_parameters = util.parse_star_parameters(args_dict['columns'])
-    else:
-        new_column_parameters = None
-
-    # Determine the proximity parameter
-    if args_dict['proximity'] is not None:
-        proximity_option = True
-        pixel_range      = args_dict['proximity']
-    else:
-        proximity_option = False
-        pixel_range      = 0
 
     # Create an EM project object
     new_project = em.Project(name='EMCopy')
@@ -76,7 +61,7 @@ def main():
     new_project.prepare_io_files_star()
 
     # Add new columns
-    new_project.copy_from_ref(new_column_parameters, proximity_option, pixel_range, pixel_range)
+    new_project.copy_from_ref(args_dict['columns'], args_dict['compare'])
 
     # Write output files
     new_project.write_output_files(write_ref_class_star=False)

@@ -412,28 +412,33 @@ class Project:
         self.particle_star.determine_star_apix()
         self.particle_star.recenter2D(mic_apix=self.mic_apix)
 
-    def copy_from_ref(self, columns={}, proximity=True, pixel_range=50, pixel_step=50):
+    def copy_from_ref(self, columns=[], compare='img'):
         '''
         Copy columns from reference star
         '''
-        # Set ptcl copy list
-        ptcl_copy_list = None
 
-        if proximity:
-            ptcl_copy_list = self.get_same_ptcls(pixel_range, pixel_step)
+        if compare == 'img':
+            cmp_columns = ['shortImageName']
+
+            # Create short Image name
+            self.particle_star.create_shortImageName()
+            self.ref_class_star.create_shortImageName()
+
         else:
-            if self.particle_star.get_numRows() != self.ref_class_star.get_numRows():
-                print('Number of rows in the particle and reference star files dont match')
-                return 0
+            cmp_columns = ['rlnMicrographName', 'rlnCoordinateX', 'rlnCoordinateY']
 
-        # Iterate over all columns
-        self.particle_star.copy_columns(self.ref_class_star, columns, ptcl_copy_list)
+        # Delete copy columns
+        self.particle_star.delete_columns(columns)
 
-    def get_same_ptcls(self, pixel_range=50, pixel_step=50):
-        '''
-        Get the same particle in the original and reference particle list
-        '''
-        return self.particle_star.get_same_ptcls(self.ref_class_star, pixel_range, pixel_step)
+        # Shrink reference star data block
+        self.ref_class_star.keep_columns(columns+cmp_columns)
+
+        # Merge the two data sets
+        self.particle_star.merge(self.ref_class_star, cmp_columns)
+        
+        # Delete accesory columns
+        if compare == 'img':
+            self.particle_star.delete_shortImageName()
 
     def copy_columns(self, column_params):
         '''
@@ -2375,6 +2380,9 @@ class ProjectIntersect(Project):
         '''
         Intersect star files
         '''
+        # Comparison columns 
+        cmp_columns = ['rlnMicrographName', 'rlnCoordinateX', 'rlnCoordinateY']
+
         if self.particle_star is not None:
             for i in range(1, len(self.files)):
 
@@ -2384,7 +2392,7 @@ class ProjectIntersect(Project):
                 current_star = Star(self.files[i])
 
                 # Intersect with the first star
-                self.particle_star.intersect(current_star)
+                self.particle_star.intersect(current_star, cmp_columns)
 
     def run(self, star_files):
         '''
@@ -3760,12 +3768,19 @@ class Star(EMfile):
 
         self.data_block = self.data_block.loc[selected_ptcls, :]
 
-    def intersect(self, other):
+    def intersect(self, other, cmp_columns):
         '''
         Intersect this star with other star object
         '''
-        cmp_columns = ['rlnMicrographName', 'rlnCoordinateX', 'rlnCoordinateY']
+
         intersect_data_block = pd.merge(self.data_block, other.data_block[cmp_columns], how='inner')
+        self.set_data_block(intersect_data_block)
+
+    def merge(self, other, cmp_columns):
+        '''
+        Merge the two data set
+        '''
+        intersect_data_block = pd.merge(self.data_block, other.data_block,on=cmp_columns, how='inner')
         self.set_data_block(intersect_data_block)
 
     def sort(self, column='rlnDefocusU'):
@@ -3905,17 +3920,17 @@ class Star(EMfile):
 
             self.data_block.loc[:, 'rlnMicrographName'] = new_mic_name_list
 
-    def build_ptcl_map(self, pix_range=50, pix_step=50):
+    def build_proximity_map(self, pix_range=50, pix_step=50):
         '''
-        Build ptcl map
+        Build ptcl map based on location on micrographs
         '''
         self.ptcl_map = {}
 
-        for ptcl in range(self.data_block.shape[0]):
+        for index, ptcl in self.data_block.iterrows():
 
-            coord_x  = self.data_block['rlnCoordinateX'][ptcl]
-            coord_y  = self.data_block['rlnCoordinateY'][ptcl]
-            mic_name = self.data_block['rlnMicrographName'][ptcl]
+            coord_x  = ptcl['rlnCoordinateX']
+            coord_y  = ptcl['rlnCoordinateY']
+            mic_name = ptcl['rlnMicrographName']
 
             x_floor = np.floor(1.0*(coord_x-pix_range)/pix_step)*pix_step
             x_ceil  = np.ceil(1.0*(coord_x+pix_range)/pix_step)*pix_step
@@ -3935,6 +3950,20 @@ class Star(EMfile):
             new_map = dict(zip(xym, ptcl_list))
 
             self.ptcl_map.update(new_map)
+
+    def build_ptcl_map(self):
+        '''
+        Build ptcl map based on img id
+        '''
+        self.ptcl_map = {}
+
+        for index, ptcl in self.data_block.iterrows():
+
+            # Get ptcl key
+           ptcl_key = self.get_ptcl_key(ptcl)
+
+           self.ptcl_map[ptcl_key] = ptcl
+
 
     def set_micrograph_apix(self, apix=1.82):
         '''
@@ -4048,6 +4077,21 @@ class Star(EMfile):
         if self.has_label(label):
             self.data_block = self.data_block.drop(columns=label)
 
+    def delete_columns(self, columns):
+        '''
+        Delete columns
+        '''
+        for label in columns:
+            self.delete_column(label)
+
+    def keep_columns(self, columns):
+        '''
+        Keep columns
+        '''
+        column_list = list(filter(self.has_label, columns))
+
+        self.data_block = self.data_block[column_list]
+
     def add_column(self, label=None):
         '''
         Add new column to data block
@@ -4112,7 +4156,7 @@ class Star(EMfile):
         # Iterate over all columns
         for label, value in columns.items():
             if other.has_label(label):
-                if self.has_label(label) and other.has_label(label):
+                if self.has_label(label):
                     self.data_block.loc[ptcl_copy_list['self'].tolist(), label] = other.data_block.loc[ptcl_copy_list['other'].tolist(), label].tolist()
                 else:
                     self.add_column(label)
@@ -4199,49 +4243,61 @@ class Star(EMfile):
 
             return ptcl_list
 
-    def get_ptcl_key(self, ptcl, pixel_step=10):
+    def get_proximity_key(self, ptcl, pixel_step=10):
         '''
-        Get ptcl key
+        Get proximity key
         '''
-        coordinate_x = self.data_block["rlnCoordinateX"][ptcl]
-        coordinate_y = self.data_block["rlnCoordinateY"][ptcl]
+        coordinate_x = ptcl["rlnCoordinateX"]
+        coordinate_y = ptcl["rlnCoordinateY"]
 
-        mic_name = self.data_block["rlnMicrographName"][ptcl]
+        mic_name = ptcl["rlnMicrographName"]
 
         int_x = int(np.floor(1.0*coordinate_x/pixel_step)*pixel_step)
         int_y = int(np.floor(1.0*coordinate_y/pixel_step)*pixel_step)
 
         return (mic_name, int_x, int_y)
 
-    def get_same_ptcls(self, other, pixel_range=50, pixel_step=50):
+    def expand_img_column(self):
         '''
-        Determine which particles in self are also in other
+        Expand img column to its id-number and stack-name
         '''
-        if not self._has_coordinate():
-            return None
+        if self.has_label('rlnImageName'):
+            def parse_img_name(img):
+                img_id, img_name   = img.split('@')
+                img_head, img_tail = os.path.split(img_name)
 
-        # Other list
-        copy_list = []
+                return int(img_id), img_tail
 
-        # Build ptcl map for the other star
-        other.build_ptcl_map(pixel_range, pixel_step)
+            img_num_list  = []
+            img_head_list = []
 
-        for ptcl in range(self.data_block.shape[0]):
+            img_data = np.array(list(map(parse_img_name, self.data_block['rlnImageName'].tolist())))
 
-            # Get ptcl key
-            ptcl_key = self.get_ptcl_key(ptcl, pixel_step)
+            # Expand the columns
+            self.data_block['idx'] = img_data[:,0]
+            self.data_block['img'] = img_data[:,1]
 
-            # Check if the particle exists in other star file
-            if ptcl_key in other.ptcl_map.keys():
-                copy_list.append([ptcl, other.ptcl_map[ptcl_key]])
-            else:
-                print(ptcl_key, ' particle doesnt exist in reference star')
+    def delete_img_columns(self):
+        '''
+        Delete expanded image columns
+        '''
+        if self.has_label('idx') and self.has_label('img'):
+            self.data_block = self.data_block.drop(columns=['idx', 'img'])
 
-        # Convert to numpy array
-        copy_list = np.array(copy_list)
+    def get_ptcl_key(self, ptcl):
+        '''
+        Get ptcl key
+        '''
+        # Get img number and full image name
+        img_num, img_name = ptcl['rlnImageName'].split('@')
+        
+        # Get img tail
+        img_head, img_tail = os.path.split(img_name)
 
-        # Convert to data frame
-        return pd.DataFrame({'self': copy_list[:, 0], 'other': copy_list[:, 1]})
+        # Construct ptcl key
+        ptcl_key = (int(img_num), img_tail)
+
+        return ptcl_key
 
     def has_label(self, label):
         '''
@@ -4827,17 +4883,29 @@ class CryoSparc(EMfile):
         '''
         # Create shortImageName and delete rlnImageName for ptcl star
         self.star.create_shortImageName()
-        self.star.delete_column('rlnImageName')
-        self.star.delete_column('rlnMicrographName')
 
         # Create shortImage nam
         self.original_star.create_shortImageName()
 
-        # Candidate column list
-        candidate_list = ['shortImageName', 'rlnCoordinateX','rlnCoordinateY', 'rlnImageName', 'rlnMicrographName', 'rlnIsFlip', 'rlnParticleName']
+        # Delete micrograph name in the new cs-star file
+        self.star.delete_column('rlnMicrographName')
 
         # Comparison list
-        cmp_list = ['shortImageName', 'rlnCoordinateX', 'rlnCoordinateY']
+        cmp_list = ['shortImageName']
+
+        # Delete the first set of candidate list in star file
+        candidate_list = ['rlnCoordinateX','rlnCoordinateY', 'rlnImageName', 'rlnMicrographName']
+        self.star.delete_columns(candidate_list)
+
+        # Candidate column list
+        candidate_list += ['shortImageName', 'rlnIsFlip', 'rlnParticleName']
+
+        # Add the priors
+        candidate_list +=  ['rlnOriginXPrior',
+                            'rlnOriginYPrior',
+                            'rlnAnglePsiPrior',
+                            'rlnAngleRotPrior',
+                            'rlnAngleTiltPrior']
 
         # If to restore the coordinate and angle offsets
         if restore_offsets:
@@ -4847,14 +4915,7 @@ class CryoSparc(EMfile):
                              'rlnAngleRot',
                              'rlnAngleTilt']
 
-            prior_params =  ['rlnOriginXPrior',
-                             'rlnOriginYPrior',
-                             'rlnAnglePsiPrior',
-                             'rlnAngleRotPrior',
-                             'rlnAngleTiltPrior']
-
-            for param in offset_params+prior_params:
-                self.star.delete_column(param)
+            self.star.delete_columns(offset_params)
 
             # Add offset params to the candidate list
             candidate_list += offset_params
