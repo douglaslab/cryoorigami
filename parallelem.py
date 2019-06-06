@@ -729,7 +729,7 @@ def crop_class(class_img2D, ctf_a, ctf_s, ctf_r, ptcl_star, mask_align_img2D, ma
     mask_align_img2D, mask_structure_img2D, mask_subtract_img2D = inv_transform_masks(ptcl_star, mask_align_img2D, mask_structure_img2D, mask_subtract_img2D)
 
     # Get the mask for noise stats
-    mask_background_img2D = mask_align_img2D - mask_structure_img2D
+    mask_background_img2D = 1 - mask_align_img2D
     background_mean, background_std = calc_mean_std_intensity(ptcl_img2D, mask_background_img2D)
 
     # Determine the mask for bg subtraction
