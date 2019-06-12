@@ -946,6 +946,18 @@ class Project:
         # Create symlink
         os.symlink(relative_input_dir, relative_output_dir)
 
+    def tilt90_particles(self):
+        '''
+        Make all tilts at 90
+        '''
+        self.particle_star.tilt90()
+
+    def Zflip_particles(self):
+        '''
+        Z-flip particles
+        '''
+        self.particle_star.Zflip()
+
 
 class ProjectScale(Project):
     '''
@@ -4549,6 +4561,31 @@ class Star(EMfile):
         '''
         if self.has_label(label):
             return self.data_block[label]
+
+    def tilt90(self):
+        '''
+        Tilt 90 star
+        '''
+        if self.has_label('rlnAngleTilt') and self.has_label('rlnAngleRot'):
+            valid_rows = (self.data_block['rlnAngleTilt'] % 360) > 180
+
+            # Update tilt angle
+            self.data_block.loc[valid_rows, 'rlnAngleTilt'] -= 180
+            self.data_block.loc[valid_rows, 'rlnAngleTilt'] %= 360
+
+            # Update rot angle
+            self.data_block.loc[valid_rows, 'rlnAngleRot'] += 180
+            self.data_block.loc[valid_rows, 'rlnAngleRot'] %= 360
+
+    def Zflip(self):
+        '''
+        Z-flip star
+        '''
+        if self.has_label('rlnAngleRot'):
+
+            # Update tilt angle
+            self.data_block['rlnAngleRot'] *= -1
+            self.data_block['rlnAngleRot'] %= 360
 
     def create_write_formatter(self):
         '''
