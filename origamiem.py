@@ -18,6 +18,7 @@ import scipy.ndimage
 import parallelem
 import multiprocessing
 import shutil
+import sqlite3
 import matplotlib.pyplot as py
 import barcode
 
@@ -4613,6 +4614,13 @@ class Cistem(Project):
         self.sigmacutoff = None
         self.mlcutoff    = None
 
+        # Database variables
+        self.db_conn        = None
+        self.ref_packages   = []
+        self.ref_nums       = []
+        self.ref_num        = None
+        self.orig_positions = None
+
     def set_par2star_params(self, delclasses=None, selclasses=None, scorecutoff=None, sigmacutoff=None, mlcutoff=None):
         '''
         Set par2star params
@@ -4621,7 +4629,7 @@ class Cistem(Project):
         self.selclasses  = selclasses
         self.scorecutoff = scorecutoff
         self.sigmacutoff = sigmacutoff
-        self.mlcutoff    = mlcutoff 
+        self.mlcutoff    = mlcutoff
 
     def sort_images(self):
         '''
@@ -4639,11 +4647,52 @@ class Cistem(Project):
                                                 dtype=self.par_dtypes,
                                                 comments='C')
 
+    def read_db(self, db_file):
+        '''
+        Read Cistem database
+        '''
+        if db_file is not None and os.path.isfile(db_file):
+            self.db_conn = sqlite3.connect(db_file)
+        else:
+            return
+
+        # Get refinement package info
+        self.ref_packages   = []
+        self.ref_nums       = []
+        self.orig_positions = []
+
+        # Set a db cursor
+        c = self.db_conn.cursor()
+
+        # Iterate over the refinement packages
+        for row in c.execute("select * from refinement_package_assets"):
+            print('Refinement ID: %d - Refinement PackageName: %s' % (row[0], row[1]))
+            self.ref_packages.append(row)
+            self.ref_nums.append(int(row[0]))
+
+        # Get reference info
+        while self.ref_num not in self.ref_nums:
+            self.ref_num = int(input('Enter the refinement package ID: '))
+
+        # Get the original position ids
+        for row in c.execute("select original_particle_position_asset_id from refinement_package_contained_particles_%d" % (self.ref_num)):
+            self.orig_positions.append(int(row[0])-1)
+
+    def select_particles(self):
+        '''
+        Select from particles based on the cistem database information
+        '''
+        if self.orig_positions is not None and len(self.orig_positions) > 0:
+            self.particle_star.data_block = self.particle_star.data_block.iloc[self.orig_positions]
+
     def copy2star(self):
         '''
         Convert par data to star object
         '''
         if self.particle_star is not None and self.par_data_block is not None:
+            if self.particle_star.data_block.shape[0] != self.par_data_block.shape[0]:
+                sys.exit('Particle star and par file rows dont match. Exiting!')
+
             # Copy the data columns from par to star
             self.particle_star.data_block['rlnOriginX'] = -self.par_data_block['SHX']/self.particle_apix
             self.particle_star.data_block['rlnOriginY'] = -self.par_data_block['SHY']/self.particle_apix

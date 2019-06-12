@@ -17,13 +17,14 @@ def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument("-i",            "--input",       type=str,            help="Particle star file")
+    parser.add_argument("-o",            "--output",      type=str,            help="Output directory", default=None)
     parser.add_argument("-orig",         "--original",    type=str,            help="Original star file")
     parser.add_argument("-del-classes",  "--delclasses",  type=int, nargs='*', help="Classes to be deleted", default=None)
     parser.add_argument("-sel-classes",  "--selclasses",  type=int, nargs='*', help="Selected classes", default=None)
     parser.add_argument("-score-cutoff", "--scorecutoff", type=float,          help="Frealign score lower cutoff", default=None)
     parser.add_argument("-sigma-cutoff", "--sigmacutoff", type=float,          help="Frealign sigma noise lower cutoff", default=None)
     parser.add_argument("-ml-cutoff",    "--mlcutoff",    type=float,          help="Frealign maximum-likelihood lower cutoff", default=None)
-    parser.add_argument("-o",            "--output",      type=str,            help="Output directory", default=None)
+    parser.add_argument("-db",           "--db",          type=str,            help="Cistem database file", default=None)
 
     args = parser.parse_args()
 
@@ -35,6 +36,7 @@ def main():
                  'scorecutoff': args.scorecutoff,
                  'sigmacutoff': args.sigmacutoff,
                  'mlcutoff':    args.mlcutoff,
+                 'db':          args.db,
                  'output':      args.output}
 
     # Check if the input file exists
@@ -78,6 +80,12 @@ def main():
                                     args_dict['scorecutoff'],
                                     args_dict['sigmacutoff'],
                                     args_dict['mlcutoff'])
+
+    # Read cistem database
+    new_project.read_db(args_dict['db'])
+
+    # Select particles that exist in the refinement package
+    new_project.select_particles()
 
     # Convert to par
     new_project.copy2star()
