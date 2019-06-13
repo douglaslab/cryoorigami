@@ -19,13 +19,15 @@ def main():
     parser.add_argument("-i",        "--input",       type=str, help="Particle star file")
     parser.add_argument("-o",        "--output",      type=str, help="Output directory", default=None)
     parser.add_argument("-cols",     "--columns",     type=str, help="Columns to delete", nargs='*', default=None)
+    parser.add_argument("-priors",   "--priors",      type=str, help="Delete priors", default=None, choices=['angle','all'])
 
     args = parser.parse_args()
 
     # Prepare args dict
     args_dict = {'input':       args.input,
                  'output':      args.output,
-                 'columns':     args.columns
+                 'columns':     args.columns,
+                 'priors':      args.priors
                  }
 
     # Check if the input file exists
@@ -38,6 +40,18 @@ def main():
         new_column_parameters = util.parse_star_parameters(args_dict['columns'])
     else:
         new_column_parameters = None
+
+    # Prior colummns
+    if args_dict['priors'] == 'all':
+        new_column_parameters = {'rlnOriginXPrior':  None,
+                                 'rlnOriginYPrior':  None,
+                                 'rlnAnglePsiPrior': None,
+                                 'rlnAngleRotPrior': None,
+                                 'rlnAngleTiltPrior':None}
+    elif args_dict['priors'] == 'angle':
+        new_column_parameters = {'rlnAnglePsiPrior': None,
+                                 'rlnAngleRotPrior': None,
+                                 'rlnAngleTiltPrior':None}
 
     # Create an EM project object
     new_project = em.Project(name='EMDeleteColumns')
