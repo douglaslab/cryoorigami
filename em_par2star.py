@@ -25,7 +25,6 @@ def main():
     parser.add_argument("-sigma-cutoff", "--sigmacutoff", type=float,          help="Frealign sigma noise lower cutoff", default=None)
     parser.add_argument("-ml-cutoff",    "--mlcutoff",    type=float,          help="Frealign maximum-likelihood lower cutoff", default=None)
     parser.add_argument("-db",           "--db",          type=str,            help="Cistem database file", default=None)
-
     args = parser.parse_args()
 
     # Prepare args dict

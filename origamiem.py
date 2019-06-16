@@ -2538,6 +2538,7 @@ class ProjectAlign2D(Project):
 
         # Relion output string
         self.relion_output_str    = None
+        self.ref_class_number     = 1
 
         # Trasnformed mrc file
         self.ref_class_transformed_star_file = None
