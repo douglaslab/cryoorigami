@@ -52,11 +52,11 @@ def main():
 
     # Make tilt angle around 90 degree
     if args_dict['tilt90']:
-        new_project.tilt90()
+        new_project.tilt90_particles()
 
     # Z-flip particles
     if args_dict['Zflip']:
-        new_project.Zflip()
+        new_project.Zflip_particles()
 
     # Write output files
     new_project.write_output_files()
