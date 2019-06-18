@@ -35,6 +35,13 @@ def main():
                                                                                               'rlnAngleRot:rlnAngleRotPrior',
                                                                                               'rlnAngleTilt:rlnAngleTiltPrior',
                                                                                               'rlnAnglePsi:rlnAnglePsiPrior'])
+    parser.add_argument("-diffs",        "--diffs",         type=str,     nargs='+', default=['rlnOriginX:rlnOriginXPrior',
+                                                                                              'rlnOriginY:rlnOriginYPrior',
+                                                                                              'rlnAngleRot:rlnAngleRotPrior',
+                                                                                              'rlnAngleTilt:rlnAngleTiltPrior',
+                                                                                              'rlnAnglePsi:rlnAnglePsiPrior'])
+
+    parser.add_argument("-orientation",  "--orientation",   action='store_true', help="Plot orientation of the particles with respect to priors")
 
     parser.add_argument("-nbins",        "--nbins",         type=int,     default=20)
     parser.add_argument("-format",       "--format",        type=str,     default='svg', choices=['png','svg'])
@@ -46,6 +53,8 @@ def main():
                  'output':        args.output,
                  'columns':       args.columns,
                  'pairs':         args.pairs,
+                 'diffs':         args.diffs,
+                 'orientation':   args.orientation,
                  'nbins':         args.nbins,
                  'format':        args.format}
 
@@ -65,7 +74,7 @@ def main():
     new_project.prepare_io_files(args_dict['format'])
 
     # Run the project
-    new_project.run(args_dict['columns'], args_dict['pairs'], args_dict['nbins'])
+    new_project.run(args_dict['columns'], args_dict['pairs'], args_dict['diffs'], args_dict['orientation'], args_dict['nbins'])
 
     # Write output files
     new_project.write_output_files(args_dict['format'])

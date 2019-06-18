@@ -14,6 +14,29 @@ from pyfftw.builders import fft2
 from pyfftw.builders import ifft2
 
 
+def estimate_cistem_params(fsc50, prev_percent, prev_limit, num_particles, mask_radius, num_classes):
+    '''
+    Estimate cistem auto-refine parameters based on Cistem paper
+    '''
+    if fsc50 is not None:
+        new_limit = 1.0/(1.0/fsc50 - 1.0/mask_radius)
+    else:
+        new_limit = None
+
+    # Calculate percent-particles
+    calc_percent  = 8000.0*num_classes*np.exp(75/prev_limit**2)/num_particles
+
+    # Better-resolution percent
+    new_percent_betterRes = max([prev_percent, calc_percent])
+
+    # Worse-resolution percent
+    new_percent_worseRes  = 1.5*prev_percent 
+    if new_percent_worseRes > 1:
+        new_percent_worseRes = 1 
+
+    return new_limit, new_percent_betterRes, new_percent_worseRes
+
+
 def write_config_file(fname, args_dict):
     '''
     Dump parameters into ymal config file

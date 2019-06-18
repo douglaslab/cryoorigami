@@ -20,14 +20,15 @@ def main():
     parser.add_argument("-o",      "--output",      type=str, help="Output directory", default=None)
     parser.add_argument("-Zflip",  "--Zflip",       action='store_true', help="Z-Flip particles in star file")
     parser.add_argument("-tilt90", "--tilt90",      action='store_true', help="Set tilt of particles to 90-degree side")
-
+    parser.add_argument("-aligntopriors", "--aligntopriors", type=str, nargs='*', default=None)
     args = parser.parse_args()
 
     # Prepare args dict
-    args_dict = {'input':       args.input,
-                 'Zflip':       args.Zflip,
-                 'tilt90':      args.tilt90,
-                 'output':      args.output
+    args_dict = {'input':         args.input,
+                 'Zflip':         args.Zflip,
+                 'tilt90':        args.tilt90,
+                 'output':        args.output,
+                 'aligntopriors': args.aligntopriors
                  }
 
     # Check if the input file exists
@@ -57,6 +58,10 @@ def main():
     # Z-flip particles
     if args_dict['Zflip']:
         new_project.Zflip_particles()
+
+    # Align to priors
+    if args_dict['aligntopriors'] is not None:
+        new_project.align_to_priors(args_dict['aligntopriors'])
 
     # Write output files
     new_project.write_output_files()

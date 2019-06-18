@@ -958,6 +958,14 @@ class Project:
         '''
         self.particle_star.Zflip()
 
+    def align_to_priors(self, columns):
+        '''
+        Align particle column values to their priors
+        '''
+        for column in columns:
+            self.particle_star.align_to_prior(column)
+
+
 
 class ProjectScale(Project):
     '''
@@ -2427,12 +2435,49 @@ class ProjectPlot(Project):
         self.column_names = []
         self.column_pairs = []
 
+    def plot_diff(self, diff_pair, nbins):
+        '''
+        Plot difference
+        '''
+        if len(diff_pair) != 2:
+            return
+
+        # Get column names
+        column1, column2 = diff_pair
+        diff = self.particle_star.get_norm_diff(column1, column2)
+        if diff is not None:
+            py.hist(diff, density=True, bins=nbins)
+            py.xlabel(column1+'-'+column2)
+
+    def plot_orientation(self, nbins):
+        '''
+        Plot orientation
+        '''
+        if (self.particle_star.has_label('rlnAnglePsi') and
+            self.particle_star.has_label('rlnAnglePsiPrior') and
+            self.particle_star.has_label('rlnAngleTilt') and
+            self.particle_star.has_label('rlnAngleTiltPrior')):
+
+            # Get psi difference
+            diffPsi = self.particle_star.get_norm_diff('rlnAnglePsi', 'rlnAnglePsiPrior')
+
+            # Get tilt difference
+            diffTilt = self.particle_star.get_norm_diff('rlnAngleTilt', 'rlnAngleTiltPrior')
+
+            # Cumulative difference
+            diffCum  = (diffPsi+diffTilt)%360
+
+            py.hist(diffCum, density=True, bins=nbins)
+            py.xlabel('Orientation angle')
+
+
     def plot_hist(self, column_name, nbins):
         '''
         Plot histogram
         '''
         if self.particle_star.has_label(column_name):
-            py.hist(self.particle_star.data_block[column_name], density=True, bins=nbins)
+            # Get data
+            py.hist(self.particle_star.get_norm_data(column_name), density=True, bins=nbins)
             py.xlabel(column_name)
 
     def plot_scatter(self, column_pair):
@@ -2445,7 +2490,7 @@ class ProjectPlot(Project):
         # Get column names
         column1, column2 = column_pair
         if self.particle_star.has_label(column1) and self.particle_star.has_label(column2):
-            py.plot(self.particle_star.data_block[column1], self.particle_star.data_block[column2],'*')
+            py.plot(self.particle_star.get_norm_data(column1), self.particle_star.get_norm_data(column2),'*')
             py.xlabel(column1)
             py.ylabel(column2)
 
@@ -2459,11 +2504,11 @@ class ProjectPlot(Project):
         # Get column names
         column1, column2 = column_pair
         if self.particle_star.has_label(column1) and self.particle_star.has_label(column2):
-            py.hist2d(self.particle_star.data_block[column1], self.particle_star.data_block[column2],bins=nbins**2, cmap=py.cm.Blues)
+            py.hist2d(self.particle_star.get_norm_data(column1), self.particle_star.get_norm_data(column2),bins=nbins**2, cmap=py.cm.Blues)
             py.xlabel(column1)
             py.ylabel(column2)
 
-    def run(self, column_names, column_pairs, nbins=20):
+    def run(self, column_names, column_pairs, column_diffs, orientation, nbins=20):
         '''
         Plot the columns
         '''
@@ -2472,27 +2517,52 @@ class ProjectPlot(Project):
         # Get column pairs
         self.column_pairs = [pair.split(':') for pair in column_pairs]
 
-        # Get the dimensions of plot canvas
-        num_columns = len(self.column_names)
+        # Get column diffs
+        self.column_diffs = [pair.split(':') for pair in column_diffs]
+
+        # Get singles number
+        num_singles = len(self.column_names)
 
         # Get number of pairs
         num_pairs = len(self.column_pairs)
 
+        # Get number of diffs
+        num_diffs = len(self.column_diffs)
+
         # Determine number of rows and columns
-        num_rows = int(np.sqrt(num_columns+num_pairs)) + 1
+        num_rows = int(np.sqrt(num_singles+num_pairs+num_diffs)) + 1
 
         # Create figure
         py.figure(figsize=(20,20))
 
         # Plot histograms for each column
-        for i in range(num_columns):
+        for i in range(num_singles):
             py.subplot(num_rows, num_rows, i+1)
             self.plot_hist(self.column_names[i], nbins)
 
+        # Update num plots
+        num_plots = num_singles
+
         # Plot scatter plots
         for i in range(num_pairs):
-            py.subplot(num_rows, num_rows, num_columns+i+1)
+            py.subplot(num_rows, num_rows, num_plots+i+1)
             self.plot_hist2D(self.column_pairs[i], nbins)
+
+        # Update num plots
+        num_plots += num_pairs
+
+        # Plot difference plots
+        for i in range(num_diffs):
+            py.subplot(num_rows, num_rows, num_plots+i+1)
+            self.plot_diff(self.column_diffs[i], nbins)
+
+        # Update num plots
+        num_plots += num_diffs
+        
+        # Plot orientation angle
+        if orientation:
+            py.subplot(num_rows, num_rows, num_plots+1)
+            self.plot_orientation(nbins)
 
         # Tight layout
         py.tight_layout()
@@ -3642,6 +3712,55 @@ class Star(EMfile):
         if file is not None and os.path.isfile(file):
             self.read(file)
 
+    def get_norm_diff(self, column1, column2):
+        '''
+        Get angle difference
+        '''
+        diff = None
+        if self.has_label(column1) and self.has_label(column2):
+            diff = self.get_norm_data(column1) - self.get_norm_data(column2)
+            
+            # If the columns are angles, perform a normalization procedure
+            if self.is_angle_column(column1) and self.is_angle_column(column2):
+                # If the columns are angles perform a different analysis
+                diff    %= 360
+                diffComp = 360 - diff
+                diffMin  = pd.DataFrame([diff, diffComp]).min()
+                # Assign diffMin to diff
+                diff     = diffMin
+
+        return diff
+
+    def is_angle_column(self, column):
+        '''
+        Check if it is an angle column
+        '''
+        return ('Angle' in column)
+
+
+    def align_to_prior(self, column):
+        '''
+        Align angle values to its prior values
+        '''
+
+        # Get prior name for the angle
+        column_prior = column+'Prior'
+        if self.has_label(column) and self.has_label(column_prior) and self.is_angle_column(column):
+            # Angle difference
+            diff = (self.data_block[column]%360 - self.data_block[column_prior]%360)%360
+            
+            # Complement angle difference
+            diffComp = 360 - diff
+            
+            # Get minimum difference
+            diffMin = pd.DataFrame([diff, diffComp]).min()
+            
+            # If minimum difference is over 90, flip it
+            self.data_block.loc[diffMin > 90, column] += 180
+
+            # Normalize angles
+            self.data_block[column] %= 360
+
     def pick_random_set(self, num_ptcls, rand_seed=1):
         '''
         Pick random set of ptcls
@@ -3650,6 +3769,19 @@ class Star(EMfile):
 
         if num_ptcls < total_ptcls:
             self.data_block = self.data_block.sample(n=num_ptcls, random_state=rand_seed)
+
+    def get_norm_data(self, label):
+        '''
+        Get normalized data
+        '''
+        data = None
+        if self.has_label(label):
+            data = self.data_block[label]
+
+        if data is not None and 'Angle' in label:
+            data %= 360
+
+        return data
 
     def create_shortImageName(self):
         '''
