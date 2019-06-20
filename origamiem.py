@@ -923,12 +923,26 @@ class Project:
 
         return particle_mrc
 
-    def filter_ptcls(self, maxprob=0.5, maxclass=10):
+    def filter_ptcls(self, 
+                     maxprob=0.5, 
+                     maxclass=10,
+                     tilt_range=[0, 360],
+                     dpsi_range=[0, 360],
+                     dtilt_range=[0, 360],
+                     dalign_range=[0, 360]):
         '''
         Filter ptcls
         '''
         if self.particle_star is not None:
-            self.particle_star.filter(maxprob, maxclass)
+            # Filter based on classification parameters
+            self.particle_star.filter_classification(maxprob, maxclass)
+
+            # Filter based on orientation parameters
+            self.particle_star.filter_orientation(tilt_range,
+                                                  dpsi_range,
+                                                  dtilt_range,
+                                                  dalign_range)
+
 
     def make_symlink2parent(self, input_file, out_path='particle_input'):
         '''
@@ -2215,6 +2229,22 @@ class ProjectImgName(Project):
         self.ref_star_file = os.path.abspath(file)
         self.ref_star = Star(file)
 
+    def add_suffix(self, suffix_list):
+        '''
+        Add suffix to image name
+        '''
+        if len(suffix_list) == 1:
+            self.particle_star.data_block['rlnImageName'] = self.particle_star.data_block['rlnImageName'].str.replace('.mrcs',suffix_list[0]+'.mrcs')
+        elif len(suffix_list) == 2:
+            self.particle_star.data_block['rlnImageName'] = self.particle_star.data_block['rlnImageName'].str.replace(suffix_list[0]+'.mrcs',suffix_list[1]+'.mrcs')
+
+    def remove_suffix(self, remove_suffix):
+        '''
+        Add suffix to image name
+        '''
+        if remove_suffix is not None:
+            self.particle_star.data_block['rlnImageName'] = self.particle_star.data_block['rlnImageName'].str.replace(remove_suffix+'.mrcs','.mrcs')
+
     def get_reference_img(self):
         '''
         Get reference img path
@@ -2434,8 +2464,19 @@ class ProjectPlot(Project):
 
         self.column_names = []
         self.column_pairs = []
+        self.column_diffs = []
 
-    def plot_diff(self, diff_pair, nbins):
+        self.ref_star_file = None
+        self.ref_star      = None
+
+    def read_reference(self, file):
+        '''
+        Read ref star file
+        '''
+        self.ref_star_file = os.path.abspath(file)
+        self.ref_star = Star(file)
+
+    def plot_diff(self, diff_pair, nbins, ref_star=None):
         '''
         Plot difference
         '''
@@ -2444,7 +2485,10 @@ class ProjectPlot(Project):
 
         # Get column names
         column1, column2 = diff_pair
-        diff = self.particle_star.get_norm_diff(column1, column2)
+        if ref_star is not None:
+            diff = self.particle_star.ref_norm_diff(ref_star, column1, column2)
+        else:
+            diff = self.particle_star.get_norm_diff(column1, column2)
         if diff is not None:
             py.hist(diff, density=True, bins=nbins)
             py.xlabel(column1+'-'+column2)
@@ -2458,17 +2502,11 @@ class ProjectPlot(Project):
             self.particle_star.has_label('rlnAngleTilt') and
             self.particle_star.has_label('rlnAngleTiltPrior')):
 
-            # Get psi difference
-            diffPsi = self.particle_star.get_norm_diff('rlnAnglePsi', 'rlnAnglePsiPrior')
+            # Get alignment angle difference
+            direction = self.particle_star.get_align_diff()
 
-            # Get tilt difference
-            diffTilt = self.particle_star.get_norm_diff('rlnAngleTilt', 'rlnAngleTiltPrior')
-
-            # Cumulative difference
-            diffCum  = (diffPsi+diffTilt)%360
-
-            py.hist(diffCum, density=True, bins=nbins)
-            py.xlabel('Orientation angle')
+            py.hist(direction, density=True, bins=nbins)
+            py.xlabel('Alignment')
 
 
     def plot_hist(self, column_name, nbins):
@@ -2508,9 +2546,34 @@ class ProjectPlot(Project):
             py.xlabel(column1)
             py.ylabel(column2)
 
-    def run(self, column_names, column_pairs, column_diffs, orientation, nbins=20):
+    def run_ref(self, column_pairs, column_diffs, nbins=20):
         '''
-        Plot the columns
+        Plot utility comparing ref and ptcl star
+        '''
+
+        # Get column diffs
+        self.column_diffs = [pair.split(':') for pair in column_diffs]
+
+        # Get number of diffs
+        num_diffs = len(self.column_diffs)
+
+        # Determine number of rows and columns
+        num_rows = int(np.sqrt(num_diffs)) + 1
+
+        # Create figure
+        py.figure(figsize=(20,20))
+
+        # Plot difference plots
+        for i in range(num_diffs):
+            py.subplot(num_rows, num_rows, i+1)
+            self.plot_diff(self.column_diffs[i], nbins, self.ref_star)
+
+        # Tight layout
+        py.tight_layout()
+
+    def run_ptcl(self, column_names, column_pairs, column_diffs, orientation, nbins=20):
+        '''
+        Plot utility for ptcl star
         '''
         self.column_names = column_names
 
@@ -3712,6 +3775,22 @@ class Star(EMfile):
         if file is not None and os.path.isfile(file):
             self.read(file)
 
+    def get_align_diff(self):
+        '''
+        Get alignment difference in angles
+        '''
+        # Get psi difference
+        diffPsi   = self.get_norm_diff('rlnAnglePsi', 'rlnAnglePsiPrior')
+
+        # Get tilt difference
+        diffTilt  = self.get_norm_diff('rlnAngleTilt', 'rlnAngleTiltPrior')
+
+        # Cumulative difference
+        directionPsi  = 2*(diffPsi < 90).astype(int)-1
+        directionTilt = 2*(diffTilt < 90).astype(int)-1 
+        
+        return directionPsi*directionTilt
+
     def get_norm_diff(self, column1, column2):
         '''
         Get angle difference
@@ -3723,11 +3802,22 @@ class Star(EMfile):
             # If the columns are angles, perform a normalization procedure
             if self.is_angle_column(column1) and self.is_angle_column(column2):
                 # If the columns are angles perform a different analysis
-                diff    %= 360
-                diffComp = 360 - diff
-                diffMin  = pd.DataFrame([diff, diffComp]).min()
-                # Assign diffMin to diff
-                diff     = diffMin
+                diff = util.get_min_angle_diff(diff)
+
+        return diff
+
+    def ref_norm_diff(self, other, column1, column2):
+        '''
+        Get angle differences between the columns of self and other star
+        '''
+        diff = None
+        if self.has_label(column1) and other.has_label(column2):
+            diff = self.get_norm_data(column1) - other.get_norm_data(column2)
+            
+            # If the columns are angles, perform a normalization procedure
+            if self.is_angle_column(column1) and other.is_angle_column(column2):
+                # If the columns are angles perform a different analysis
+                diff = util.get_min_angle_diff(diff)
 
         return diff
 
@@ -3936,17 +4026,55 @@ class Star(EMfile):
         if self.has_label(column):
             self.data_block.sort_values(column, inplace=True)
 
-    def filter(self, maxprob=0.5, maxclass=10):
+    def filter_classification(self, maxprob=0.5, maxclass=10):
         '''
         Filter the data using max probability in star data
         '''
         if self.has_label('rlnMaxValueProbDistribution'):
-            prob_mask = self.data_block['rlnMaxValueProbDistribution'] >= maxprob
-            self.data_block = self.data_block.loc[prob_mask, :]
+            if maxprob is not None:
+                prob_mask = self.data_block['rlnMaxValueProbDistribution'] >= maxprob
+                self.data_block = self.data_block.loc[prob_mask, :]
 
         if self.has_label('rlnNrOfSignificantSamples'):
-            class_mask = self.data_block['rlnNrOfSignificantSamples'] <= maxclass
-            self.data_block = self.data_block.loc[class_mask, :]
+            if maxclass is not None:
+                class_mask = self.data_block['rlnNrOfSignificantSamples'] <= maxclass
+                self.data_block = self.data_block.loc[class_mask, :]
+
+    def filter_orientation(self, tilt_range=[0, 360], dpsi_range=[0, 360], dtilt_range=[0, 360], dalign_range=[0, 360]):
+        
+        # Tilt Angle
+        if self.has_label('rlnAngleTilt'):
+            tilt = self.get_norm_data('rlnAngleTilt')
+            
+            # Make selection
+            self.data_block = self.data_block.loc[tilt>=tilt_range[0],:]
+            self.data_block = self.data_block.loc[tilt<=tilt_range[1],:]
+
+        # diffPsi
+        if self.has_label('rlnAnglePsi') and self.has_label('rlnAnglePsiPrior'):
+            diffPsi = self.get_norm_diff('rlnAnglePsi', 'rlnAnglePsiPrior')
+            
+            # Make selection
+            self.data_block = self.data_block.loc[diffPsi>=dpsi_range[0],:]
+            self.data_block = self.data_block.loc[diffPsi<=dpsi_range[1],:]
+
+        # diffTilt
+        if self.has_label('rlnAngleTilt') and self.has_label('rlnAngleTiltPrior'):
+            diffTilt = self.get_norm_diff('rlnAngleTilt', 'rlnAngleTiltPrior')
+
+            # Make selection
+            self.data_block = self.data_block.loc[diffTilt>=dtilt_range[0],:]
+            self.data_block = self.data_block.loc[diffTilt<=dtilt_range[1],:]
+
+        # diffAlign
+        if(self.has_label('rlnAnglePsi') and self.has_label('rlnAnglePsiPrior') and
+           self.has_label('rlnAngleTilt') and self.has_label('rlnAngleTiltPrior')):
+            
+            diffAlign  = self.get_align_diff()
+
+            # Make selection
+            self.data_block = self.data_block.loc[diffAlign>=dalign_range[0],:]
+            self.data_block = self.data_block.loc[diffAlign<=dalign_range[1],:]
 
     def set_data_block(self, data):
         '''

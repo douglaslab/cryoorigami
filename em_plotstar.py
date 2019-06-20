@@ -46,6 +46,8 @@ def main():
     parser.add_argument("-nbins",        "--nbins",         type=int,     default=20)
     parser.add_argument("-format",       "--format",        type=str,     default='svg', choices=['png','svg'])
 
+    parser.add_argument("-ref",          "--reference",     type=str,   help="Reference star file", default=None)
+
     args = parser.parse_args()
 
     # Prepare args dict
@@ -55,6 +57,7 @@ def main():
                  'pairs':         args.pairs,
                  'diffs':         args.diffs,
                  'orientation':   args.orientation,
+                 'reference':     args.reference,
                  'nbins':         args.nbins,
                  'format':        args.format}
 
@@ -73,8 +76,17 @@ def main():
     # Prepare io files
     new_project.prepare_io_files(args_dict['format'])
 
-    # Run the project
-    new_project.run(args_dict['columns'], args_dict['pairs'], args_dict['diffs'], args_dict['orientation'], args_dict['nbins'])
+    # Read references if it is provided
+    if args_dict['reference'] is not None and os.path.isfile(args_dict['reference']):
+        # Read particles
+        new_project.read_reference(args_dict['reference'])
+        print('Read reference star file {}'.format(args_dict['reference']))
+
+        # Run reference project
+        new_project.run_ref(args_dict['pairs'], args_dict['diffs'])
+    else:
+      # Run ptcl project
+      new_project.run_ptcl(args_dict['columns'], args_dict['pairs'], args_dict['diffs'], args_dict['orientation'], args_dict['nbins'])
 
     # Write output files
     new_project.write_output_files(args_dict['format'])

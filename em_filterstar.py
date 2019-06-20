@@ -18,16 +18,24 @@ def main():
 
     parser.add_argument("-i",            "--input",         type=str,     help="Particle star file")
     parser.add_argument("-o",            "--output",        type=str,     help="Output directory", default=None)
-    parser.add_argument("-maxprob",      "--maxprob",       type=float,   help="Maximum probability", default=0.5)
-    parser.add_argument("-maxclass",     "--maxclass",      type=int,     help="Maximum number of classes assigned for a particle", default=10)
-
+    parser.add_argument("-maxprob",      "--maxprob",       type=float,   help="Maximum probability", default=None)
+    parser.add_argument("-maxclass",     "--maxclass",      type=int,     help="Maximum number of classes assigned for a particle", default=None)
+    parser.add_argument("-tilt",         "--tilt",          type=float,   nargs=2, help="Accepted range of tilt angles. [ min ,max]",       default=[0, 360])
+    parser.add_argument("-dtilt",        "--dtilt",         type=float,   nargs=2, help="Accepted range of diff-tilt angles. [ min ,max]",  default=[0, 360])
+    parser.add_argument("-dpsi",         "--dpsi",          type=float,   nargs=2, help="Accepted range of diff-psi angles. [ min ,max]",   default=[0, 360])
+    parser.add_argument("-dalign",       "--dalign",        type=float,   nargs=2, help="Accepted range of diff-align angles. [ min ,max]", default=[-1, 1])
+    
     args = parser.parse_args()
 
     # Prepare args dict
     args_dict = {'input':         args.input,
                  'output':        args.output,
                  'maxprob':       args.maxprob,
-                 'maxclass':      args.maxclass}
+                 'maxclass':      args.maxclass,
+                 'tilt':          args.tilt,
+                 'dtilt':         args.dtilt,
+                 'dpsi':          args.dpsi,
+                 'dalign':        args.dalign}
 
     # Check if the input file exists
     if args_dict['input'] is None or not os.path.isfile(args_dict['input']):
@@ -35,7 +43,7 @@ def main():
         sys.exit('Input file does not exist!')
 
     # Create an EM project object
-    new_project = em.Project(name='EMFilter2D')
+    new_project = em.Project(name='EMFilter')
     new_project.set_output_directory(args_dict['output'], project_root='.')
 
     # Write parameters to args filename
@@ -53,7 +61,12 @@ def main():
     new_project.read_particle_apix()
 
     # Subtract class mrc from particle mrc
-    new_project.filter_ptcls(maxprob=args_dict['maxprob'], maxclass=args_dict['maxclass'])
+    new_project.filter_ptcls(maxprob=args_dict['maxprob'], 
+                             maxclass=args_dict['maxclass'],
+                             tilt_range=args_dict['tilt'],
+                             dpsi_range=args_dict['dpsi'],
+                             dtilt_range=args_dict['dtilt'],
+                             dalign_range=args_dict['dalign'])
 
     # Write output files
     new_project.write_output_files()
