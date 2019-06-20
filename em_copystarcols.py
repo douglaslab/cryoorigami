@@ -19,8 +19,8 @@ def main():
     parser.add_argument("-i",             "--input",        type=str, help="Particle star file")
     parser.add_argument("-o",             "--output",       type=str, help="Output directory", default=None)
     parser.add_argument("-cols",          "--columns",      type=str, help="Columns to copy", nargs='*', default=None)
-    parser.add_argument("-copytopriors",   "--copypriors",   type=str, help="Copy offset and/or angle parameters to priors", default=None, choices=['angle','all'])
-    parser.add_argument("-copytooffsets",  "--copyoffsets",  type=str, help="Copy priors to angle and distance offset parameters", default=None, choices=['angle','all'])
+    parser.add_argument("-copytopriors",  "--copypriors",   type=str, help="Copy offset and/or angle parameters to priors", default=None, choices=['angle','all', 'helix'])
+    parser.add_argument("-copytooffsets", "--copyoffsets",  type=str, help="Copy priors to angle and distance offset parameters", default=None, choices=['angle','all', 'helix'])
     parser.add_argument("-reset-priors",  "--resetpriors",  action='store_true', help="Delete prior offset and angle columngs")
     parser.add_argument("-reset-offsets", "--resetoffsets", action='store_true', help="Assign angle and origin offsets to 0")
     parser.add_argument("-invert-psi",    "--invertpsi",    action='store_true', help="Invert psi angle")
@@ -62,6 +62,11 @@ def main():
         new_column_parameters = {'rlnAnglePsi': 'rlnAnglePsiPrior',
                                  'rlnAngleRot': 'rlnAngleRotPrior',
                                  'rlnAngleTilt':'rlnAngleTiltPrior'}
+    elif args_dict['copypriors'] == 'helix':
+        new_column_parameters = {'rlnOriginX':  'rlnOriginXPrior',
+                                 'rlnOriginY':  'rlnOriginYPrior',
+                                 'rlnAnglePsi': 'rlnAnglePsiPrior',
+                                 'rlnAngleTilt':'rlnAngleTiltPrior'}
 
     # Copy priors to offsets overwrites
     if args_dict['copyoffsets'] == 'all':
@@ -73,6 +78,11 @@ def main():
     elif args_dict['copyoffsets'] == 'angle':
         new_column_parameters = {'rlnAnglePsiPrior': 'rlnAnglePsi',
                                  'rlnAngleRotPrior': 'rlnAngleRot',
+                                 'rlnAngleTiltPrior':'rlnAngleTilt'}
+    elif args_dict['copyoffsets'] == 'helix':
+        new_column_parameters = {'rlnOriginXPrior':  'rlnOriginX',
+                                 'rlnOriginYPrior':  'rlnOriginY',
+                                 'rlnAnglePsiPrior': 'rlnAnglePsi',
                                  'rlnAngleTiltPrior':'rlnAngleTilt'}
 
     # Create an EM project object
