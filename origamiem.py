@@ -22,6 +22,7 @@ import sqlite3
 import matplotlib.pyplot as py
 import barcode
 
+from collections import Counter
 from mpl_toolkits.mplot3d import Axes3D
 from shutil import copyfile
 
@@ -133,6 +134,12 @@ class Project:
         # Star files to merge
         self.particle_star_files = []
         self.other_star          = None
+
+    def read_ptcl_mrc_paths(self):
+        '''
+        Read ptcl mrc paths
+        '''
+        self.particle_star.read_mrc_paths()
 
     def group_ptcls(method='defocus'):
         '''
@@ -2509,6 +2516,18 @@ class ProjectPlot(Project):
             py.xlabel('Alignment')
 
 
+    def plot_mic_paths(self):
+        '''
+        Plot mic path counter
+        '''
+        # Read the dates
+        regex = r"\d+-\d+-\d+"
+        dates = []
+        for path in self.particle_star.mic_counter.keys():
+            match = re.search(regex, path)
+            dates.append(match.group(0))
+        py.bar(dates, self.particle_star.mic_counter.values(), color='orange')
+
     def plot_hist(self, column_name, nbins):
         '''
         Plot histogram
@@ -2571,6 +2590,13 @@ class ProjectPlot(Project):
         # Tight layout
         py.tight_layout()
 
+    def set_tick_fontsize(self, size=8):
+        '''
+        Set tick fontsizes
+        '''
+        py.rc('xtick',labelsize=size)
+        py.rc('ytick',labelsize=size)
+
     def run_ptcl(self, column_names, column_pairs, column_diffs, orientation, nbins=20):
         '''
         Plot utility for ptcl star
@@ -2593,7 +2619,7 @@ class ProjectPlot(Project):
         num_diffs = len(self.column_diffs)
 
         # Determine number of rows and columns
-        num_rows = int(np.sqrt(num_singles+num_pairs+num_diffs)) + 1
+        num_rows = int(np.sqrt(num_singles+num_pairs+num_diffs+2)) + 1
 
         # Create figure
         py.figure(figsize=(20,20))
@@ -2626,6 +2652,11 @@ class ProjectPlot(Project):
         if orientation:
             py.subplot(num_rows, num_rows, num_plots+1)
             self.plot_orientation(nbins)
+
+        # Plot micrographs paths
+        if self.particle_star.mic_counter is not None:
+            py.subplot(num_rows, num_rows, num_plots+2)
+            self.plot_mic_paths()
 
         # Tight layout
         py.tight_layout()
@@ -3771,9 +3802,23 @@ class Star(EMfile):
         # Micrograph pixel size
         self.mic_apix      = 1.82
 
+        # Micrographs
+        self.micrographs   = None
+        self.mic_folders   = None
+        self.mic_counter   = None
+
         # Read file
         if file is not None and os.path.isfile(file):
             self.read(file)
+
+    def read_mrc_paths(self):
+        '''
+        Read mrc paths
+        '''
+        if self.has_label('rlnMicrographName'):
+            self.micrographs = self.data_block['rlnMicrographName'].tolist()
+            self.mic_folders = [os.path.split(os.path.realpath(mic))[0] for mic in self.micrographs]
+            self.mic_counter = Counter(self.mic_folders)
 
     def get_align_diff(self):
         '''
