@@ -4199,6 +4199,10 @@ class Star(EMfile):
         if self.has_label('rlnOriginX'):
             self.data_block.loc[valid_rows,'rlnOriginX'] = -self.data_block.loc[valid_rows,'rlnOriginX']
 
+        # Invert X-Prior
+        if self.has_label('rlnOriginXPrior'):
+            self.data_block.loc[valid_rows,'rlnOriginXPrior'] = -self.data_block.loc[valid_rows,'rlnOriginXPrior']
+
         # Update Psi
         if self.has_label('rlnAnglePsi'):
             self.data_block.loc[valid_rows,'rlnAnglePsi'] = -self.data_block.loc[valid_rows,'rlnAnglePsi']
