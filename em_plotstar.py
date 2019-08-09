@@ -51,6 +51,8 @@ def main():
     parser.add_argument("-format",       "--format",        type=str,     default='svg', choices=['png','svg'])
 
     parser.add_argument("-ref",          "--reference",     type=str,   help="Reference star file", default=None)
+    parser.add_argument("-barcode",      "--barcode",       type=str, help="Barcode to select", nargs='*', default={})
+
 
     args = parser.parse_args()
 
@@ -64,7 +66,14 @@ def main():
                  'fontsize':      args.fontsize,
                  'reference':     args.reference,
                  'nbins':         args.nbins,
-                 'format':        args.format}
+                 'format':        args.format,
+                 'barcode':       args.barcode}
+
+    # Get the new column parameters
+    if args_dict['barcode'] is not None:
+        barcode_parameters = util.parse_star_parameters(args_dict['barcode'])
+    else:
+        barcode_parameters = None
 
     # Create an EM project object
     new_project = em.ProjectPlot(name='EMPlot')
@@ -77,6 +86,10 @@ def main():
     # Read particles
     new_project.read_particles(args_dict['input'])
     print('Read particle star file {}'.format(args_dict['input']))
+
+    # Select based on the barcode
+    if barcode_parameters is not None:
+      new_project.select_by_barcode(args_dict['barcode'])
 
     # Read particle mrc paths
     new_project.read_ptcl_mrc_paths()
