@@ -18,7 +18,6 @@ def main():
 
     parser.add_argument("-i",        "--input",       type=str, help="Particle star file")
     parser.add_argument("-o",        "--output",      type=str, help="Output directory", default=None)
-    parser.add_argument("-func",     "--function",    type=str, help="Function to apply on the barcode", choices=['Frame'], default='Frame')
 
     args = parser.parse_args()
 
@@ -49,7 +48,7 @@ def main():
     new_project.prepare_io_files_star()
 
     # Add new columns
-    new_project.apply_barcode(args_dict['function'])
+    new_project.apply_barcode()
 
     # Write output files
     new_project.write_output_files(write_ref_class_star=False)

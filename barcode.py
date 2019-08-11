@@ -11,29 +11,7 @@ import numpy as np
 
 
 # Barcode functions for DNA origami assisted cryo-EM
-def Frame(barcode_num):
-    # Rotation angle pitch
-    angle_pitch = 34.28
-
-    rot_angle_map = {1:  0,
-                     2: -1*angle_pitch,
-                     3: -2*angle_pitch,
-                     4: -3*angle_pitch,
-                     5:  1*angle_pitch,
-                     6:  2*angle_pitch,
-                     7:  3*angle_pitch}
-    # Tilt angle
-    tilt_angle = 90.0
-
-    if barcode_num in rot_angle_map:
-        rot_angle = rot_angle_map[barcode_num]
-    else:
-        rot_angle = 0.0
-
-    return tilt_angle, rot_angle
-
-
-def Framerev(barcode_num):
+def Framev60(barcode_num):
     # Rotation angle pitch
     angle_pitch = 34.28
 
@@ -45,10 +23,54 @@ def Framerev(barcode_num):
                      6: -2*angle_pitch,
                      7: -3*angle_pitch}
     # Tilt angle
-    tilt_angle = -90.0
+    tilt_angle = 90.0
 
     if barcode_num in rot_angle_map:
         rot_angle = rot_angle_map[barcode_num]
+    else:
+        rot_angle = 0.0
+
+    return tilt_angle, rot_angle
+
+
+def Framev61(barcode_num):
+    # Rotation angle pitch
+    angle_pitch = 34.28
+
+    rot_angle_map = {1:  0,
+                     2:  1*angle_pitch,
+                     3:  2*angle_pitch,
+                     4:  3*angle_pitch,
+                     5: -1*angle_pitch,
+                     6: -2*angle_pitch,
+                     7: -3*angle_pitch}
+    # Tilt angle
+    tilt_angle = 90.0
+
+    if barcode_num in rot_angle_map:
+        rot_angle = rot_angle_map[barcode_num]
+    else:
+        rot_angle = 0.0
+
+    return tilt_angle, rot_angle
+
+
+def Framev60rev(barcode_num):
+    # Rotation angle pitch
+    angle_pitch = 34.28
+
+    rot_angle_map = {1:  0,
+                     2:  1*angle_pitch,
+                     3:  2*angle_pitch,
+                     4:  3*angle_pitch,
+                     5: -1*angle_pitch,
+                     6: -2*angle_pitch,
+                     7: -3*angle_pitch}
+    # Tilt angle
+    tilt_angle = 90.0
+
+    if barcode_num in rot_angle_map:
+        rot_angle = rot_angle_map[barcode_num] - 34.28
     else:
         rot_angle = 0.0
 
@@ -69,18 +91,19 @@ def parse_barcode(ptcl_star):
     return barcode_dict
 
 
-def Frame_ptcl_angle(ptcl_star, map_func=Frame):
+def Frame_ptcl_angle(ptcl_star):
     '''
     Frame v3-7 barcode function
     '''
     barcode_dict = parse_barcode(ptcl_star)
 
     # Get bottom code
-    # The code is in reverse order compared to the DNA origami design (e.g. 0 is actually 6, 6 is actually 0)
+    bit_code  = int(barcode_dict['bit'])
 
-    bottom_code  = int(barcode_dict['rot'])
+    # Frame name
+    map_func     = int(barcode_dict['name'])
 
-    tilt_angle, rot_angle = map_func(bottom_code)
+    tilt_angle, rot_angle = map_func(bit_code)
 
     # Result dictionary
     result_dict = {'rlnAngleTiltPrior': tilt_angle,
@@ -89,7 +112,7 @@ def Frame_ptcl_angle(ptcl_star, map_func=Frame):
     return result_dict
 
 
-def Frame_angle(data_star, map_func=Frame):
+def Frame_angle(data_star, rot_only=True):
     '''
     Frame v3-7 barcode function for data star
     '''
@@ -100,12 +123,15 @@ def Frame_angle(data_star, map_func=Frame):
 
     for ptcl_index, ptcl_row in data_star.iterrows():
 
-        barcode_dict = Frame_ptcl_angle(ptcl_row, map_func)
+        barcode_dict = Frame_ptcl_angle(ptcl_row)
         tilt_angle_list.append(barcode_dict['rlnAngleTiltPrior'])
         rot_angle_list.append(barcode_dict['rlnAngleRotPrior'])
 
     # Assign the new values
-    data_star['rlnAngleTiltPrior'] = np.array(tilt_angle_list)
+    if not rot_only:
+        data_star['rlnAngleTiltPrior'] = np.array(tilt_angle_list)
+        data_star['rlnAngleTilt']      = np.array(tilt_angle_list)
+    data_star['rlnAngleRot']       = np.array(rot_angle_list)
     data_star['rlnAngleRotPrior']  = np.array(rot_angle_list)
 
     return data_star
