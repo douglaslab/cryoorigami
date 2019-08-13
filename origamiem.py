@@ -127,10 +127,6 @@ class Project:
         self.class2Ds  = []
         self.class3Ds  = []
 
-        # Barcode functions
-        self.barcode_funcs = {'Frame': barcode.Frame,
-                              'Framerev': barcode.Framerev}
-
         # Star files to merge
         self.particle_star_files = []
         self.other_star          = None

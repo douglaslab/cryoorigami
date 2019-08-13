@@ -76,6 +76,10 @@ def Framev60rev(barcode_num):
 
     return tilt_angle, rot_angle
 
+# Map functions
+map_funcs = {'Framev60': Framev60,
+			 'Framev60rev': Framev60rev,
+			 'Framev61': Framev61}
 
 def parse_barcode(ptcl_star):
     '''
@@ -101,9 +105,10 @@ def Frame_ptcl_angle(ptcl_star):
     bit_code  = int(barcode_dict['bit'])
 
     # Frame name
-    map_func     = int(barcode_dict['name'])
+    map_func  = barcode_dict['name']
 
-    tilt_angle, rot_angle = map_func(bit_code)
+    # Get the angles
+    tilt_angle, rot_angle = map_funcs[map_func](bit_code)
 
     # Result dictionary
     result_dict = {'rlnAngleTiltPrior': tilt_angle,

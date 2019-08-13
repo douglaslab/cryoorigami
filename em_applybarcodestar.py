@@ -23,8 +23,7 @@ def main():
 
     # Prepare args dict
     args_dict = {'input':       args.input,
-                 'output':      args.output,
-                 'function':    args.function
+                 'output':      args.output
                  }
 
     # Check if the input file exists
