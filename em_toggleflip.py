@@ -47,7 +47,7 @@ def main():
     new_project.prepare_io_files_star()
 
     # Add new columns
-    new_project.toggle_flip_on()
+    new_project.toggle_flip()
 
     # Write output files
     new_project.write_output_files()

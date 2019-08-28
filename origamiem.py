@@ -491,12 +491,19 @@ class Project:
         for label in prior_columns:
             self.particle_star.delete_column(label)
 
-    def toggle_flip_on(self):
+    def toggle_flip(self):
         '''
         Set flip on for particles
         '''
         if self.particle_star:
-            self.particle_star.set_column('rlnIsFlip', 1)
+            if self.particle_star.has_label('rlnIsFlip'):
+                flipON  = self.particle_star.data_block['rlnIsFlip'] == 1
+                flipOFF = self.particle_star.data_block['rlnIsFlip'] == 0
+
+                self.particle_star.data_block.loc[flipON, 'rlnIsFlip'] = 0
+                self.particle_star.data_block.loc[flipOFF,'rlnIsFlip'] = 1
+            else:
+                self.particle_star.set_column('rlnIsFlip', 1)
 
     def transform_particles(self, final_offset=[0, 0], com_offset=False, rotate_psi=0):
         '''

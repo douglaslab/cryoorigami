@@ -70,7 +70,7 @@ def Framev60rev(barcode_num):
     tilt_angle = 90.0
 
     if barcode_num in rot_angle_map:
-        rot_angle = rot_angle_map[barcode_num] - 34.28
+        rot_angle = rot_angle_map[barcode_num] + 180.0
     else:
         rot_angle = 0.0
 
