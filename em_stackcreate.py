@@ -59,7 +59,7 @@ def main():
     new_project.read_particles(args_dict['input'])
     print('Read particle star file {}'.format(args_dict['input']))
 
-    # Read particle diameter
+    # Set original pixel
     new_project.set_orig_apix(args_dict['origapix'])
 
     # Read particle diameter

@@ -1670,6 +1670,13 @@ class ProjectStack(Project):
         # Original micrograph apix
         self.orig_apix       = None
 
+    def prepare_star(self):
+        '''
+        Prepare star file
+        '''
+        if self.particle_star.has_label('rlnReferenceImage') and not self.particle_star.has_label('rlnImageName'):
+            self.particle_star.rename_columns({'rlnReferenceImage':'rlnImageName'})
+
     def prepare_background_mask(self, clipbox=None):
         '''
         Prepare background maks
@@ -1695,6 +1702,7 @@ class ProjectStack(Project):
         '''
         Prepare meta objects using reference class avarages
         '''
+        self.prepare_star()
         self.read_particle_apix()
         self.set_particle_radius()
         self.read_first_particle_mrc()
@@ -1841,7 +1849,7 @@ class ProjectStack(Project):
 
             print('Writing Particle %d/%d %d/100' % (ptcl_index+1,
                                                      num_ptcls,
-                                                     100.0*(ptcl_index+1)/num_ptcls))
+                                                     int(100.0*(ptcl_index+1)/num_ptcls)))
 
             # Create a new process
             worker_result = mp_pool.apply_async(parallelem.read_ptcl_mrc, args=(ptcl_row, transform, self.fft_mask, clipbox, self.background_mask, recenter))
@@ -4157,7 +4165,7 @@ class Star(EMfile):
 
                 # Check that the column name exists and the new name is a proper star varaible
                 if self.has_label(old_column) and new_column in self.PARAMETERS:
-                    self.data_block = self.data_block.rename(index=str, columns={old_column:new_column})
+                    self.data_block = self.data_block.rename(index=int, columns={old_column:new_column})
 
     def reset_offsets(self):
         '''
