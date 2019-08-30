@@ -3962,8 +3962,7 @@ class Star(EMfile):
         barcode_str = util.convert_dict2str(barcode)
 
         # Set barcode
-        if not self.has_label('rlnParticleName'):
-            self.set_column('rlnParticleName', barcode_str)
+        self.set_column('rlnParticleName', barcode_str)
 
     def set_ptcl_barcode(self, ptcl_index, barcode={}):
         '''
