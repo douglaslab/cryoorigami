@@ -117,7 +117,7 @@ def Frame_ptcl_angle(ptcl_star):
     return result_dict
 
 
-def Frame_angle(data_star, rot_only=True):
+def Frame_angle(data_star, rot_only=False):
     '''
     Frame v3-7 barcode function for data star
     '''
@@ -135,8 +135,6 @@ def Frame_angle(data_star, rot_only=True):
     # Assign the new values
     if not rot_only:
         data_star['rlnAngleTiltPrior'] = np.array(tilt_angle_list)
-        data_star['rlnAngleTilt']      = np.array(tilt_angle_list)
-    data_star['rlnAngleRot']       = np.array(rot_angle_list)
     data_star['rlnAngleRotPrior']  = np.array(rot_angle_list)
 
     return data_star
