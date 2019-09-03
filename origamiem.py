@@ -131,6 +131,13 @@ class Project:
         self.particle_star_files = []
         self.other_star          = None
 
+    def set_particle_num(self, num=None):
+        '''
+        Set particle number
+        '''
+        if num is not None and self.particle_star is not None:
+            self.particle_star.data_block = self.particle_star.data_block.loc[:num, :]
+
     def read_ptcl_mrc_paths(self):
         '''
         Read ptcl mrc paths

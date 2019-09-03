@@ -26,6 +26,7 @@ def main():
     parser.add_argument("-origapix",     "--origapix",      type=float, help="Original micrograph pixel size (A)", default=1.82)
     parser.add_argument("-recenter",     "--recenter",   action='store_true', help="Recenter the images prior to clipping. Use with clip option only.", default=None)
     parser.add_argument("-diameter",     "--diameter",      type=int,   help="Particle diameter for normalization. If provided, perform normalization", default=None)
+    parser.add_argument("-n",            "--numptcls",      type=int,   help="Number of particles to process", default=None)
 
     args = parser.parse_args()
 
@@ -39,7 +40,8 @@ def main():
                  'clip':          args.clip,
                  'diameter':      args.diameter,
                  'recenter':      args.recenter,
-                 'origapix':      args.origapix
+                 'origapix':      args.origapix,
+                 'numptcls':      args.numptcls
                  }
 
     # Check if the input file exists
@@ -58,6 +60,9 @@ def main():
     # Read particles
     new_project.read_particles(args_dict['input'])
     print('Read particle star file {}'.format(args_dict['input']))
+
+    # Set particle number
+    new_project.set_particle_num(args_dict['numptcls'])
 
     # Set original pixel
     new_project.set_orig_apix(args_dict['origapix'])
