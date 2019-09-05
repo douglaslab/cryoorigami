@@ -41,8 +41,7 @@ def main():
                                   'rlnAngleTiltPrior':90,
                                   'rlnAnglePsiFlipRatio':0}
 
-        del_column_parameters  = {'rlnAngleRot':None,
-                                  'rlnAngleRotPrior':None}
+        del_column_parameters  = {'rlnAngleRotPrior':None}
 
         copy_column_parameters = {'rlnOriginX':  'rlnOriginXPrior',
                                   'rlnOriginY':  'rlnOriginYPrior',
