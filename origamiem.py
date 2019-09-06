@@ -74,6 +74,10 @@ class Project:
         self.ref_class_mrc_file       = None
         self.consensus_class_mrc_file = None
 
+        # Metadata file
+        self.metadata      = None
+        self.metadata_file = None
+
         # Micrograph dimensions
         self.mic_NX = 0
         self.mic_NY = 0
@@ -4220,19 +4224,11 @@ class Star(EMfile):
 
         # Update Psi
         if self.has_label('rlnAnglePsi'):
-            self.data_block.loc[valid_rows,'rlnAnglePsi'] = -self.data_block.loc[valid_rows,'rlnAnglePsi']
+            self.data_block.loc[valid_rows,'rlnAnglePsi'] = 180 - self.data_block.loc[valid_rows,'rlnAnglePsi']
 
         # Update Psi-Prior
         if self.has_label('rlnAnglePsiPrior'):
-            self.data_block.loc[valid_rows,'rlnAnglePsiPrior'] = -self.data_block.loc[valid_rows,'rlnAnglePsiPrior']
-
-        # Update Tilt
-        if self.has_label('rlnAngleTilt'):
-            self.data_block.loc[valid_rows,'rlnAngleTilt'] = (180.0 + self.data_block.loc[valid_rows,'rlnAngleTilt']) % 360.0
-
-        # Update Psi-Prior
-        if self.has_label('rlnAngleTiltPrior'):
-            self.data_block.loc[valid_rows,'rlnAngleTiltPrior'] = (180.0 + self.data_block.loc[valid_rows,'rlnAngleTiltPrior']) % 360.0
+            self.data_block.loc[valid_rows,'rlnAnglePsiPrior'] = 180 - self.data_block.loc[valid_rows,'rlnAnglePsiPrior']
 
     def create_micname_from_imagename(self, mic_path='Micrographs'):
         '''
@@ -5278,8 +5274,9 @@ class CryoSparc(EMfile):
         '''
         Delete classes
         '''
-        keep_classes = ~self.star.data_block['rlnClassNumber'].isin(del_classes)
-        self.star.data_block = self.star.data_block.loc[keep_classes, :]
+        if self.star.has_label('rlnClassNumber'):
+            keep_classes = ~self.star.data_block['rlnClassNumber'].isin(del_classes)
+            self.star.data_block = self.star.data_block.loc[keep_classes, :]
 
     def get_ref_mrc_file(self):
         '''
@@ -5512,18 +5509,28 @@ class CryoSparc(EMfile):
                 self.data_block_dict['rlnAnglePsi'] = np.array(util.rad2deg(self.data_block_blob['alignments2D/pose']),
                                                                dtype=self.star.PARAMETERS['rlnAnglePsi']['nptype'])
             if self.has_label_passthrough('alignments3D/pose'):
-                self.data_block_dict['rlnAngleRot'] = np.array(util.rad2deg(self.data_block_passthrough['alignments3D/pose'][:, 0]),
+                
+                # Convert rotation matrix to eular angles
+                radAngles   = np.array([util.rodriguez2euler(x) for x in self.data_block_passthrough['alignments3D/pose']])
+                eulerAngles = util.rad2deg(radAngles) 
+                
+                self.data_block_dict['rlnAngleRot']  = np.array(eulerAngles[:, 0],
                                                                dtype=self.star.PARAMETERS['rlnAngleRot']['nptype'])
-                self.data_block_dict['rlnAngleTilt'] = np.array(util.rad2deg(self.data_block_passthrough['alignments3D/pose'][:, 1]),
+                self.data_block_dict['rlnAngleTilt'] = np.array(eulerAngles[:, 1],
                                                                 dtype=self.star.PARAMETERS['rlnAngleTilt']['nptype'])
-                self.data_block_dict['rlnAnglePsi'] = np.array(util.rad2deg(self.data_block_passthrough['alignments3D/pose'][:, 2]),
+                self.data_block_dict['rlnAnglePsi']  = np.array(eulerAngles[:, 2],
                                                                dtype=self.star.PARAMETERS['rlnAnglePsi']['nptype'])
             if self.has_label_blob('alignments3D/pose'):
-                self.data_block_dict['rlnAngleRot'] = np.array(util.rad2deg(self.data_block_blob['alignments3D/pose'][:, 0]),
+                
+                # Convert rotation matrix to eular angles
+                radAngles = np.array([util.rodriguez2euler(x) for x in self.data_block_blob['alignments3D/pose']])
+                eulerAngles = util.rad2deg(radAngles)
+
+                self.data_block_dict['rlnAngleRot']  = np.array(eulerAngles[:, 0],
                                                                dtype=self.star.PARAMETERS['rlnAngleRot']['nptype'])
-                self.data_block_dict['rlnAngleTilt'] = np.array(util.rad2deg(self.data_block_blob['alignments3D/pose'][:, 1]),
+                self.data_block_dict['rlnAngleTilt'] = np.array(eulerAngles[:, 1],
                                                                 dtype=self.star.PARAMETERS['rlnAngleTilt']['nptype'])
-                self.data_block_dict['rlnAnglePsi'] = np.array(util.rad2deg(self.data_block_blob['alignments3D/pose'][:, 2]),
+                self.data_block_dict['rlnAnglePsi']  = np.array(eulerAngles[:, 2],
                                                                dtype=self.star.PARAMETERS['rlnAnglePsi']['nptype'])
 
             # rlnCoordianteX/Y
