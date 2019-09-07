@@ -25,6 +25,7 @@ import barcode
 from collections import Counter
 from mpl_toolkits.mplot3d import Axes3D
 from shutil import copyfile
+from matplotlib.colors import LogNorm
 
 
 class Relion:
@@ -134,6 +135,23 @@ class Project:
         # Star files to merge
         self.particle_star_files = []
         self.other_star          = None
+
+        # Metadata file
+        self.metadata      = None
+        self.metadata_file = None
+
+        # Geometrical parameters
+        self.direction = None
+        self.diff_tilt = None
+        self.diff_psi  = None
+        self.diff_rot  = None
+
+    def write_metadata(self):
+        '''
+        Write metadata
+        '''
+        if self.metadata is not None and self.metadata_file is not None:
+            self.metadata.to_csv(self.metadata_file, header=True, index=False, sep='\t')
 
     def set_particle_num(self, num=None):
         '''
@@ -590,6 +608,9 @@ class Project:
         if self.ref_class_cs is not None and write_cs_star:
             self.ref_class_cs.star.write(self.ref_class_out_file)
 
+        if self.metadata is not None:
+            self.write_metadata()
+
     def set_output_directory(self, output_directory=None, project_root='.'):
         '''
         Set output directory
@@ -646,7 +667,17 @@ class Project:
             self.left_star.data_block  = self.particle_star.data_block.loc[left_mask, :]
             self.right_star.data_block = self.particle_star.data_block.loc[right_mask, :]
 
+    def prepare_metadata_file(self):
+        '''
+        Prepare metadata file
+        '''
+        if self.metadata_file is None:
+            self.metadata_file = self.output_directory+'/metadata.txt'
+
     def prepare_io_files_star(self):
+        # Prepare metadata file
+        self.prepare_metadata_file()
+
         # Copy input file to output directory
         if self.particle_star_file is not None:
             head, tail = os.path.split(self.particle_star_file)
@@ -2520,21 +2551,37 @@ class ProjectPlot(Project):
             py.hist(diff, density=True, bins=nbins)
             py.xlabel(column1+'-'+column2)
 
-    def plot_orientation(self, nbins):
+    def calc_orientation(self):
         '''
-        Plot orientation
+        Calculate orientation information
         '''
         if (self.particle_star.has_label('rlnAnglePsi') and
             self.particle_star.has_label('rlnAnglePsiPrior') and
             self.particle_star.has_label('rlnAngleTilt') and
             self.particle_star.has_label('rlnAngleTiltPrior')):
 
-            # Get alignment angle difference
-            direction = self.particle_star.get_align_diff()
+            self.direction, self.diff_psi, self.diff_tilt = self.particle_star.get_align_diff()
 
-            py.hist(direction, density=True, bins=nbins)
+            self.metadata = pd.DataFrame(data={'direction': self.direction,
+                                               'deltaPsi':  self.diff_psi,
+                                               'deltaTilt': self.diff_tilt})
+    def plot_orientation(self, nbins):
+        '''
+        Plot orientation
+        '''
+        if self.direction is not None:
+            py.hist(self.direction, density=True, bins=[-1.25, -0.75, 0.75, 1.25])
+            py.xlim(-1.5, 1.5)
             py.xlabel('Alignment')
 
+    def plot_diff_angles(self, nbins):
+        '''
+        Plot diff_psi and diff_tilt
+        '''
+        if self.diff_psi is not None and self.diff_tilt is not None:
+            py.hist2d(self.diff_psi, self.diff_tilt, bins=nbins, cmap='Blues', norm=LogNorm(), range=[[0, 180], [0, 180]])
+            py.xlabel(r'$\Delta\psi$')
+            py.ylabel(r'$\Delta\theta$')
 
     def plot_mic_paths(self):
         '''
@@ -2639,7 +2686,7 @@ class ProjectPlot(Project):
         num_diffs = len(self.column_diffs)
 
         # Determine number of rows and columns
-        num_rows = int(np.sqrt(num_singles+num_pairs+num_diffs+2)) + 1
+        num_rows = int(np.sqrt(num_singles+num_pairs+num_diffs+3)) + 1
 
         # Create figure
         py.figure(figsize=(20,20))
@@ -2670,12 +2717,16 @@ class ProjectPlot(Project):
         
         # Plot orientation angle
         if orientation:
+            self.calc_orientation()
             py.subplot(num_rows, num_rows, num_plots+1)
             self.plot_orientation(nbins)
 
+            py.subplot(num_rows, num_rows, num_plots+2)
+            self.plot_diff_angles(nbins)
+
         # Plot micrographs paths
         if self.particle_star.mic_counter is not None:
-            py.subplot(num_rows, num_rows, num_plots+2)
+            py.subplot(num_rows, num_rows, num_plots+3)
             self.plot_mic_paths()
 
         # Tight layout
@@ -2694,10 +2745,17 @@ class ProjectPlot(Project):
         # Make symlink
         self.make_symlink2parent(self.particle_star_file)
 
+        # Prepare metadata file
+        self.prepare_metadata_file()
+
     def write_output_files(self,output_format='svg'):
         '''
         Write output files
         '''
+        # Write metadata
+        self.write_metadata()
+
+        # Save plot
         py.savefig(self.particle_plot_file, dpi=100,transparent=False, format=output_format)
 
 
@@ -3854,7 +3912,7 @@ class Star(EMfile):
         directionPsi  = 2*(diffPsi < 90).astype(int)-1
         directionTilt = 2*(diffTilt < 90).astype(int)-1 
         
-        return directionPsi*directionTilt
+        return directionPsi*directionTilt, diffPsi, diffTilt
 
     def get_norm_diff(self, column1, column2):
         '''
