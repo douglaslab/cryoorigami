@@ -1745,6 +1745,7 @@ class ProjectStack(Project):
         Prepare meta objects using reference class avarages
         '''
         self.prepare_star()
+        self.sort_star()
         self.read_particle_apix()
         self.set_particle_radius()
         self.read_first_particle_mrc()
@@ -1845,6 +1846,14 @@ class ProjectStack(Project):
         Set original apix
         '''
         self.orig_apix = apix
+
+    def sort_star(self, colname='rlnClassDistribution', ascending=False):
+        '''
+        Sort based on class distribution
+        '''
+        if self.particle_star.has_label(colname):
+            self.particle_star.sort(column=colname, ascending=ascending)
+
 
     def center_stack_star(self):
         '''
@@ -4141,12 +4150,13 @@ class Star(EMfile):
         intersect_data_block = pd.merge(self.data_block, other.data_block,on=cmp_columns, how='inner')
         self.set_data_block(intersect_data_block)
 
-    def sort(self, column='rlnDefocusU'):
+    def sort(self, column='rlnDefocusU', ascending=False):
         '''
         Sort the star object based on a column
         '''
         if self.has_label(column):
-            self.data_block.sort_values(column, inplace=True)
+            self.data_block.sort_values(column, inplace=True, ascending=ascending)
+            self.data_block.reset_index(drop=True, inplace=True)
 
     def filter_classification(self, maxprob=0.5, maxclass=10):
         '''
