@@ -2832,6 +2832,7 @@ class ProjectAlign2D(Project):
         # Determine the output transformed mrcs and star files
         self.ref_class_transformed_mrc_file  = os.path.relpath(os.path.abspath(self.output_directory+'/Class2D_output_transformed.mrcs'))
         self.ref_class_transformed_star_file = os.path.relpath(os.path.abspath(self.output_directory+'/Class2D_output_transformed.star'))
+        self.consensus_class_mrc_file        = os.path.relpath(os.path.abspath(self.output_directory+'/Class2D_consensus.mrcs'))
 
         # Create MRCS output file
         if self.ref_class_transformed_mrc is None:
@@ -2850,8 +2851,9 @@ class ProjectAlign2D(Project):
         class_data_block   = self.ref_class_star.get_data_block()
 
         # Keep transformed imgs
-        transformed_img2Ds = []
-        ptcl_list          = []
+        transformed_img2Ds  = []
+        class_distributions = []
+        ptcl_list           = []
 
         # Iterate over each class
         for class_index, class_row in class_data_block.iterrows():
@@ -2870,6 +2872,20 @@ class ProjectAlign2D(Project):
 
             # ptcl list
             ptcl_list.append(class_index)
+
+            # Add class distribution
+            if self.ref_class_star.has_label('rlnClassDistribution'):
+                class_distributions.append(class_row['rlnClassDistribution'])
+
+        # Consensus class average
+        if self.ref_class_star.has_label('rlnClassDistribution'):
+
+            consensus_img2D = transformed_img2Ds[0]*class_distributions[0]
+
+            for i in range(1, len(class_distributions)):
+                consensus_img2D += class_distributions[i]*transformed_img2Ds[i]
+
+            mrcfile.new(self.consensus_class_mrc_file, data=consensus_img2D)
 
         # Write the transfomed img2D
         self.ref_class_transformed_mrc.mrc_data.data[ptcl_list] = transformed_img2Ds
