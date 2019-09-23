@@ -22,6 +22,8 @@ def main():
     parser.add_argument("-apix",         "--apix",         type=float, help='Pixel size in anstroms', default=1.82)
     parser.add_argument("-diameter",     "--diameter",     type=float, help='Particle diameter in Anstroms', default=1000)
     parser.add_argument("-numiter",      "--numiter",      type=int,   help='Number of iterations', default=20)
+    parser.add_argument("-sigma-psi",     "--sigmapsi",      type=float, help="Sigma-psi for alignment of classes", default=-1)
+    parser.add_argument("-offset-range",  "--offsetrange",   type=int,   help="Offset range for alignment of classes", default=10)
 
     args = parser.parse_args()
 
@@ -31,7 +33,9 @@ def main():
                  'useunmasked': args.useunmasked,
                  'apix':        args.apix,
                  'diameter':    args.diameter,
-                 'numiter':     args.numiter
+                 'numiter':     args.numiter,
+                 'sigmapsi':    args.sigmapsi,
+                 'offsetrange': args.offsetrange
                  }
 
     # Check if the input file exists
@@ -64,7 +68,7 @@ def main():
     new_project.normalize_class_refs()
 
     # Run relion
-    new_project.set_relion_refine_args(offset_range=5, num_iter=args_dict['numiter'], firstiter_cc=False, T=4)
+    new_project.set_relion_refine_args(offset_range=args_dict['offsetrange'], sigma_psi=args_dict['sigmapsi'], num_iter=args_dict['numiter'], firstiter_cc=False, T=4)
     new_project.run_refine2D()
 
     # Process 2D refine files

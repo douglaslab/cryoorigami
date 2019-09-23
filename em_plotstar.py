@@ -26,7 +26,9 @@ def main():
                                                                                               'rlnMaxValueProbDistribution',
                                                                                               'rlnNrOfSignificantSamples',
                                                                                               'rlnAngleRot',
+                                                                                              'rlnAngleRotPrior',
                                                                                               'rlnAngleTilt',
+                                                                                              'rlnAngleTiltPrior',
                                                                                               'rlnAnglePsi',
                                                                                               'rlnOriginX',
                                                                                               'rlnOriginY'])
@@ -46,7 +48,7 @@ def main():
 
     parser.add_argument("-orientation",  "--orientation",   action='store_true', help="Plot orientation of the particles with respect to priors")
 
-    parser.add_argument("-nbins",        "--nbins",         type=int,     default=20)
+    parser.add_argument("-nbins",        "--nbins",         type=int,     default=30)
     parser.add_argument("-fontsize",     "--fontsize",      type=int,     default=5)
     parser.add_argument("-format",       "--format",        type=str,     default='svg', choices=['png','svg'])
 

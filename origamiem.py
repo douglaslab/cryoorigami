@@ -2604,11 +2604,35 @@ class ProjectPlot(Project):
             dates.append(match.group(0))
         py.bar(dates, self.particle_star.mic_counter.values(), color='orange')
 
-    def plot_hist(self, column_name, nbins):
+    def plot_polar_hist(self, nrows, ncols, index, column_name, nbins):
+        '''
+        Plot polar histogram
+        '''
+        # Set x-axis
+        radian    = np.linspace(0.0, 2 * np.pi, nbins, endpoint=False)
+        bar_width = 2*np.pi/nbins
+
+        # Get histogram
+        hist, bin_edges = np.histogram(self.particle_star.get_norm_data(column_name), density=True, bins=nbins, range=(0, 360))
+
+        # Get average value
+        mean_angle = np.sum(hist*radian)/np.sum(hist)
+
+        # Plot polar bar-plot
+        py.subplot(nrows, ncols, index, projection='polar')
+        py.bar(radian, hist, bottom=0.0, width=bar_width)
+
+        # x-label
+        py.xlabel(column_name)
+
+    def plot_hist(self, nrows, ncols, index, column_name, nbins):
         '''
         Plot histogram
         '''
         if self.particle_star.has_label(column_name):
+            # Create subplot
+            py.subplot(nrows, ncols, index)
+            
             # Get data
             py.hist(self.particle_star.get_norm_data(column_name), density=True, bins=nbins)
             py.xlabel(column_name)
@@ -2703,7 +2727,10 @@ class ProjectPlot(Project):
         # Plot histograms for each column
         for i in range(num_singles):
             py.subplot(num_rows, num_rows, i+1)
-            self.plot_hist(self.column_names[i], nbins)
+            if self.column_names[i] in ['rlnAnglePsi', 'rlnAngleTilt', 'rlnAngleRot']:
+                self.plot_polar_hist(num_rows, num_rows, i+1, self.column_names[i], nbins)
+            else:
+                self.plot_hist(num_rows, num_rows, i+1, self.column_names[i], nbins)
 
         # Update num plots
         num_plots = num_singles

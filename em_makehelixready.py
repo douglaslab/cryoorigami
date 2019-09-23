@@ -20,6 +20,8 @@ def main():
     parser.add_argument("-o",             "--output",       type=str, help="Output directory", default=None)
     parser.add_argument("-copytopriors",  "--copypriors",   action='store_true', help="Copy offset and/or angle parameters to priors", default=True)
     parser.add_argument("-copytooffsets", "--copyoffsets",  action='store_true', help="Copy priors to angle and distance offset parameters")
+    parser.add_argument("-fliponly",      "--fliponly",     action='store_true', help="Set only flip ratio to 0")
+    parser.add_argument("-fliprot",       "--fliprot",      action='store_true', help="Set flip ratio to 0 and delete rlnAngleRotPrior")
 
     args = parser.parse_args()
 
@@ -28,6 +30,8 @@ def main():
                  'output':       args.output,
                  'copypriors':   args.copypriors,
                  'copyoffsets':  args.copyoffsets,
+                 'fliponly':     args.fliponly,
+                 'fliprot':      args.fliprot
                  }
 
     # Check if the input file exists
@@ -47,8 +51,7 @@ def main():
                                   'rlnOriginY':  'rlnOriginYPrior',
                                   'rlnAnglePsi': 'rlnAnglePsiPrior',
                                   'rlnAngleTilt':'rlnAngleTiltPrior'}
-        
-    # Copy priors to offsets    
+           
     if args_dict['copyoffsets']:
         add_column_parameters  = {}
 
@@ -58,6 +61,20 @@ def main():
                                   'rlnOriginYPrior':  'rlnOriginY',
                                   'rlnAnglePsiPrior': 'rlnAnglePsi',
                                   'rlnAngleTiltPrior':'rlnAngleTilt'}
+    if args_dict['fliponly']:
+        add_column_parameters   = {'rlnAnglePsiFlipRatio':0}
+
+        del_column_parameters   = {}
+
+        copy_column_parameters  = {}
+
+    if args_dict['fliprot']:
+        add_column_parameters   = {'rlnAnglePsiFlipRatio':0}
+
+        del_column_parameters   = {'rlnAngleRotPrior':None}
+
+        copy_column_parameters  = {}
+
 
     # Create an EM project object
     new_project = em.Project(name='EMHelixReady')

@@ -119,6 +119,16 @@ def convert_dict2str(dictionary={}):
 
     return conversion_str
 
+def euler360to180(ang):
+    '''
+    Convert euler360 to 180
+    '''
+    ang360 = ang%360
+
+    if ang360 > 180:
+        return -(360-ang360)
+    else:
+        return ang360
 
 def parse_star_parameters(parameter_input):
     '''

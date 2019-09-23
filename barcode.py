@@ -11,7 +11,7 @@ import numpy as np
 
 
 # Barcode functions for DNA origami assisted cryo-EM
-def Framev60(barcode_num):
+def Framev60(barcode_num, offset=225):
     # Rotation angle pitch
     angle_pitch = 34.28
 
@@ -26,14 +26,14 @@ def Framev60(barcode_num):
     tilt_angle = 90.0
 
     if barcode_num in rot_angle_map:
-        rot_angle = rot_angle_map[barcode_num]
+        rot_angle = -(rot_angle_map[barcode_num] + offset)
     else:
         rot_angle = 0.0
 
-    return tilt_angle, rot_angle
+    return tilt_angle, util.euler360to180(rot_angle)
 
 
-def Framev61(barcode_num):
+def Framev61(barcode_num, offset=225):
     # Rotation angle pitch
     angle_pitch = 34.28
 
@@ -48,14 +48,14 @@ def Framev61(barcode_num):
     tilt_angle = 90.0
 
     if barcode_num in rot_angle_map:
-        rot_angle = rot_angle_map[barcode_num]
+        rot_angle = -(rot_angle_map[barcode_num] + offset)
     else:
         rot_angle = 0.0
 
-    return tilt_angle, rot_angle
+    return tilt_angle, util.euler360to180(rot_angle)
 
 
-def Framev60rev(barcode_num):
+def Framev60rev(barcode_num, offset=225):
     # Rotation angle pitch
     angle_pitch = 34.28
 
@@ -70,11 +70,11 @@ def Framev60rev(barcode_num):
     tilt_angle = 90.0
 
     if barcode_num in rot_angle_map:
-        rot_angle = rot_angle_map[barcode_num] + 180.0
+        rot_angle = -(rot_angle_map[barcode_num] + (180.0 + offset)%360)
     else:
         rot_angle = 0.0
 
-    return tilt_angle, rot_angle
+    return tilt_angle, util.euler360to180(rot_angle)
 
 # Map functions
 map_funcs = {'Framev60': Framev60,
