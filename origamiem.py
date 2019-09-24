@@ -242,11 +242,11 @@ class Project:
         '''
         self.particle_star.delete_by_barcode(barcode_list)
 
-    def apply_barcode(self):
+    def apply_barcode(self, offsetrot):
         '''
         Apply barcode on particle star
         '''
-        new_data_block = barcode.Frame_angle(self.particle_star.get_data_block())
+        new_data_block = barcode.Frame_angle(self.particle_star.get_data_block(), offsetrot)
         self.particle_star.set_data_block(new_data_block)
 
     def append_particle_barcode(self, barcode={}):

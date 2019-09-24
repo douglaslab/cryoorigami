@@ -16,14 +16,16 @@ def main():
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument("-i",        "--input",       type=str, help="Particle star file")
-    parser.add_argument("-o",        "--output",      type=str, help="Output directory", default=None)
+    parser.add_argument("-i",           "--input",       type=str,   help="Particle star file")
+    parser.add_argument("-o",           "--output",      type=str,   help="Output directory", default=None)
+    parser.add_argument("-offsetrot",   "--offsetrot",   type=float, help="Rotation offset",  default=225)
 
     args = parser.parse_args()
 
     # Prepare args dict
     args_dict = {'input':       args.input,
-                 'output':      args.output
+                 'output':      args.output,
+                 'offsetrot':   args.offsetrot
                  }
 
     # Check if the input file exists
@@ -47,7 +49,7 @@ def main():
     new_project.prepare_io_files_star()
 
     # Add new columns
-    new_project.apply_barcode()
+    new_project.apply_barcode(args_dict['offsetrot'])
 
     # Write output files
     new_project.write_output_files(write_ref_class_star=False)

@@ -11,7 +11,7 @@ import numpy as np
 
 
 # Barcode functions for DNA origami assisted cryo-EM
-def Framev60(barcode_num, offset=225):
+def Framev60(barcode_num, offsetrot=225):
     # Rotation angle pitch
     angle_pitch = 34.28
 
@@ -26,14 +26,14 @@ def Framev60(barcode_num, offset=225):
     tilt_angle = 90.0
 
     if barcode_num in rot_angle_map:
-        rot_angle = -(rot_angle_map[barcode_num] + offset)
+        rot_angle = -(rot_angle_map[barcode_num] + offsetrot)
     else:
         rot_angle = 0.0
 
     return tilt_angle, util.euler360to180(rot_angle)
 
 
-def Framev61(barcode_num, offset=225):
+def Framev61(barcode_num, offsetrot=225):
     # Rotation angle pitch
     angle_pitch = 34.28
 
@@ -48,14 +48,14 @@ def Framev61(barcode_num, offset=225):
     tilt_angle = 90.0
 
     if barcode_num in rot_angle_map:
-        rot_angle = -(rot_angle_map[barcode_num] + offset)
+        rot_angle = -(rot_angle_map[barcode_num] + offsetrot)
     else:
         rot_angle = 0.0
 
     return tilt_angle, util.euler360to180(rot_angle)
 
 
-def Framev60rev(barcode_num, offset=225):
+def Framev60rev(barcode_num, offsetrot=225):
     # Rotation angle pitch
     angle_pitch = 34.28
 
@@ -70,7 +70,7 @@ def Framev60rev(barcode_num, offset=225):
     tilt_angle = 90.0
 
     if barcode_num in rot_angle_map:
-        rot_angle = -(rot_angle_map[barcode_num] + (180.0 + offset)%360)
+        rot_angle = -(rot_angle_map[barcode_num] + (180.0 + offsetrot)%360)
     else:
         rot_angle = 0.0
 
@@ -95,7 +95,7 @@ def parse_barcode(ptcl_star):
     return barcode_dict
 
 
-def Frame_ptcl_angle(ptcl_star):
+def Frame_ptcl_angle(ptcl_star, offsetrot):
     '''
     Frame v3-7 barcode function
     '''
@@ -108,7 +108,7 @@ def Frame_ptcl_angle(ptcl_star):
     map_func  = barcode_dict['name']
 
     # Get the angles
-    tilt_angle, rot_angle = map_funcs[map_func](bit_code)
+    tilt_angle, rot_angle = map_funcs[map_func](bit_code, offsetrot)
 
     # Result dictionary
     result_dict = {'rlnAngleTiltPrior': tilt_angle,
@@ -117,7 +117,7 @@ def Frame_ptcl_angle(ptcl_star):
     return result_dict
 
 
-def Frame_angle(data_star, rot_only=False):
+def Frame_angle(data_star, offsetrot):
     '''
     Frame v3-7 barcode function for data star
     '''
@@ -128,13 +128,12 @@ def Frame_angle(data_star, rot_only=False):
 
     for ptcl_index, ptcl_row in data_star.iterrows():
 
-        barcode_dict = Frame_ptcl_angle(ptcl_row)
+        barcode_dict = Frame_ptcl_angle(ptcl_row, offsetrot)
         tilt_angle_list.append(barcode_dict['rlnAngleTiltPrior'])
         rot_angle_list.append(barcode_dict['rlnAngleRotPrior'])
 
     # Assign the new values
-    if not rot_only:
-        data_star['rlnAngleTiltPrior'] = np.array(tilt_angle_list)
+    data_star['rlnAngleTiltPrior'] = np.array(tilt_angle_list)
     data_star['rlnAngleRotPrior']  = np.array(rot_angle_list)
 
     return data_star
