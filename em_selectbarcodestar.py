@@ -16,28 +16,24 @@ def main():
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument("-i",        "--input",       type=str, help="Particle star file")
-    parser.add_argument("-o",        "--output",      type=str, help="Output directory", default=None)
-    parser.add_argument("-barcode",  "--barcode",     type=str, help="Barcode to select", nargs='*', default={})
+    parser.add_argument("-i",           "--input",          type=str, help="Particle star file")
+    parser.add_argument("-o",           "--output",         type=str, help="Output directory", default=None)
+    parser.add_argument("-selbarcode",  "--selbarcode",     type=str, help="Barcode to select", nargs='*', default={})
+    parser.add_argument("-delbarcode",  "--delbarcode",     type=str, help="Barcode to delete", nargs='*', default={})
 
     args = parser.parse_args()
 
     # Prepare args dict
     args_dict = {'input':       args.input,
                  'output':      args.output,
-                 'barcode':     args.barcode
+                 'selbarcode':  args.selbarcode,
+                 'delbarcode':  args.delbarcode
                  }
 
     # Check if the input file exists
     if args_dict['input'] is None or not os.path.isfile(args_dict['input']):
         parser.print_help()
         sys.exit('Input file does not exist!')
-
-    # Get the new column parameters
-    if args_dict['barcode'] is not None:
-        barcode_parameters = util.parse_star_parameters(args_dict['barcode'])
-    else:
-        barcode_parameters = {}
 
     # Create an EM project object
     new_project = em.Project(name='EMSelectBarcode')
@@ -54,8 +50,11 @@ def main():
     # Prepare input and output files
     new_project.prepare_io_files_star()
 
-    # Add new columns
-    new_project.select_by_barcode(args_dict['barcode'])
+    # Select barcode
+    new_project.select_by_barcode(args_dict['selbarcode'])
+
+    # Delete barcode
+    new_project.delete_by_barcode(args_dict['delbarcode'])
 
     # Write output files
     new_project.write_output_files(write_ref_class_star=False)
