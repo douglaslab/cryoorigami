@@ -18,7 +18,7 @@ def main():
 
     parser.add_argument("-i",           "--input",       type=str,   help="Particle star file")
     parser.add_argument("-o",           "--output",      type=str,   help="Output directory", default=None)
-    parser.add_argument("-offsetrot",   "--offsetrot",   type=float, help="Rotation offset",  default=225)
+    parser.add_argument("-offsetrot",   "--offsetrot",   type=float, help="Rotation offset",  default=0)
 
     args = parser.parse_args()
 

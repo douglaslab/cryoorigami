@@ -2543,6 +2543,12 @@ class ProjectPlot(Project):
         self.ref_star_file = os.path.abspath(file)
         self.ref_star = Star(file)
 
+    def set_offsetrot(self, angle):
+        '''
+        Set offsetrot
+        '''
+        self.offsetrot = angle
+
     def plot_diff(self, diff_pair, nbins, ref_star=None):
         '''
         Plot difference
@@ -2611,6 +2617,12 @@ class ProjectPlot(Project):
         # Set x-axis
         radian    = np.linspace(0.0, 2 * np.pi, nbins, endpoint=False)
         bar_width = 2*np.pi/nbins
+
+        # Get angle data
+        angle_data = self.particle_star.get_norm_data(column_name)
+
+        if column_name in ['rlnAngleRot', 'rlnAngleRotPrior']:
+            angle_data -= self.offsetrot
 
         # Get histogram
         hist, bin_edges = np.histogram(self.particle_star.get_norm_data(column_name), density=True, bins=nbins, range=(0, 360))

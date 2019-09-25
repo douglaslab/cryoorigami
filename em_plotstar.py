@@ -52,9 +52,9 @@ def main():
     parser.add_argument("-fontsize",     "--fontsize",      type=int,     default=5)
     parser.add_argument("-format",       "--format",        type=str,     default='svg', choices=['png','svg'])
 
-    parser.add_argument("-ref",          "--reference",     type=str,   help="Reference star file", default=None)
-    parser.add_argument("-barcode",      "--barcode",       type=str, help="Barcode to select", nargs='*', default={})
-
+    parser.add_argument("-ref",          "--reference",     type=str,     help="Reference star file", default=None)
+    parser.add_argument("-barcode",      "--barcode",       type=str,     help="Barcode to select", nargs='*', default={})
+    parser.add_argument("-offsetrot",    "--offsetrot",     type=int,     default=0)
 
     args = parser.parse_args()
 
@@ -69,7 +69,8 @@ def main():
                  'reference':     args.reference,
                  'nbins':         args.nbins,
                  'format':        args.format,
-                 'barcode':       args.barcode}
+                 'barcode':       args.barcode,
+                 'offsetrot':     args.offsetrot}
 
     # Get the new column parameters
     if args_dict['barcode'] is not None:
@@ -98,6 +99,9 @@ def main():
 
     # Prepare io files
     new_project.prepare_io_files(args_dict['format'])
+
+    # Set rotation angle offset
+    new_project.set_offsetrot(args_dict['offsetrot'])
 
     # Set tick fontsizes
     new_project.set_tick_fontsize(size=args_dict['fontsize'])
