@@ -18,13 +18,14 @@ def main():
 
     parser.add_argument("-i",            "--input",         type=str,     help="Particle star file")
     parser.add_argument("-o",            "--output",        type=str,     help="Output directory", default=None)
-    parser.add_argument("-cols",         "--columns",       type=str,     nargs='+', default=['rlnDefocusU',
+    parser.add_argument("-cols",         "--columns",       type=str,     nargs='*', default=['rlnDefocusU',
                                                                                               'rlnDefocusV',
                                                                                               'rlnDefocusAngle',
                                                                                               'rlnCtfFigureOfMerit',
                                                                                               'rlnFinalResolution',
                                                                                               'rlnMaxValueProbDistribution',
                                                                                               'rlnNrOfSignificantSamples',
+                                                                                              'rlnLogLikeliContribution',
                                                                                               'rlnAngleRot',
                                                                                               'rlnAngleRotPrior',
                                                                                               'rlnAngleTilt',
@@ -33,14 +34,14 @@ def main():
                                                                                               'rlnOriginX',
                                                                                               'rlnOriginY'])
 
-    parser.add_argument("-pairs",        "--pairs",         type=str,     nargs='+', default=['rlnCtfFigureOfMerit:rlnFinalResolution',
+    parser.add_argument("-pairs",        "--pairs",         type=str,     nargs='*', default=['rlnCtfFigureOfMerit:rlnFinalResolution',
                                                                                               'rlnAngleTilt:rlnAngleRot',
                                                                                               'rlnMaxValueProbDistribution:rlnNrOfSignificantSamples',
                                                                                               'rlnOriginX:rlnOriginY',
                                                                                               'rlnAngleRot:rlnAngleRotPrior',
                                                                                               'rlnAngleTilt:rlnAngleTiltPrior',
                                                                                               'rlnAnglePsi:rlnAnglePsiPrior'])
-    parser.add_argument("-diffs",        "--diffs",         type=str,     nargs='+', default=['rlnOriginX:rlnOriginXPrior',
+    parser.add_argument("-diffs",        "--diffs",         type=str,     nargs='*', default=['rlnOriginX:rlnOriginXPrior',
                                                                                               'rlnOriginY:rlnOriginYPrior',
                                                                                               'rlnAngleRot:rlnAngleRotPrior',
                                                                                               'rlnAngleTilt:rlnAngleTiltPrior',

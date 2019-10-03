@@ -2631,8 +2631,15 @@ class ProjectPlot(Project):
         mean_angle = np.sum(hist*radian)/np.sum(hist)
 
         # Plot polar bar-plot
-        py.subplot(nrows, ncols, index, projection='polar')
-        py.bar(radian, hist, bottom=0.0, width=bar_width)
+        ax = py.subplot(nrows, ncols, index, projection='polar')
+        ax.bar(radian, hist, bottom=0.0, width=bar_width)
+        
+        # Remove ticklabels
+        ax.set_yticklabels([])
+        ax.set_xticklabels([])
+
+        # Tick params
+        ax.tick_params(labelsize=30, pad=40)
 
         # x-label
         py.xlabel(column_name)
@@ -2673,7 +2680,7 @@ class ProjectPlot(Project):
         # Get column names
         column1, column2 = column_pair
         if self.particle_star.has_label(column1) and self.particle_star.has_label(column2):
-            py.hist2d(self.particle_star.get_norm_data(column1), self.particle_star.get_norm_data(column2),bins=nbins**2, cmap=py.cm.Blues)
+            py.hist2d(self.particle_star.get_norm_data(column1), self.particle_star.get_norm_data(column2),bins=[nbins, nbins], cmap=py.cm.Blues)
             py.xlabel(column1)
             py.ylabel(column2)
 
@@ -2804,7 +2811,7 @@ class ProjectPlot(Project):
         self.write_metadata()
 
         # Save plot
-        py.savefig(self.particle_plot_file, dpi=100,transparent=False, format=output_format)
+        py.savefig(self.particle_plot_file, dpi=100,transparent=True, format=output_format)
 
 
 class ProjectAlign2D(Project):
