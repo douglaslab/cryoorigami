@@ -11,66 +11,66 @@ import numpy as np
 
 
 # Barcode functions for DNA origami assisted cryo-EM
-def Framev60(barcode_num, offsetrot=225):
+def Framev60(barcode_num, offsetrot=0):
     # Rotation angle pitch
     angle_pitch = 34.28
 
     rot_angle_map = {1:  0,
-                     2:  1*angle_pitch,
-                     3:  2*angle_pitch,
-                     4:  3*angle_pitch,
-                     5: -1*angle_pitch,
-                     6: -2*angle_pitch,
-                     7: -3*angle_pitch}
+                     2: -1*angle_pitch,
+                     3: -2*angle_pitch,
+                     4: -3*angle_pitch,
+                     5:  1*angle_pitch,
+                     6:  2*angle_pitch,
+                     7:  3*angle_pitch}
     # Tilt angle
     tilt_angle = 90.0
 
     if barcode_num in rot_angle_map:
-        rot_angle = -(rot_angle_map[barcode_num] + offsetrot)
+        rot_angle = rot_angle_map[barcode_num] + offsetrot
     else:
         rot_angle = 0.0
 
     return tilt_angle, util.euler360to180(rot_angle)
 
 
-def Framev61(barcode_num, offsetrot=225):
+def Framev61(barcode_num, offsetrot=0):
     # Rotation angle pitch
     angle_pitch = 34.28
 
     rot_angle_map = {1:  0,
-                     2:  1*angle_pitch,
-                     3:  2*angle_pitch,
-                     4:  3*angle_pitch,
-                     5: -1*angle_pitch,
-                     6: -2*angle_pitch,
-                     7: -3*angle_pitch}
+                     2: -1*angle_pitch,
+                     3: -2*angle_pitch,
+                     4: -3*angle_pitch,
+                     5:  1*angle_pitch,
+                     6:  2*angle_pitch,
+                     7:  3*angle_pitch}
     # Tilt angle
     tilt_angle = 90.0
 
     if barcode_num in rot_angle_map:
-        rot_angle = -(rot_angle_map[barcode_num] + offsetrot)
+        rot_angle = rot_angle_map[barcode_num] + offsetrot
     else:
         rot_angle = 0.0
 
     return tilt_angle, util.euler360to180(rot_angle)
 
 
-def Framev60rev(barcode_num, offsetrot=225):
+def Framev60rev(barcode_num, offsetrot=0):
     # Rotation angle pitch
     angle_pitch = 34.28
 
     rot_angle_map = {1:  0,
-                     2:  1*angle_pitch,
-                     3:  2*angle_pitch,
-                     4:  3*angle_pitch,
-                     5: -1*angle_pitch,
-                     6: -2*angle_pitch,
-                     7: -3*angle_pitch}
+                     2: -1*angle_pitch,
+                     3: -2*angle_pitch,
+                     4: -3*angle_pitch,
+                     5:  1*angle_pitch,
+                     6:  2*angle_pitch,
+                     7:  3*angle_pitch}
     # Tilt angle
     tilt_angle = 90.0
 
     if barcode_num in rot_angle_map:
-        rot_angle = -(rot_angle_map[barcode_num] + (180.0 + offsetrot)%360)
+        rot_angle = -rot_angle_map[barcode_num] +  offsetrot
     else:
         rot_angle = 0.0
 
