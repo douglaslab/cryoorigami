@@ -113,11 +113,8 @@ def main():
       new_project.read_reference(args_dict['reference'])
       print('Read reference star file {}'.format(args_dict['reference']))
 
-      # Run reference project
-      new_project.run_ref(args_dict['pairs'], args_dict['diffs'])
-    else:
-      # Run ptcl project
-      new_project.run_ptcl(args_dict['columns'], args_dict['pairs'], args_dict['diffs'], args_dict['orientation'], args_dict['nbins'])
+    # Run ptcl project
+    new_project.run_ptcl(args_dict['columns'], args_dict['pairs'], args_dict['diffs'], args_dict['orientation'], args_dict['nbins'])
 
     # Write output files
     new_project.write_output_files(args_dict['format'])

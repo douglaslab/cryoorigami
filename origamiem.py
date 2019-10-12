@@ -21,6 +21,7 @@ import shutil
 import sqlite3
 import matplotlib.pyplot as py
 import barcode
+import xml.etree.ElementTree as ET
 
 from collections import Counter
 from mpl_toolkits.mplot3d import Axes3D
@@ -2535,6 +2536,56 @@ class ProjectPlot(Project):
 
         self.ref_star_file = None
         self.ref_star      = None
+        self.fsc           = []
+
+        self.fsc_plot_file = None
+        self.fsc_data_file = None 
+
+    def read_fsc(self, file):
+        '''
+        Read fsc xml file
+        '''
+        tree = ET.parse(file)
+        root = tree.getroot()
+
+        self.fsc = []
+        # Iterate over xml data
+        for element in root:
+            self.fsc.append([float(element[0].text), float(element[1].text)])
+
+        self.fsc = np.array(self.fsc)
+
+    def plot_fsc(self, res_labels=True):
+        '''
+        Plot fsc data
+        '''
+        py.figure(figsize=(7,5))
+        if len(self.fsc) > 0:
+            # Res labels
+            res_labels = [ "%.1f"%(x) for x in 1.0/self.fsc[1:,0][::4] ]
+
+            py.plot(self.fsc[:,0], self.fsc[:,1],'b-', linewidth=5)
+
+            py.xticks(fontsize=15)
+            py.yticks(fontsize=15)
+
+            if res_labels:
+                py.xticks(self.fsc[:,0][1::4], res_labels, fontsize=15, rotation=90)
+
+
+    def write_fsc(self,output_format='svg'):
+        '''
+        Write fsc plots
+        '''
+
+        self.fsc_plot_file = self.output_directory+'/fsc_plot.svg'
+        self.fsc_data_file = self.output_directory+'/fsc_data.txt'
+
+        # Write metadata
+        np.savetxt(self.fsc_data_file, self.fsc, header='1/A\tFSC')
+
+        # Save plot
+        py.savefig(self.fsc_plot_file, dpi=100,transparent=True, format=output_format)
 
     def read_reference(self, file):
         '''
@@ -2542,6 +2593,16 @@ class ProjectPlot(Project):
         '''
         self.ref_star_file = os.path.abspath(file)
         self.ref_star = Star(file)
+        self.copy_ref2particles()
+
+
+    def copy_ref2particles(self):
+        '''
+        Copy from ref to particle star file
+        '''
+        if self.ref_star is not None:
+            self.particle_star.copy_columns(self.ref_star, columns={'rlnAnglePsiPrior':0, 'rlnAngleTiltPrior':0, 'rlnAngleRotPrior':0, 
+                                                                    'rlnOriginXPrior':0, 'rlnOriginYPrior':0})
 
     def set_offsetrot(self, angle):
         '''
@@ -4620,11 +4681,11 @@ class Star(EMfile):
         # Iterate over all columns
         for label, value in columns.items():
             if other.has_label(label):
-                if self.has_label(label):
-                    self.data_block.loc[ptcl_copy_list['self'].tolist(), label] = other.data_block.loc[ptcl_copy_list['other'].tolist(), label].tolist()
-                else:
-                    self.add_column(label)
-                    self.set_column(label, value)
+                self.add_column(label)
+                self.data_block.loc[ptcl_copy_list['self'].tolist(), label] = other.data_block.loc[ptcl_copy_list['other'].tolist(), label].tolist()
+            else:
+                self.add_column(label)
+                self.set_column(label, value)
 
         # Assign only the portion of the data frame
         self.data_block = self.data_block.loc[ptcl_copy_list['self'].tolist(), :]
