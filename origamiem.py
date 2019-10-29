@@ -27,6 +27,7 @@ from collections import Counter
 from mpl_toolkits.mplot3d import Axes3D
 from shutil import copyfile
 from matplotlib.colors import LogNorm
+from matplotlib.ticker import FormatStrFormatter
 
 
 class Relion:
@@ -2555,22 +2556,29 @@ class ProjectPlot(Project):
 
         self.fsc = np.array(self.fsc)
 
-    def plot_fsc(self, res_labels=True):
+    def plot_fsc(self, color='blue', x_res=True):
         '''
         Plot fsc data
         '''
-        py.figure(figsize=(7,5))
+        py.figure(figsize=(7, 5))
         if len(self.fsc) > 0:
             # Res labels
-            res_labels = [ "%.1f"%(x) for x in 1.0/self.fsc[1:,0][::4] ]
+            res_labels = ["%.1f" % (x) for x in 1.0/self.fsc[1:, 0][::4]]
 
-            py.plot(self.fsc[:,0], self.fsc[:,1],'b-', linewidth=5)
+            py.plot(self.fsc[:, 0], self.fsc[:, 1], '-', linewidth=5, color=color)
+            py.plot(self.fsc[:, 0], 0.143*np.ones(len(self.fsc[:, 0])), '--', color='gray')
 
             py.xticks(fontsize=15)
             py.yticks(fontsize=15)
+            py.ylim(-0.05, 1.05)
 
-            if res_labels:
-                py.xticks(self.fsc[:,0][1::4], res_labels, fontsize=15, rotation=90)
+            if x_res:
+                py.xticks(self.fsc[:, 0][1::4], res_labels, fontsize=15, rotation=90)
+            else:
+                py.xticks(self.fsc[:, 0][1::4], self.fsc[:, 0][1::4], fontsize=15, rotation=90)
+
+            ax = py.gca()
+            ax.xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
 
 
     def write_orientation(self):

@@ -17,12 +17,16 @@ def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument("-i",            "--input",         type=str,     help="Relion FSC xml file")
+    parser.add_argument("-c",            "--color",         type=str,     help="Color for the plot", default='magenta')
+    parser.add_argument("-xres",         "--xres",          action='store_true', help="Angstrom resolution values on x-axis", default=False)
     parser.add_argument("-o",            "--output",        type=str,     help="Output directory", default=None)
 
     args = parser.parse_args()
 
     # Prepare args dict
     args_dict = {'input':         args.input,
+                 'color':         args.color,
+                 'xres':          args.xres,
                  'output':        args.output}
 
     # Create an EM project object
@@ -38,7 +42,7 @@ def main():
     print('Read FSC xml file {}'.format(args_dict['input']))
 
     # Plot fsc
-    new_project.plot_fsc()
+    new_project.plot_fsc(color=args_dict['color'], x_res=args_dict['xres'])
 
     # Write output files
     new_project.write_fsc()
