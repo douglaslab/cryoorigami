@@ -2573,6 +2573,19 @@ class ProjectPlot(Project):
                 py.xticks(self.fsc[:,0][1::4], res_labels, fontsize=15, rotation=90)
 
 
+    def write_orientation(self):
+        '''
+        Write orientation
+        '''
+        if self.direction is not None:
+            self.orientation_file = self.output_directory+'/orientation.txt'
+            num_correct  = np.sum(self.direction > 0)
+            frac_correct = 1.0*num_correct/len(self.direction)
+            f = open(self.orientation_file, 'w')
+            f.write('Correct: %.2f' % (frac_correct))
+            f.close()
+
+
     def write_fsc(self,output_format='svg'):
         '''
         Write fsc plots
@@ -2650,6 +2663,9 @@ class ProjectPlot(Project):
             py.xlim(-1.5, 1.5)
             py.xlabel('Alignment')
 
+        # Write orientation
+        self.write_orientation()
+
     def plot_diff_angles(self, nbins):
         '''
         Plot diff_psi and diff_tilt
@@ -2668,8 +2684,11 @@ class ProjectPlot(Project):
         dates = []
         for path in self.particle_star.mic_counter.keys():
             match = re.search(regex, path)
-            dates.append(match.group(0))
-        py.bar(dates, self.particle_star.mic_counter.values(), color='orange')
+            if match is not None:
+                dates.append(match.group(0))
+        # Plot only if dates is non-zero
+        if len(dates) > 0:
+            py.bar(dates, self.particle_star.mic_counter.values(), color='orange')
 
     def plot_polar_hist(self, nrows, ncols, index, column_name, nbins):
         '''
