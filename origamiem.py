@@ -4237,12 +4237,15 @@ class Star(EMfile):
 
         return new_barcode
 
-    def delete_by_barcode(self, select_barcode_list):
+    def delete_by_barcode(self, select_barcode_list=[]):
         '''
         Select ptcls by barcode
         '''
 
         if not self.has_label('rlnParticleName'):
+            return
+
+        if len(select_barcode_list) == 0:
             return
 
         selected_ptcls = []
@@ -4267,6 +4270,9 @@ class Star(EMfile):
         '''
 
         if not self.has_label('rlnParticleName'):
+            return
+
+        if len(select_barcode_list) == 0:
             return
 
         selected_ptcls = []
