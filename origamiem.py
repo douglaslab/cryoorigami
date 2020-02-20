@@ -148,6 +148,9 @@ class Project:
         self.diff_psi  = None
         self.diff_rot  = None
 
+    def copy_micrographs(self, dest='Mics'):
+        self.particle_star.copy_micrographs(self.output_directory+'/'+dest)
+
     def write_metadata(self):
         '''
         Write metadata
@@ -4047,6 +4050,21 @@ class Star(EMfile):
         # Read file
         if file is not None and os.path.isfile(file):
             self.read(file)
+
+    def copy_micrographs(self, dest='Mics'):
+        '''
+        Copy Micrographs
+        '''
+        if self.has_label('rlnMicrographName'):
+            self.micrographs = self.data_block['rlnMicrographName'].tolist()
+
+        # Check if directory exists
+        os.makedirs(dest, exist_ok=True)
+
+        # Copy micrographs
+        for micrograph in self.micrographs:
+            head, fname = os.path.split(micrograph)
+            shutil.copy(micrograph, dest+'/'+fname)
 
     def read_mrc_paths(self):
         '''
