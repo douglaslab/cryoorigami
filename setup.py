@@ -4,7 +4,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="origamiem-turalaksel", # Replace with your own username
+    name="cryoorigami-turalaksel", # Replace with your own username
     version="0.0.1",
     author="Tural Aksel",
     author_email="turalaksel@gmail.com",
