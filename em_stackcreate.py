@@ -27,7 +27,7 @@ def main():
     parser.add_argument("-recenter",     "--recenter",   action='store_true', help="Recenter the images prior to clipping. Use with clip option only.", default=None)
     parser.add_argument("-diameter",     "--diameter",      type=int,   help="Particle diameter for normalization. If provided, perform normalization", default=None)
     parser.add_argument("-n",            "--numptcls",      type=int,   help="Number of particles to process", default=None)
-    parser.add_argument("-copymics",     "--copymics",   action='store_true', help="Copy micrographs in the final directory/Mics", default=None)
+    parser.add_argument("-copymics",     "--copymics",   action='store_true', help="Copy micrographs instead of making particle stack", default=None)
 
     args = parser.parse_args()
 
@@ -75,12 +75,13 @@ def main():
     # Prepare project
     new_project.prepare_project(args_dict['highpass'], args_dict['lowpass'], args_dict['clip'])
 
-    # Flip particles
-    new_project.create_stack(args_dict['batch'], args_dict['transform'], args_dict['clip'], args_dict['recenter'])
-
     # Copy micrographs
     if args_dict['copymics']:
         new_project.copy_micrographs()
+    else:
+        # Flip particles
+        new_project.create_stack(args_dict['batch'], args_dict['transform'], args_dict['clip'], args_dict['recenter'])
+
 
 if __name__ == "__main__":
     main()

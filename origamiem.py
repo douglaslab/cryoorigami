@@ -4056,15 +4056,19 @@ class Star(EMfile):
         Copy Micrographs
         '''
         if self.has_label('rlnMicrographName'):
-            self.micrographs = self.data_block['rlnMicrographName'].tolist()
+            micrographs = list(set(self.data_block['rlnMicrographName'].tolist()))
 
         # Check if directory exists
         os.makedirs(dest, exist_ok=True)
 
         # Copy micrographs
-        for micrograph in self.micrographs:
-            head, fname = os.path.split(micrograph)
-            shutil.copy(micrograph, dest+'/'+fname)
+        for i in range(len(micrographs)):
+            micrograph      = micrographs[i]
+            head, ori_fname = os.path.split(micrograph)
+            dest_fname      = dest+'/'+ori_fname
+
+            print('%d/%d \t : Copying %s to %s' % (i+1, len(micrographs), micrograph, dest_fname))
+            shutil.copy(micrograph, dest_fname)
 
     def read_mrc_paths(self):
         '''
