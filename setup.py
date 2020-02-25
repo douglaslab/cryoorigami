@@ -18,5 +18,9 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
+    install_requires = ['mrcfile==1.1.0', 
+                        'numpy==1.14.0',
+                        'scipy==1.2.0',
+                        'pandas==0.22.0']
     python_requires='>=3.5',
 )
