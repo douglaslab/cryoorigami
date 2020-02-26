@@ -6,4 +6,6 @@ build/
 *.cs
 *.mrc
 *.mrcs
+yifan*
+requirements.txt
 .DS_Store
