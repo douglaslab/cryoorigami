@@ -24,7 +24,7 @@ If you would like to run the scripts in any path, make sure to add the `bin` fol
 
 ## Descriptions for commonly used scripts
 
-For usage type `em_xxx.py -h`
+For usage type `em_***.py -h`
 
 `em_addstarcols.py`: Add new columns to a star file.
 
