@@ -24,6 +24,8 @@ If you would like to run the scripts in any path, make sure to add the `bin` fol
 
 ## Descriptions for commonly used scripts
 
+For usage type `em_xxx.py -h`
+
 `em_addstarcols.py`: Add new columns to a star file.
 
 `em_align2D.py`: Align particles from 2D classification output to a reference class average.
@@ -32,4 +34,18 @@ If you would like to run the scripts in any path, make sure to add the `bin` fol
 
 `em_cistempars.py`: Estimate cistem parameters for manual refinement run.
 
-...
+`em_dfsc`: Calculate directional fsc.
+
+`em_csparc2star`: Convert csparc files to star file.
+
+`em_par2star`: Convert par file to star.
+
+`em_stackcreate.py`: Create particle stack from star file.
+
+`em_subtract2D.py`: Subtract from particle images. 
+
+`em_plotfsc.py`: Plot FSC curve from xml data file.
+
+`em_plotstar.py`: Plot star file data.
+
+
