@@ -1,4 +1,4 @@
-# pyOrigamiEM
+# cryoorigami
 DNA Origami Goniometer assisted cryoEM data analysis package. Python scripts and classes in this package can be used for other cryo-EM projects. Please cite ... if you use this python package for your work. 
 
 Part of cryosparc `.cs` to relion `.star`data conversion script is adapted from Daniel Asarnow's [pyem python package](https://github.com/asarnow/pyem).
@@ -32,6 +32,5 @@ If you would like to run the scripts in any path, make sure to add the `bin` fol
 
 `em_alignclassaverages.py`: Align class averages to a single class.   
 
-
-`
+`em_cistempars.py`:
 ...
