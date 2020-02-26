@@ -1,5 +1,5 @@
 # cryoorigami
-DNA Origami Goniometer assisted cryoEM data analysis package. Python scripts and classes in this package can be used for other cryo-EM projects. Please cite ... if you use this python package for your work. 
+DNA Origami Goniometer assisted cryoEM data analysis package. Python scripts and classes in this package can be used for other cryo-EM projects. Please cite [...]() if you use this python package for your work. 
 
 ## Dependencies
 
@@ -47,5 +47,8 @@ For usage type `em_xxx.py -h`
 `em_plotfsc.py`: Plot FSC curve from xml data file.
 
 `em_plotstar.py`: Plot star file data.
+
+
+&copy; 2020 Tural Aksel
 
 
