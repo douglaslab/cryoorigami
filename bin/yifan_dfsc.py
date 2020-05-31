@@ -12,7 +12,7 @@ import glob
 
 import time
 import timeit
-import utilities as util
+import cryoorigami.utilities as util
 
 # mrc image class ------------------------------------------------------------
 class mrc_image:
@@ -37,7 +37,7 @@ class mrc_image:
         self.byte_pattern1='=' + '10i' + '6f' + '3i' + '3f' + '30i' + '4s'*2 + 'fi'
         #self.byte_pattern1='=' + 'i'*10 + 'f'*6 + 'i'*3 + 'f'*3 + 'i'*30 + '4s'*2 + 'fi'
         self.byte_pattern2='=' + '800s'
-        print "byte_pattern1", self.byte_pattern1
+        print("byte_pattern1", self.byte_pattern1)
 
     # read header only -------------------------------------------------------
     def read_head(self):
@@ -55,7 +55,7 @@ class mrc_image:
         header = struct.unpack(self.byte_pattern1,self.header1)
         self.dim=header[:3]   #(dimx,dimy,dimz)
         self.imagetype=header[3]
-        print "header", header
+        print("header", header)
         self.cellsize=header[10:13] # cell size in angstroms 
         #0: 8-bit signed, 1:16-bit signed, 2: 32-bit float, 6: unsigned 16-bit (non-std)
         if (self.imagetype == 0):imtype=numpy.uint8
@@ -107,12 +107,12 @@ class mrc_image:
             dtype=image.dtype
             if dtype==numpy.uint8:dtype=0
             elif dtype==numpy.float32:dtype=2
-            else:print 'WARNING: Unknown data type'
+            else:print('WARNING: Unknown data type')
             header1=struct.pack(self.byte_pattern1,dim[0],dim[1],dim[2],dtype,0,0,0,dim[0],dim[1],dim[2],
                                 dim[0]*apix,dim[1]*apix,dim[2]*apix,90,90,90,1,2,3,amin,amax,amean,
                                 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,'MAP','DA\x00\x00',0.0,1)
             header2=struct.pack(self.byte_pattern2,' ') #comments
-            print "header1", dim[0]*apix
+            print("header1", dim[0]*apix)
             output_image.write(header1)
             output_image.write(header2)
             image.tofile(output_image)
@@ -122,7 +122,7 @@ class mrc_image:
             nparts=output.shape[0]
             loc=numpy.where(output==1)[0]
             nout=loc.shape[0]
-            if ntrue==0:print 'ERROR: no labeled images'
+            if ntrue==0:print('ERROR: no labeled images')
             else:
                 dum=image.shape # Get dimensions of image/stk
                 dim=[image.shape[2],image.shape[1],nout]
@@ -161,18 +161,18 @@ class Main():
         # get user input ----------------------------------------------------
         parser=argument_parser()
         args=parser.args
-        file_half1=args.half1; print 'Half-map 1:',file_half1
-        file_half2=args.half2; print 'Half-map 2:',file_half2
-        file_whole=args.whole; print 'Whole-map:',file_whole
-        file_mask=args.mask; print 'Mask:',file_mask
-        apix=args.apix; print 'Pixel size:',apix
-        adhoc_bfactor=args.bfactor; print 'B-factor:',adhoc_bfactor
+        file_half1=args.half1; print('Half-map 1:',file_half1)
+        file_half2=args.half2; print('Half-map 2:',file_half2)
+        file_whole=args.whole; print('Whole-map:',file_whole)
+        file_mask=args.mask; print('Mask:',file_mask)
+        apix=args.apix; print('Pixel size:',apix)
+        adhoc_bfactor=args.bfactor; print('B-factor:',adhoc_bfactor)
         if apix=='':
             apix=0
         else:
             apix=float(apix)
-        ncones=int(args.ncones); print 'Number of cones:',ncones
-        halfangle=float(args.angle); print 'Angular spread:',halfangle
+        ncones=int(args.ncones); print('Number of cones:',ncones)
+        halfangle=float(args.angle); print('Angular spread:',halfangle)
         # Set output directory
         self.set_output_directory(args.o)
 
@@ -192,7 +192,7 @@ class Main():
         util.write_config_file(args_filename, args_dict)
 
         # load half maps ----------------------------------------------------
-        print 'Reading maps'
+        print('Reading maps')
 
         dummy1=mrc_image(file_half1)
         dummy1.read()
@@ -209,23 +209,23 @@ class Main():
             maskmap=numpy.ones((imdim[0],imdim[1],imdim[2]),dtype=numpy.float32)
         if apix == 0:
             apix = dummy4.cellsize[0] / dummy4.image_data.shape[0] 
-            print "cellsize", apix 
+            print("cellsize", apix)
         map_half1=dummy1.image_data*maskmap
         map_half2=dummy2.image_data*maskmap
         map_whole=dummy4.image_data*maskmap
 
         # Fourier transforms ------------------------------------------------
-        print 'Computing FFTs'
+        print('Computing FFTs')
 
-        print "map_half1.shape", map_half1.shape
+        print("map_half1.shape", map_half1.shape)
         half1_ft=numpy.fft.rfftn(map_half1)
-        print "half1_ft.shape", half1_ft.shape
+        print("half1_ft.shape", half1_ft.shape)
         half1_ft=self.fft_wrap(half1_ft)
-        print "half1_ft", half1_ft.shape
+        print("half1_ft", half1_ft.shape)
         half2_ft=numpy.fft.rfftn(map_half2)
         half2_ft=self.fft_wrap(half2_ft)
         whole_ft=numpy.fft.rfftn(map_whole)
-        print "whole_ft", whole_ft.shape
+        print("whole_ft", whole_ft.shape)
         whole_ft=self.fft_wrap(whole_ft)
 
         # print "map_half1_shape", map_half1.shape
@@ -233,7 +233,7 @@ class Main():
 
 
         # compute points on a sphere ----------------------------------------
-        print 'Computing Fibonacci sphere'
+        print('Computing Fibonacci sphere')
 
         arsize=map_half1.shape[0]
         arsizeby2=arsize/2
@@ -246,7 +246,7 @@ class Main():
         for i in range(points.shape[0]):
             fccmap[points[i,0],points[i,1],points[i,2]]=1.
         # create mask -------------------------------------------------------
-        print 'Computing mask'
+        print('Computing mask')
 
         xyzgrid=numpy.mgrid[-arsizeby2:arsizeby2,-arsizeby2:arsizeby2,-arsizeby2:arsizeby2]
         dist2=xyzgrid[0]**2+xyzgrid[1]**2+xyzgrid[2]**2
@@ -281,7 +281,7 @@ class Main():
         z = coord[2]
         xyz = numpy.array([x,y,z])
         fcc_global = self.fcc_compute(half1_ft, half2_ft, xyz, dist2)
-        print "fcc_global.shape[0]", fcc_global.size
+        print("fcc_global.shape[0]", fcc_global.size)
         mask2 = numpy.zeros((arsize, arsize, arsize), dtype=numpy.float32)
         cref = self.fcc_Cref_mask(mask2, xyz, fcc_global)
         outmrc=mrc_image(self.output_directory+'/global_Cref.mrc')
@@ -339,7 +339,7 @@ class Main():
         # print "vecarray", vecarray
 
         # calculate first cone ----------------------------------------------
-        print 'Computing first cone'
+        print('Computing first cone')
 
         # print time.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -387,7 +387,7 @@ class Main():
             #sys.stdout.flush()
             #sys.stdout.write("\rComputing dFSC...")
             #sys.stdout.flush()
-            print "cone", i
+            print("cone", i)
 
             start_i = timeit.default_timer()
 
@@ -396,14 +396,14 @@ class Main():
                              numpy.dot(vecarray[2],points2[i,2])
             cosangarray1=cosangarray1*mask
             conepoints1=(numpy.where((cosangarray1>cosangthres)))
-            print "fibnaci points i", points2[i]
+            print("fibnaci points i", points2[i])
             # print "conepoints0", numpy.ndim(conepoints0), conepoints0
 
             x1=conepoints1[0]
             y1=conepoints1[1]
             z1=conepoints1[2]
             xyz1=numpy.array([x1,y1,z1])
-            print "xyz1.size", xyz1.size
+            print("xyz1.size", xyz1.size)
  
             # rotaxis=points2[i]+points2[0]
             # rotaxismag=numpy.linalg.norm(rotaxis)
@@ -525,7 +525,7 @@ class Main():
         outmrc=mrc_image(self.output_directory+'/dWeighted_gSharpened.mrc')
         outmrc.write(weight_sharpened.astype(numpy.float32),apix)
 
-        print 'totaltime', totaltime
+        print('totaltime', totaltime)
 
         #print time.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -847,7 +847,7 @@ class Main():
         lnF_fit = numpy.log(structureF[index_fit] / count[index_fit])
         slope, intercept = numpy.polyfit(1/res[index_fit]**2, lnF_fit, 1)
         bfactor = 4. * slope
-        print "slope, intercept, bfactor", slope, intercept, bfactor
+        print("slope, intercept, bfactor", slope, intercept, bfactor)
         return bfactor
 
     def bfactor_compute_save(self, map_ft, points, fcc, apix, dist, fit_minres, fit_maxres, file_name):
@@ -862,11 +862,11 @@ class Main():
         index_fit = numpy.where((res <= fit_minres) & (res >= fit_maxres) & (res >= apix*2) & (structureF > 0))
         res_fit = 1/res[index_fit]**2
         lnF_fit = numpy.log(structureF[index_fit] / count[index_fit])
-        print "structureF", structureF
-        print "res", res
-        print "index_fit", index_fit
-        print "res_fit", res_fit
-        print "lnF_fit", lnF_fit
+        print("structureF", structureF)
+        print("res", res)
+        print("index_fit", index_fit)
+        print("res_fit", res_fit)
+        print("lnF_fit", lnF_fit)
         slope, intercept = numpy.polyfit(res_fit, lnF_fit, 1)
         # plt.plot(res_fit, lnF_fit, 'm.-', label='lnF')
         # plt.plot(res_fit, res_fit * slope + intercept, 'b')
@@ -879,7 +879,7 @@ class Main():
             plt.xlabel('Spatial frequency (1/Angstroms^2)')
         plt.savefig(file_name)
         bfactor = 4. * slope
-        print "slope, intercept, bfactor", slope, intercept, bfactor
+        print("slope, intercept, bfactor", slope, intercept, bfactor)
         return bfactor
 
     # def bfactor_mask(self, mask, points, bfactor, apix):
@@ -904,4 +904,4 @@ class Main():
 
 # run program ---------------------------------------------------------------
 Main()
-print 'dFSC calculation complete!'
+print('dFSC calculation complete!')

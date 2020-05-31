@@ -15,7 +15,7 @@ import mrcfile
 import subprocess
 import sys
 import scipy.ndimage
-import cryoorigami.parallelem
+import cryoorigami.parallelem as parallelem
 import multiprocessing
 import shutil
 import sqlite3
@@ -1136,7 +1136,7 @@ class ProjectFsc(Project):
         self.fcc_img3D = None
         self.fcc_map   = None
 
-    def set_params(self, half_map1, half_map2, whole_map, mask, apix, bfactor, ncones, angle, batch):
+    def set_params(self, half_map1, half_map2, whole_map, mask, apix, bfactor, highpass=200, ncones=500, angle=7.5, batch=10):
         '''
         Set project parameters
         '''
@@ -1150,6 +1150,16 @@ class ProjectFsc(Project):
         self.ncones  = ncones
         self.angle   = angle
         self.batch   = batch
+
+        # Directional fcc map
+        self.fcc_img3D = None
+
+        # Highpass filter
+        self.highpass_cutoff = highpass
+
+        # Results container
+        self.fsc1D_directional = []
+        self.fsc1D_global = None
 
     def prepare_project(self):
         '''
@@ -1196,7 +1206,15 @@ class ProjectFsc(Project):
             copyfile(self.mask_file, self.output_directory+'/'+file)
 
         # Fcc output file
-        self.fcc_out_file = self.output_directory+'/dfsc.mrc'
+        self.fcc_out_mrc_file = self.output_directory+'/dfsc3d.mrc'
+
+        # Direction fscs
+        self.dfsc_out_txt_file = self.output_directory+'/dfsc1d.txt'
+        self.dfsc_out_svg_file = self.output_directory+'/dfsc1d.svg'
+
+        # Global fsc
+        self.fsc_out_txt_file = self.output_directory+'/fsc1d.txt'
+        self.fsc_out_svg_file = self.output_directory+'/fsc1d.svg'
 
     def prepare_ffts(self):
         '''
@@ -1220,13 +1238,22 @@ class ProjectFsc(Project):
         zfreq   = np.fft.fftshift(np.fft.fftfreq(zdim, self.apix))
 
         self.fft_sx, self.fft_sy, self.fft_sz = np.meshgrid(xfreq, yfreq, zfreq)
-        self.fft_s                = np.sqrt(self.fft_sx**2 + self.fft_sy**2 + self.fft_sz**2)
+        self.fft_s = np.sqrt(self.fft_sx**2 + self.fft_sy**2 + self.fft_sz**2)
+        self.fft_mask = self.fft_s <= 1.0/(2*self.apix)
 
         # Determine r
         spacing = 1.0/(xdim*self.apix)
         self.fft_r = np.round(self.fft_s/spacing)
-
         self.fft_r = self.fft_r.astype(int)
+
+        # Get maximum-r
+        self.max_r = np.max(self.fft_r[self.fft_mask])
+
+        # Get resolution axis
+        self.resolution_axis = spacing*np.arange(self.max_r+1)
+
+        # Prepare resolution max
+        self.res_mask = self.resolution_axis >= 1.0/self.highpass_cutoff
 
     def apply_mask(self):
         '''
@@ -1246,11 +1273,36 @@ class ProjectFsc(Project):
         '''
         self.fcc_img3D   = np.zeros(self.half_map1.get_fft().shape)
         self.count_img3D = np.zeros(self.half_map1.get_fft().shape)
+        self.fsc1D_directional = [np.vstack(self.resolution_axis)]
 
-    def run(self):
+    def calc_cc(self):
         '''
-        Run the computation
+        Calculate cross-correlation maps
         '''
+        self.fft_half1 = self.half_map1.get_fft()
+        self.fft_half2 = self.half_map2.get_fft()
+
+        # Calculate cross-correlations
+        self.cross_cc = self.fft_half1*np.conj(self.fft_half2)
+        self.half1_cc = self.fft_half1*np.conj(self.fft_half1)
+        self.half2_cc = self.fft_half2*np.conj(self.fft_half2)
+
+    def run_fsc(self):
+        '''
+        Run FSC calculation
+        '''
+
+        # Calculate global-FSC
+        fsc1D, fsc3D = parallelem.calc_fsc(self.cross_cc, self.half1_cc, self.half2_cc, self.fft_r, self.max_r, fft_mask=self.fft_mask)
+
+        # Assign global fsc
+        self.fsc1D_global = np.hstack((np.vstack(self.resolution_axis), np.vstack(fsc1D)))
+
+    def run_dfsc(self):
+        '''
+        Run the DFSC computation
+        '''
+
         # Create a pool
         mp_pool = multiprocessing.Pool(multiprocessing.cpu_count())
 
@@ -1260,22 +1312,20 @@ class ProjectFsc(Project):
         # Initialize the results
         self.init_results()
 
-        # Get ffts
-        half_map1_fft = self.half_map1.get_fft()
-        half_map2_fft = self.half_map2.get_fft()
-
         for i in range(self.fib_points.shape[0]):
 
             # Determine cone point
-            cone_point = self.fib_points[i,:]
+            cone_point = self.fib_points[i, :]
 
             print('Calculating FSC for cone %d/%d %d/100' % (i+1,
-                                                      self.ncones,
-                                                      100.0*(i+1)/self.ncones))
+                  self.ncones,
+                  100.0*(i+1)/self.ncones))
             # Create a new process
-            worker_result = mp_pool.apply_async(parallelem.calc_fcc, args=(half_map1_fft,
-                                                                           half_map2_fft,
+            worker_result = mp_pool.apply_async(parallelem.calc_fcc, args=(self.cross_cc,
+                                                                           self.half1_cc,
+                                                                           self.half2_cc,
                                                                            self.fft_r,
+                                                                           self.max_r,
                                                                            self.fft_s,
                                                                            self.fft_sx,
                                                                            self.fft_sy,
@@ -1294,17 +1344,30 @@ class ProjectFsc(Project):
         # Normalize results
         self.normalize_results()
 
+        # Prepare directional fsc
+        self.prepare_directional_fsc()
+
+        # Calculate dfsc stats
+        self.calc_dfsc_stats()
+
+    def calc_dfsc_stats(self):
+        '''
+        Calculate dfsc stats
+        '''
+        self.fsc1D_directional_std = np.std(self.fsc1D_directional[:, 1:], axis=1)
+        self.fsc1D_directional_mean = np.mean(self.fsc1D_directional[:, 1:], axis=1)
+
     def process_results(self):
         '''
         Process results
         '''
-
         # Iterate over the results
         for result in self.pool_results:
-            fcc_img3D, count_img3D = result.get()
+            fcc_img1D, fcc_img3D, count_img3D = result.get()
 
             self.fcc_img3D   += fcc_img3D
             self.count_img3D += count_img3D.astype(int)
+            self.fsc1D_directional.append(np.vstack(fcc_img1D))
 
         self.pool_results = []
 
@@ -1320,13 +1383,79 @@ class ProjectFsc(Project):
         valid = self.count_img3D > 0
         self.fcc_img3D[valid] /= self.count_img3D[valid]
 
+    def prepare_directional_fsc(self):
+        '''
+        Directional fsc
+        '''
+        self.fsc1D_directional = np.hstack(self.fsc1D_directional)
+
+    def write_fcc_map(self):
+        '''
+        Write fcc map
+        '''
+        if self.fcc_img3D is not None:
+            self.fcc_map = Map()
+            self.fcc_map.set_img3D(self.fcc_img3D)
+            self.fcc_map.write_img3D(self.fcc_out_mrc_file, self.apix)
+
+    def write_global_fsc(self):
+        '''
+        Write global fsc
+        '''
+        if self.fsc1D_global is not None:
+            np.savetxt(self.fsc_out_txt_file, self.fsc1D_global)
+            self.plot_global_fsc()
+
+    def write_directional_fsc(self):
+        '''
+        Write directional fsc
+        '''
+        if len(self.fsc1D_directional) > 0:
+            np.savetxt(self.dfsc_out_txt_file, self.fsc1D_directional)
+            self.plot_directional_fsc()
+
+    def plot_global_fsc(self):
+        '''
+        Plot global fsc
+        '''
+        py.figure()
+        py.plot(self.fsc1D_global[self.res_mask, 0], self.fsc1D_global[self.res_mask, 1], 'r-', linewidth=2)
+        py.xlabel(r'Spatial Frequency ($\AA$)')
+        py.ylabel('FSC')
+        py.ylim([0, 1])
+        py.xlim([0, self.resolution_axis[-1]])
+        py.savefig(self.fsc_out_svg_file, dpi=100)
+        py.close()
+
+    def plot_directional_fsc(self):
+        '''
+        Plot directional fsc
+        '''
+        py.figure()
+        # Plot all the fscs
+        py.plot(self.fsc1D_directional[self.res_mask, 0], self.fsc1D_directional[self.res_mask, 1:], ls='--', color='gray', linewidth=0.5, alpha=0.5)
+
+        # Plot global fsc
+        py.plot(self.fsc1D_global[self.res_mask, 0], self.fsc1D_global[self.res_mask, 1], 'r-', linewidth=2)
+
+        # Plot +1/-1 std directional FSC
+        py.plot(self.fsc1D_directional[self.res_mask, 0], self.fsc1D_directional_mean[self.res_mask] + self.fsc1D_directional_std[self.res_mask], 'g--', linewidth=2)
+        py.plot(self.fsc1D_directional[self.res_mask, 0], self.fsc1D_directional_mean[self.res_mask] - self.fsc1D_directional_std[self.res_mask], 'g--', linewidth=2)
+
+        py.xlabel(r'Spatial Frequency ($\AA$)')
+        py.ylabel('FSC')
+        py.ylim([0, 1])
+        py.xlim([0, self.resolution_axis[-1]])
+        py.savefig(self.dfsc_out_svg_file, dpi=100)
+        py.close()
+
     def write_output_files(self):
         '''
         Write output files
         '''
-        self.fcc_map = Map()
-        self.fcc_map.set_img3D(self.fcc_img3D)
-        self.fcc_map.write_img3D(self.fcc_out_file, self.apix)
+        self.write_global_fsc()
+        self.write_directional_fsc()
+        self.write_fcc_map()
 
 
 class Map:
@@ -2724,7 +2853,6 @@ class ProjectPlot(Project):
         # Plot polar bar-plot
         ax = py.subplot(nrows, ncols, index, projection='polar')
         ax.bar(radian, hist, bottom=0.0, width=bar_width)
-        
         # Remove ticklabels
         ax.set_yticklabels([])
         ax.set_xticklabels([])
@@ -2742,7 +2870,6 @@ class ProjectPlot(Project):
         if self.particle_star.has_label(column_name):
             # Create subplot
             py.subplot(nrows, ncols, index)
-            
             # Get data
             py.hist(self.particle_star.get_norm_data(column_name), density=True, bins=nbins)
             py.xlabel(column_name)

@@ -22,9 +22,6 @@ def main():
     parser.add_argument('-mask',    "--mask",    type=str,   default=None,help='Mask for FSC calculation')
     parser.add_argument('-apix',    "--apix",    type=float, default=1.82,help='Pixel size (Angstroms)')
     parser.add_argument('-bfactor', "--bfactor", type=float, default=None,help='B-factor for global sharpening (Negative)')
-    parser.add_argument('-ncones',  "--ncones",  type=int,   default=500, help='Number of cones to use for dFSC calculation')
-    parser.add_argument('-angle',   "--angle",   type=float, default=20, help='Half apex angle of cones for dFSC calculation')
-    parser.add_argument('-batch',   "--batch",   type=int,   default=10,  help='Batch size')
 
     args = parser.parse_args()
 
@@ -36,13 +33,10 @@ def main():
                  'mask':      args.mask,
                  'apix':      args.apix,
                  'bfactor':   args.bfactor,
-                 'ncones':    args.ncones,
-                 'angle':     args.angle,
-                 'output':    args.output,
-                 'batch':     args.batch}
+                 'output':    args.output}
 
     # Create an EM project object
-    new_project = em.ProjectFsc(name='EMDFsc')
+    new_project = em.ProjectFsc(name='EMFsc')
     new_project.set_output_directory(args_dict['output'], project_root='.')
 
     # Write parameters to args filename
@@ -51,8 +45,7 @@ def main():
 
     # Set parameters
     new_project.set_params(args_dict['half1'], args_dict['half2'], args_dict['whole'], args_dict['mask'],
-                           args_dict['apix'], args_dict['bfactor'], args_dict['highpass'],
-                           args_dict['ncones'], args_dict['angle'], args_dict['batch'])
+                           args_dict['apix'], args_dict['bfactor'], args_dict['highpass'])
 
     # Prepare project
     new_project.prepare_project()
@@ -63,11 +56,8 @@ def main():
     # Calculate cross correlations
     new_project.calc_cc()
 
-    # Run the fsc project
+    # Run the project
     new_project.run_fsc()
-
-    # Run the dfsc project
-    new_project.run_dfsc()
 
     # Write output files
     new_project.write_output_files()
