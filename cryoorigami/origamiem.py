@@ -20,7 +20,7 @@ import multiprocessing
 import shutil
 import sqlite3
 import matplotlib.pyplot as py
-import cryoorigami.barcode
+import cryoorigami.barcode as barcode
 import xml.etree.ElementTree as ET
 
 from collections import Counter
@@ -978,12 +978,13 @@ class Project:
 
         return particle_mrc
 
-    def filter_ptcls(self, 
-                     maxprob=0.5, 
+    def filter_ptcls(self,
+                     maxprob=0.5,
                      maxclass=10,
                      tilt_range=[0, 360],
                      dpsi_range=[0, 360],
                      dtilt_range=[0, 360],
+                     drot_range=[0, 360],
                      dalign_range=[0, 360]):
         '''
         Filter ptcls
@@ -996,8 +997,8 @@ class Project:
             self.particle_star.filter_orientation(tilt_range,
                                                   dpsi_range,
                                                   dtilt_range,
+                                                  drot_range,
                                                   dalign_range)
-
 
     def make_symlink2parent(self, input_file, out_path='particle_input'):
         '''
@@ -4218,8 +4219,8 @@ class Star(EMfile):
 
         # Cumulative difference
         directionPsi  = 2*(diffPsi < 90).astype(int)-1
-        directionTilt = 2*(diffTilt < 90).astype(int)-1 
-        
+        directionTilt = 2*(diffTilt < 90).astype(int)-1
+
         return directionPsi*directionTilt, diffPsi, diffTilt
 
     def get_norm_diff(self, column1, column2):
@@ -4229,7 +4230,7 @@ class Star(EMfile):
         diff = None
         if self.has_label(column1) and self.has_label(column2):
             diff = self.get_norm_data(column1) - self.get_norm_data(column2)
-            
+
             # If the columns are angles, perform a normalization procedure
             if self.is_angle_column(column1) and self.is_angle_column(column2):
                 # If the columns are angles perform a different analysis
@@ -4244,7 +4245,7 @@ class Star(EMfile):
         diff = None
         if self.has_label(column1) and other.has_label(column2):
             diff = self.get_norm_data(column1) - other.get_norm_data(column2)
-            
+
             # If the columns are angles, perform a normalization procedure
             if self.is_angle_column(column1) and other.is_angle_column(column2):
                 # If the columns are angles perform a different analysis
@@ -4477,41 +4478,49 @@ class Star(EMfile):
                 class_mask = self.data_block['rlnNrOfSignificantSamples'] <= maxclass
                 self.data_block = self.data_block.loc[class_mask, :]
 
-    def filter_orientation(self, tilt_range=[0, 360], dpsi_range=[0, 360], dtilt_range=[0, 360], dalign_range=[0, 360]):
-        
+    def filter_orientation(self, tilt_range=[0, 360], dpsi_range=[0, 360], dtilt_range=[0, 360], drot_range=[0, 360], dalign_range=[-1, 1]):
+
         # Tilt Angle
         if self.has_label('rlnAngleTilt'):
             tilt = self.get_norm_data('rlnAngleTilt')
-            
+
             # Make selection
-            self.data_block = self.data_block.loc[tilt>=tilt_range[0],:]
-            self.data_block = self.data_block.loc[tilt<=tilt_range[1],:]
+            self.data_block = self.data_block.loc[tilt >= tilt_range[0], :]
+            self.data_block = self.data_block.loc[tilt <= tilt_range[1], :]
 
         # diffPsi
         if self.has_label('rlnAnglePsi') and self.has_label('rlnAnglePsiPrior'):
             diffPsi = self.get_norm_diff('rlnAnglePsi', 'rlnAnglePsiPrior')
-            
+
             # Make selection
-            self.data_block = self.data_block.loc[diffPsi>=dpsi_range[0],:]
-            self.data_block = self.data_block.loc[diffPsi<=dpsi_range[1],:]
+            self.data_block = self.data_block.loc[diffPsi >= dpsi_range[0], :]
+            self.data_block = self.data_block.loc[diffPsi <= dpsi_range[1], :]
 
         # diffTilt
         if self.has_label('rlnAngleTilt') and self.has_label('rlnAngleTiltPrior'):
             diffTilt = self.get_norm_diff('rlnAngleTilt', 'rlnAngleTiltPrior')
 
             # Make selection
-            self.data_block = self.data_block.loc[diffTilt>=dtilt_range[0],:]
-            self.data_block = self.data_block.loc[diffTilt<=dtilt_range[1],:]
+            self.data_block = self.data_block.loc[diffTilt >= dtilt_range[0], :]
+            self.data_block = self.data_block.loc[diffTilt <= dtilt_range[1], :]
+
+        # diffTilt
+        if self.has_label('rlnAngleRot') and self.has_label('rlnAngleRotPrior'):
+            diffRot = self.get_norm_diff('rlnAngleRot', 'rlnAngleRotPrior')
+
+            # Make selection
+            self.data_block = self.data_block.loc[diffRot >= drot_range[0], :]
+            self.data_block = self.data_block.loc[diffRot <= drot_range[1], :]
 
         # diffAlign
         if(self.has_label('rlnAnglePsi') and self.has_label('rlnAnglePsiPrior') and
            self.has_label('rlnAngleTilt') and self.has_label('rlnAngleTiltPrior')):
-            
+
             diffAlign  = self.get_align_diff()
 
             # Make selection
-            self.data_block = self.data_block.loc[diffAlign>=dalign_range[0],:]
-            self.data_block = self.data_block.loc[diffAlign<=dalign_range[1],:]
+            self.data_block = self.data_block.loc[diffAlign[0] >= dalign_range[0], :]
+            self.data_block = self.data_block.loc[diffAlign[0] <= dalign_range[1], :]
 
     def set_data_block(self, data):
         '''

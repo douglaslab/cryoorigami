@@ -23,8 +23,9 @@ def main():
     parser.add_argument("-tilt",         "--tilt",          type=float,   nargs=2, help="Accepted range of tilt angles. [ min ,max]",       default=[0, 360])
     parser.add_argument("-dtilt",        "--dtilt",         type=float,   nargs=2, help="Accepted range of diff-tilt angles. [ min ,max]",  default=[0, 360])
     parser.add_argument("-dpsi",         "--dpsi",          type=float,   nargs=2, help="Accepted range of diff-psi angles. [ min ,max]",   default=[0, 360])
+    parser.add_argument("-drot",         "--drot",          type=float,   nargs=2, help="Accepted range of diff-rot angles. [ min ,max]",   default=[0, 360])
     parser.add_argument("-dalign",       "--dalign",        type=float,   nargs=2, help="Accepted range of diff-align angles. [ min ,max]", default=[-1, 1])
-    
+
     args = parser.parse_args()
 
     # Prepare args dict
@@ -35,6 +36,7 @@ def main():
                  'tilt':          args.tilt,
                  'dtilt':         args.dtilt,
                  'dpsi':          args.dpsi,
+                 'drot':          args.drot,
                  'dalign':        args.dalign}
 
     # Check if the input file exists
@@ -61,11 +63,12 @@ def main():
     new_project.read_particle_apix()
 
     # Subtract class mrc from particle mrc
-    new_project.filter_ptcls(maxprob=args_dict['maxprob'], 
+    new_project.filter_ptcls(maxprob=args_dict['maxprob'],
                              maxclass=args_dict['maxclass'],
                              tilt_range=args_dict['tilt'],
                              dpsi_range=args_dict['dpsi'],
                              dtilt_range=args_dict['dtilt'],
+                             drot_range=args_dict['drot'],
                              dalign_range=args_dict['dalign'])
 
     # Write output files
