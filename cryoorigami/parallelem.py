@@ -417,6 +417,21 @@ def create_fft_cone_mask(fft_s, fft_x, fft_y, fft_z, cone_point, angle=10):
     return cone_mask
 
 
+def calc_resolution(res_axis, fsc1D, highpass=40):
+    '''
+    Calculate resolution from 1D-fsc curve
+    '''
+    # Calculate FSC-0.143 and FSC-0.5
+
+    index_0143 = np.min(np.nonzero(np.logical_and(fsc1D < 0.143, res_axis > 1.0/highpass)))
+    index_0500 = np.min(np.nonzero(np.logical_and(fsc1D < 0.5, res_axis > 1.0/highpass)))
+
+    res0143 = 1.0/res_axis[index_0143]
+    res0500 = 1.0/res_axis[index_0500]
+
+    return res0143, res0500
+
+
 def calc_fsc(cross_cc, half1_cc, half2_cc, fft_r, max_r, fft_mask=None):
     '''
     Compute frc between two ft

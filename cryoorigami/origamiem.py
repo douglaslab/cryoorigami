@@ -1137,7 +1137,7 @@ class ProjectFsc(Project):
         self.fcc_img3D = None
         self.fcc_map   = None
 
-    def set_params(self, half_map1, half_map2, whole_map, mask, apix, bfactor, highpass=200, ncones=500, angle=7.5, batch=10):
+    def set_params(self, half_map1, half_map2, whole_map, mask, apix, bfactor, highpass=40, ncones=500, angle=7.5, batch=10):
         '''
         Set project parameters
         '''
@@ -1161,6 +1161,8 @@ class ProjectFsc(Project):
         # Results container
         self.fsc1D_directional = []
         self.fsc1D_global = None
+        self.res_directional = []
+        self.res_global = None
 
     def prepare_project(self):
         '''
@@ -1210,10 +1212,13 @@ class ProjectFsc(Project):
         self.fcc_out_mrc_file = self.output_directory+'/dfsc3d.mrc'
 
         # Direction fscs
+        self.dfsc_res_txt_file = self.output_directory+'/dfsc1d_res.txt'
         self.dfsc_out_txt_file = self.output_directory+'/dfsc1d.txt'
         self.dfsc_out_svg_file = self.output_directory+'/dfsc1d.svg'
+        self.dfsc_res_svg_file = self.output_directory+'/dfsc1d_res.svg'
 
         # Global fsc
+        self.fsc_res_txt_file = self.output_directory+'/fsc1d_res.txt'
         self.fsc_out_txt_file = self.output_directory+'/fsc1d.txt'
         self.fsc_out_svg_file = self.output_directory+'/fsc1d.svg'
 
@@ -1299,6 +1304,9 @@ class ProjectFsc(Project):
         # Assign global fsc
         self.fsc1D_global = np.hstack((np.vstack(self.resolution_axis), np.vstack(fsc1D)))
 
+        # Calculate resolution
+        self.calc_fsc_resolution()
+
     def run_dfsc(self):
         '''
         Run the DFSC computation
@@ -1351,12 +1359,33 @@ class ProjectFsc(Project):
         # Calculate dfsc stats
         self.calc_dfsc_stats()
 
+        # Calculate resolution
+        self.calc_dfsc_resolution()
+
     def calc_dfsc_stats(self):
         '''
         Calculate dfsc stats
         '''
         self.fsc1D_directional_std = np.std(self.fsc1D_directional[:, 1:], axis=1)
         self.fsc1D_directional_mean = np.mean(self.fsc1D_directional[:, 1:], axis=1)
+
+    def calc_dfsc_resolution(self):
+        '''
+        Calculate dfsc resolutions
+        '''
+        self.res_directional = []
+        for i in range(1, self.fsc1D_directional.shape[1]):
+            res0143, res0500 = parallelem.calc_resolution(self.fsc1D_directional[:, 0], self.fsc1D_directional[:, i], self.highpass_cutoff)
+            self.res_directional.append(res0143)
+        self.res_directional = np.array(self.res_directional)
+
+    def calc_fsc_resolution(self):
+        '''
+        Calculate dfsc resolutions
+        '''
+
+        res0143, res0500 = parallelem.calc_resolution(self.fsc1D_global[:, 0], self.fsc1D_global[:, 1], self.highpass_cutoff)
+        self.res_global = res0143
 
     def process_results(self):
         '''
@@ -1404,16 +1433,24 @@ class ProjectFsc(Project):
         Write global fsc
         '''
         if self.fsc1D_global is not None:
+            # Write fsc output
             np.savetxt(self.fsc_out_txt_file, self.fsc1D_global)
             self.plot_global_fsc()
+
+            # Write fsc resolution
+            np.savetxt(self.fsc_res_txt_file, np.array([self.res_global]))
 
     def write_directional_fsc(self):
         '''
         Write directional fsc
         '''
         if len(self.fsc1D_directional) > 0:
+            # Write dfsc output
             np.savetxt(self.dfsc_out_txt_file, self.fsc1D_directional)
             self.plot_directional_fsc()
+
+            # Write dfsc resolutions
+            np.savetxt(self.dfsc_res_txt_file, self.res_directional)
 
     def plot_global_fsc(self):
         '''
@@ -1421,6 +1458,8 @@ class ProjectFsc(Project):
         '''
         py.figure()
         py.plot(self.fsc1D_global[self.res_mask, 0], self.fsc1D_global[self.res_mask, 1], 'r-', linewidth=2)
+        # Draw FSC0.143 line
+        py.plot(self.resolution_axis, 0.143*np.ones(len(self.resolution_axis)), 'k--', linewidth=1)
         py.xlabel(r'Spatial Frequency ($\AA$)')
         py.ylabel('FSC')
         py.ylim([0, 1])
@@ -1433,6 +1472,7 @@ class ProjectFsc(Project):
         Plot directional fsc
         '''
         py.figure()
+
         # Plot all the fscs
         py.plot(self.fsc1D_directional[self.res_mask, 0], self.fsc1D_directional[self.res_mask, 1:], ls='--', color='gray', linewidth=0.5, alpha=0.5)
 
@@ -1443,11 +1483,29 @@ class ProjectFsc(Project):
         py.plot(self.fsc1D_directional[self.res_mask, 0], self.fsc1D_directional_mean[self.res_mask] + self.fsc1D_directional_std[self.res_mask], 'g--', linewidth=2)
         py.plot(self.fsc1D_directional[self.res_mask, 0], self.fsc1D_directional_mean[self.res_mask] - self.fsc1D_directional_std[self.res_mask], 'g--', linewidth=2)
 
-        py.xlabel(r'Spatial Frequency ($\AA$)')
+        # Draw FSC0.143 line
+        py.plot(self.resolution_axis, 0.143*np.ones(len(self.resolution_axis)), 'k--', linewidth=1)
+
+        # Plot histogram
+        freq_hist, bin_edges = np.histogram(1.0/self.res_directional, density=True)
+        py.bar(bin_edges[:-1], 0.1*freq_hist/np.max(freq_hist), width=bin_edges[1:]-bin_edges[:-1], color='orange', edgecolor='blue', ls='--', linewidth=0.5, align='edge', alpha=0.8)
+
+        py.xlabel(r'Spatial Frequency ($\AA^{-1}$)')
         py.ylabel('FSC')
         py.ylim([0, 1])
         py.xlim([0, self.resolution_axis[-1]])
         py.savefig(self.dfsc_out_svg_file, dpi=100)
+        py.close()
+
+        # Plot resolution histogram
+        py.figure()
+        res_hist, bin_edges = np.histogram(self.res_directional, density=True)
+        py.bar(bin_edges[:-1], res_hist/np.max(res_hist), width=bin_edges[1:]-bin_edges[:-1], color='orange', edgecolor='blue', ls='--', linewidth=0.5, align='edge')
+        py.plot([self.res_global, self.res_global], [0, 1.1], ls='--', color='black', linewidth=1)
+        py.xlabel(r'Resolution ($\AA$)')
+        py.ylabel('Normalized counts')
+        py.ylim([0, 1.1])
+        py.savefig(self.dfsc_res_svg_file, dpi=100)
         py.close()
 
     def write_output_files(self):
