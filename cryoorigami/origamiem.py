@@ -1464,7 +1464,7 @@ class ProjectFsc(Project):
         py.ylabel('FSC')
         py.ylim([0, 1])
         py.xlim([0, self.resolution_axis[-1]])
-        py.savefig(self.fsc_out_svg_file, dpi=100)
+        py.savefig(self.fsc_out_svg_file, dpi=100, transparent=True)
         py.close()
 
     def plot_directional_fsc(self):
@@ -1494,7 +1494,7 @@ class ProjectFsc(Project):
         py.ylabel('FSC')
         py.ylim([0, 1])
         py.xlim([0, self.resolution_axis[-1]])
-        py.savefig(self.dfsc_out_svg_file, dpi=100)
+        py.savefig(self.dfsc_out_svg_file, dpi=100, transparent=True)
         py.close()
 
         # Plot resolution histogram
@@ -1505,7 +1505,7 @@ class ProjectFsc(Project):
         py.xlabel(r'Resolution ($\AA$)')
         py.ylabel('Normalized counts')
         py.ylim([0, 1.1])
-        py.savefig(self.dfsc_res_svg_file, dpi=100)
+        py.savefig(self.dfsc_res_svg_file, dpi=100, transparent=True)
         py.close()
 
     def write_output_files(self):
@@ -2797,7 +2797,7 @@ class ProjectPlot(Project):
         np.savetxt(self.fsc_data_file, self.fsc, header='1/A\tFSC')
 
         # Save plot
-        py.savefig(self.fsc_plot_file, dpi=100,transparent=True, format=output_format)
+        py.savefig(self.fsc_plot_file, dpi=100, transparent=True, format=output_format)
 
     def read_reference(self, file):
         '''
@@ -3068,7 +3068,7 @@ class ProjectPlot(Project):
         '''
         Prepare output files
         '''
-        
+
         head, tail = os.path.split(self.particle_star_file)
         root, ext  = os.path.splitext(tail)
         copyfile(self.particle_star_file, self.output_directory+'/particle_input'+ext)
@@ -3080,7 +3080,7 @@ class ProjectPlot(Project):
         # Prepare metadata file
         self.prepare_metadata_file()
 
-    def write_output_files(self,output_format='svg'):
+    def write_output_files(self, output_format='svg'):
         '''
         Write output files
         '''
@@ -3088,7 +3088,7 @@ class ProjectPlot(Project):
         self.write_metadata()
 
         # Save plot
-        py.savefig(self.particle_plot_file, dpi=100,transparent=True, format=output_format)
+        py.savefig(self.particle_plot_file, dpi=100, transparent=True, format=output_format)
 
 
 class ProjectAlign2D(Project):
