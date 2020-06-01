@@ -1474,21 +1474,21 @@ class ProjectFsc(Project):
         py.figure()
 
         # Plot all the fscs
-        py.plot(self.fsc1D_directional[self.res_mask, 0], self.fsc1D_directional[self.res_mask, 1:], ls='--', color='gray', linewidth=0.5, alpha=0.5)
+        py.plot(self.fsc1D_directional[self.res_mask, 0], self.fsc1D_directional[self.res_mask, 1:], ls='--', color='gray', linewidth=0.5, alpha=0.3, zorder=1)
 
         # Plot global fsc
-        py.plot(self.fsc1D_global[self.res_mask, 0], self.fsc1D_global[self.res_mask, 1], 'r-', linewidth=2)
+        py.plot(self.fsc1D_global[self.res_mask, 0], self.fsc1D_global[self.res_mask, 1], 'r-', linewidth=2, zorder=2)
 
         # Plot +1/-1 std directional FSC
-        py.plot(self.fsc1D_directional[self.res_mask, 0], self.fsc1D_directional_mean[self.res_mask] + self.fsc1D_directional_std[self.res_mask], 'g--', linewidth=2)
-        py.plot(self.fsc1D_directional[self.res_mask, 0], self.fsc1D_directional_mean[self.res_mask] - self.fsc1D_directional_std[self.res_mask], 'g--', linewidth=2)
+        py.plot(self.fsc1D_directional[self.res_mask, 0], self.fsc1D_directional_mean[self.res_mask] + self.fsc1D_directional_std[self.res_mask], 'g--', linewidth=2, zorder=2)
+        py.plot(self.fsc1D_directional[self.res_mask, 0], self.fsc1D_directional_mean[self.res_mask] - self.fsc1D_directional_std[self.res_mask], 'g--', linewidth=2, zorder=2)
 
         # Draw FSC0.143 line
-        py.plot(self.resolution_axis, 0.143*np.ones(len(self.resolution_axis)), 'k--', linewidth=1)
+        py.plot(self.resolution_axis, 0.143*np.ones(len(self.resolution_axis)), 'k--', linewidth=1, zorder=3)
 
         # Plot histogram
         freq_hist, bin_edges = np.histogram(1.0/self.res_directional, density=True)
-        py.bar(bin_edges[:-1], 0.1*freq_hist/np.max(freq_hist), width=bin_edges[1:]-bin_edges[:-1], color='orange', edgecolor='blue', ls='--', linewidth=0.5, align='edge', alpha=0.8)
+        py.bar(bin_edges[:-1], 0.1*freq_hist/np.max(freq_hist), width=bin_edges[1:]-bin_edges[:-1], color='orange', edgecolor='blue', ls='--', linewidth=0.5, alpha=0.5, align='edge', zorder=4)
 
         py.xlabel(r'Spatial Frequency ($\AA^{-1}$)')
         py.ylabel('FSC')
