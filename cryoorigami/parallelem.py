@@ -370,7 +370,7 @@ def eval_ctf(ctf_s, ctf_a, defU, defV, defA=0, phaseShift=0, kv=300, ac=0.1, cs=
     return img2D_ctf
 
 
-def calc_fcc(current_fft, ref_fft, fft_r, fft_s, fft_x, fft_y, fft_z, cone_point, angle):
+def calc_fcc(cross_cc, half1_cc, half2_cc, fft_r, max_r, fft_s, fft_x, fft_y, fft_z, cone_point, angle):
     '''
     Calculate fcc for a cone point
     '''
@@ -379,9 +379,9 @@ def calc_fcc(current_fft, ref_fft, fft_r, fft_s, fft_x, fft_y, fft_z, cone_point
     cone_mask = create_fft_cone_mask(fft_s, fft_x, fft_y, fft_z, cone_point, angle)
 
     # Calc fsc
-    fsc3D = calc_fsc(current_fft, ref_fft, fft_r, cone_mask)
+    fsc1D, fsc3D = calc_fsc(cross_cc, half1_cc, half2_cc, fft_r, max_r, cone_mask)
 
-    return fsc3D, cone_mask
+    return fsc1D, fsc3D, cone_mask
 
 
 def create_fft_cone_mask(fft_s, fft_x, fft_y, fft_z, cone_point, angle=10):
@@ -417,83 +417,48 @@ def create_fft_cone_mask(fft_s, fft_x, fft_y, fft_z, cone_point, angle=10):
     return cone_mask
 
 
-def calc_fsc(current_fft, ref_fft, fft_r, fft_mask=None):
+def calc_resolution(res_axis, fsc1D, highpass=40):
+    '''
+    Calculate resolution from 1D-fsc curve
+    '''
+    # Calculate FSC-0.143 and FSC-0.5
+
+    index_0143 = np.min(np.nonzero(np.logical_and(fsc1D < 0.143, res_axis > 1.0/highpass)))
+    index_0500 = np.min(np.nonzero(np.logical_and(fsc1D < 0.5, res_axis > 1.0/highpass)))
+
+    res0143 = 1.0/res_axis[index_0143]
+    res0500 = 1.0/res_axis[index_0500]
+
+    return res0143, res0500
+
+
+def calc_fsc(cross_cc, half1_cc, half2_cc, fft_r, max_r, fft_mask=None):
     '''
     Compute frc between two ft
     '''
-    fsc3D = np.zeros(current_fft.shape, dtype=np.float32)
-    rbins = np.sort(np.unique(fft_r))
-    nbins = len(rbins)
-
-    # Get cross correlations
-    cross_cc = current_fft*np.conj(ref_fft)
-    ref_cc   = np.abs(ref_fft)**2
+    fsc3D = np.zeros(cross_cc.shape, dtype=np.float32)
+    fsc1D = np.zeros(max_r+1)
 
     # Calculate for half the FFT
-    for i in range(nbins):
-        mask  = fft_r == rbins[i]
+    for i in range(max_r+1):
+        mask  = (fft_r == i)
         # Incorporate fft_mask
         if fft_mask is not None:
             mask *= (fft_mask > 0)
 
+        # If the there is no valid point in the mask, skip to next iteration
+        if np.sum(mask) == 0:
+            continue
+
         corr  = np.sum(cross_cc[mask])
-        norm  = np.sum(ref_cc[mask])
+        norm  = np.sqrt(np.sum(half1_cc[mask])*np.sum(half2_cc[mask]))
 
         # Make the assignment only if mask has positive elements
         if np.sum(mask) > 0:
-            fsc3D[mask] = np.abs(corr/norm)
+            fsc3D[mask] = corr.real/norm.real
+            fsc1D[i] = corr.real/norm.real
 
-    return fsc3D
-
-
-@jit(nopython=True)
-def calc_fsc_numba(current_fft, ref_fft, fft_r, fft_mask=None):
-    '''
-    Compute frc between two ft
-    '''
-    fsc3D = np.zeros(current_fft.shape)
-    max_r = int(np.max(fft_r))
-
-    # Initialize arrays
-    corr_sum = np.zeros(max_r+1)
-    self_sum = np.zeros(max_r+1)
-
-    # Get cross correlations
-    cross_cc = np.abs(current_fft*np.conj(ref_fft))
-    ref_cc   = np.abs(ref_fft)**2
-
-    # Calculate for half the FFT
-    for i in range(fsc3D.shape[0]):
-        for j in range(fsc3D.shape[1]):
-            for k in range(fsc3D.shape[2]):
-                r = int(fft_r[i, j, k])
-
-                # Determine mask coef
-                if fft_mask is not None:
-                    mask_coef = fft_mask[i, j, k]
-                else:
-                    mask_coef = 1.0
-
-                corr_sum[r] += mask_coef*cross_cc[i, j, k]
-                self_sum[r] += mask_coef*ref_cc[i, j, k]
-
-    # Assign to final bin
-    corr_sum[max_r] = 1.0
-    self_sum[max_r] = 1.0
-
-    # Determine norm sums
-    norm_sum = corr_sum/self_sum
-
-    # Assign values
-    for i in range(fsc3D.shape[0]):
-        for j in range(fsc3D.shape[1]):
-            for k in range(fsc3D.shape[2]):
-                r = fft_r[i, j, k]
-
-                # Assign the new value
-                fsc3D[i, j, k] = norm_sum[r]
-
-    return fsc3D
+    return fsc1D, fsc3D
 
 
 def calc_frc_original(current_fft, ref_fft, ctf_r):

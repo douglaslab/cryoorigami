@@ -11,7 +11,7 @@ setuptools.setup(
     description="Python toolset for cryo-EM data analysis",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/douglaslab/pyOrigamiEM",
+    url="https://github.com/douglaslab/cryoorigami",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
