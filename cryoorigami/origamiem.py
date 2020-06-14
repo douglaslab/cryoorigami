@@ -8,6 +8,7 @@
 import os
 import re
 import glob
+import yaml
 import numpy as np
 import pandas as pd
 import cryoorigami.utilities as util
@@ -28,7 +29,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from shutil import copyfile
 from matplotlib.colors import LogNorm
 from matplotlib.ticker import FormatStrFormatter
-
+from skimage import feature
 
 class Relion:
     def __init__(self):
@@ -164,6 +165,13 @@ class Project:
         '''
         if num is not None and self.particle_star is not None:
             self.particle_star.data_block = self.particle_star.data_block.loc[:num, :]
+
+    def get_numptcls(self):
+        # Print particle number info
+        if self.particle_star is not None:
+            num_ptcls = self.particle_star.data_block.shape[0]
+            print('Number of particles: %d' % (num_ptcls))
+            return num_ptcls
 
     def read_ptcl_mrc_paths(self):
         '''
@@ -1133,9 +1141,16 @@ class ProjectFsc(Project):
         # Fibonacci points
         self.fib_points = None
 
+        # Projections
+        self.proj_xy = None
+        self.proj_yz = None
+        self.proj_xz = None
+
         # Final map
-        self.fcc_img3D = None
-        self.fcc_map   = None
+        self.fcc_img3D          = None
+        self.fcc_img3D_filtered = None
+        self.fcc_map            = None
+        self.fcc_map_filtered   = None
 
     def set_params(self, half_map1, half_map2, whole_map, mask, apix, bfactor, highpass=40, ncones=500, angle=7.5, batch=10):
         '''
@@ -1210,17 +1225,30 @@ class ProjectFsc(Project):
 
         # Fcc output file
         self.fcc_out_mrc_file = self.output_directory+'/dfsc3d.mrc'
+        self.fcc_filtered_out_mrc_file = self.output_directory+'/dfsc3d_filtered.mrc'
+
+        # FCC projections
+        self.proj_xy_svg_file = self.output_directory+'/dfsc2d_xy.svg'
+        self.proj_yz_svg_file = self.output_directory+'/dfsc2d_yz.svg'
+        self.proj_xz_svg_file = self.output_directory+'/dfsc2d_xz.svg'
+        self.proj_xy_png_file = self.output_directory+'/dfsc2d_xy.png'
+        self.proj_yz_png_file = self.output_directory+'/dfsc2d_yz.png'
+        self.proj_xz_png_file = self.output_directory+'/dfsc2d_xz.png'
+        self.proj_res_txt_file = self.output_directory+'/dfsc2d_res.yaml'
 
         # Direction fscs
         self.dfsc_res_txt_file = self.output_directory+'/dfsc1d_res.txt'
         self.dfsc_out_txt_file = self.output_directory+'/dfsc1d.txt'
         self.dfsc_out_svg_file = self.output_directory+'/dfsc1d.svg'
         self.dfsc_res_svg_file = self.output_directory+'/dfsc1d_res.svg'
+        self.dfsc_out_png_file = self.output_directory+'/dfsc1d.png'
+        self.dfsc_res_png_file = self.output_directory+'/dfsc1d_res.png'
 
         # Global fsc
         self.fsc_res_txt_file = self.output_directory+'/fsc1d_res.txt'
         self.fsc_out_txt_file = self.output_directory+'/fsc1d.txt'
         self.fsc_out_svg_file = self.output_directory+'/fsc1d.svg'
+        self.fsc_out_png_file = self.output_directory+'/fsc1d.png'
 
     def prepare_ffts(self):
         '''
@@ -1260,6 +1288,122 @@ class ProjectFsc(Project):
 
         # Prepare resolution max
         self.res_mask = self.resolution_axis >= 1.0/self.highpass_cutoff
+
+    def filter_volume(self):
+        '''
+        Filter volume
+        '''
+        self.fcc_img3D_filtered = scipy.ndimage.median_filter(self.fcc_img3D, size=3)
+        self.fcc_img3D_filtered = scipy.ndimage.median_filter(self.fcc_img3D_filtered, size=3)
+        self.fcc_img3D_filtered = scipy.ndimage.median_filter(self.fcc_img3D_filtered, size=3)
+
+    def calc_fcc_projections(self):
+        '''
+        Calculate fcc projections
+        '''
+        # Get center coordinates
+        self.proj_xy = np.sum(self.fcc_img3D_filtered >= 0.143, axis=2) > 0
+        self.proj_yz = np.sum(self.fcc_img3D_filtered >= 0.143, axis=0) > 0
+        self.proj_xz = np.sum(self.fcc_img3D_filtered >= 0.143, axis=1) > 0
+
+        self.circ_xy = feature.canny(self.proj_xy)
+        self.circ_yz = feature.canny(self.proj_yz)
+        self.circ_xz = feature.canny(self.proj_xz)
+
+        # Res-container
+        self.proj_res = {}
+        self.proj_res['xy'] = {}
+        self.proj_res['yz'] = {}
+        self.proj_res['xz'] = {}
+
+        # Get the center
+        center = self.proj_xy.shape[0] // 2
+
+        x, y = np.nonzero(self.circ_xy)
+        dist_xy = np.sqrt((x-center)**2+(y-center)**2)
+        self.maxs_xy = int(np.max(dist_xy))
+        self.mins_xy = int(np.min(dist_xy))
+
+        self.maxr_xy = 1.0/self.resolution_axis[self.maxs_xy]
+        self.minr_xy = 1.0/self.resolution_axis[self.mins_xy]
+
+        self.proj_res['xy']['maxres'] = float(self.maxr_xy)
+        self.proj_res['xy']['minres'] = float(self.minr_xy)
+
+        y, z = np.nonzero(self.circ_yz)
+        dist_yz = np.sqrt((y-center)**2+(z-center)**2)
+        self.maxs_yz = int(np.max(dist_yz))
+        self.mins_yz = int(np.min(dist_yz))
+
+        self.maxr_yz = 1.0/self.resolution_axis[self.maxs_yz]
+        self.minr_yz = 1.0/self.resolution_axis[self.mins_yz]
+
+        self.proj_res['yz']['maxres'] = float(self.maxr_yz)
+        self.proj_res['yz']['minres'] = float(self.minr_yz)
+
+        x, z = np.nonzero(self.circ_xz)
+        dist_xz = np.sqrt((x-center)**2+(z-center)**2)
+
+        self.maxs_xz = int(np.max(dist_xz))
+        self.mins_xz = int(np.min(dist_xz))
+
+        self.maxr_xz = 1.0/self.resolution_axis[self.maxs_xz]
+        self.minr_xz = 1.0/self.resolution_axis[self.mins_xz]
+
+        self.proj_res['xz']['maxres'] = float(self.maxr_xz)
+        self.proj_res['xz']['minres'] = float(self.minr_xz)
+
+    def write_res_projections(self):
+        '''
+        Write res projections
+        '''
+        with open(self.proj_res_txt_file, 'w') as outfile:
+            yaml.dump(self.proj_res, outfile, default_flow_style=False)
+
+    def plot_fcc_projections(self):
+        '''
+        Plot fcc projections
+        '''
+        # Get the center
+        center = self.proj_xy.shape[0] // 2
+        py.figure()
+        py.imshow(0.5*np.array(self.proj_xy, dtype=np.float), cmap='Greys', aspect='equal', vmax=1.0)
+        ax = py.gca()
+        circle = py.Circle((center, center), self.maxs_xy, ec='green', fc=None, fill=False)
+        ax.add_artist(circle)
+        circle = py.Circle((center, center), self.mins_xy, ec='red', fc=None, fill=False)
+        ax.add_artist(circle)
+        ax.xaxis.set_visible(False)
+        ax.yaxis.set_visible(False)
+        py.savefig(self.proj_xy_svg_file, dpi=100, transparent=True)
+        py.savefig(self.proj_xy_png_file, dpi=100, transparent=True)
+        py.close()
+
+        py.figure()
+        py.imshow(0.5*np.array(self.proj_yz, dtype=np.float), cmap='Greys', aspect='equal', vmax=1.0)
+        ax = py.gca()
+        circle = py.Circle((center, center), self.maxs_yz, ec='green', fc=None, fill=False)
+        ax.add_artist(circle)
+        circle = py.Circle((center, center), self.mins_yz, ec='red', fc=None, fill=False)
+        ax.add_artist(circle)
+        ax.xaxis.set_visible(False)
+        ax.yaxis.set_visible(False)
+        py.savefig(self.proj_yz_svg_file, dpi=100, transparent=True)
+        py.savefig(self.proj_yz_png_file, dpi=100, transparent=True)
+        py.close()
+
+        py.figure()
+        py.imshow(0.5*np.array(self.proj_xz, dtype=np.float), cmap='Greys', aspect='equal', vmax=1.0)
+        ax = py.gca()
+        circle = py.Circle((center, center), self.maxs_xz, ec='green', fc=None, fill=False)
+        ax.add_artist(circle)
+        circle = py.Circle((center, center), self.mins_xz, ec='red', fc=None, fill=False)
+        ax.add_artist(circle)
+        ax.xaxis.set_visible(False)
+        ax.yaxis.set_visible(False)
+        py.savefig(self.proj_xz_svg_file, dpi=100, transparent=True)
+        py.savefig(self.proj_xz_png_file, dpi=100, transparent=True)
+        py.close()
 
     def apply_mask(self):
         '''
@@ -1362,6 +1506,18 @@ class ProjectFsc(Project):
         # Calculate resolution
         self.calc_dfsc_resolution()
 
+        # Filter volume
+        self.filter_volume()
+
+        # Calculate fcc projections
+        self.calc_fcc_projections()
+
+        # Plot fcc projections
+        self.plot_fcc_projections()
+
+        # Write projection res
+        self.write_res_projections()
+
     def calc_dfsc_stats(self):
         '''
         Calculate dfsc stats
@@ -1427,6 +1583,10 @@ class ProjectFsc(Project):
             self.fcc_map = Map()
             self.fcc_map.set_img3D(self.fcc_img3D)
             self.fcc_map.write_img3D(self.fcc_out_mrc_file, self.apix)
+        if self.fcc_img3D_filtered is not None:
+            self.fcc_map_filtered = Map()
+            self.fcc_map_filtered.set_img3D(self.fcc_img3D_filtered)
+            self.fcc_map_filtered.write_img3D(self.fcc_filtered_out_mrc_file, self.apix)
 
     def write_global_fsc(self):
         '''
@@ -1465,13 +1625,14 @@ class ProjectFsc(Project):
         py.ylim([0, 1])
         py.xlim([0, self.resolution_axis[-1]])
         py.savefig(self.fsc_out_svg_file, dpi=100, transparent=True)
+        py.savefig(self.fsc_out_png_file, dpi=100, transparent=True)
         py.close()
 
-    def plot_directional_fsc(self):
+    def plot_directional_fsc(self, histogram=False):
         '''
         Plot directional fsc
         '''
-        py.figure()
+        fig = py.figure()
 
         # Plot all the fscs
         py.plot(self.fsc1D_directional[self.res_mask, 0], self.fsc1D_directional[self.res_mask, 1:], ls='--', color='gray', linewidth=0.5, alpha=0.3, zorder=1)
@@ -1487,14 +1648,19 @@ class ProjectFsc(Project):
         py.plot(self.resolution_axis, 0.143*np.ones(len(self.resolution_axis)), 'k--', linewidth=1, zorder=3)
 
         # Plot histogram
-        freq_hist, bin_edges = np.histogram(1.0/self.res_directional, density=True)
-        py.bar(bin_edges[:-1], 0.1*freq_hist/np.max(freq_hist), width=bin_edges[1:]-bin_edges[:-1], color='orange', edgecolor='blue', ls='--', linewidth=0.5, alpha=0.5, align='edge', zorder=4)
+        if histogram:
+            freq_hist, bin_edges = np.histogram(1.0/self.res_directional, density=True)
+            py.bar(bin_edges[:-1], 0.1*freq_hist/np.max(freq_hist), width=bin_edges[1:]-bin_edges[:-1], color='orange', edgecolor='blue', ls='--', linewidth=0.5, alpha=0.5, align='edge', zorder=4)
 
-        py.xlabel(r'Spatial Frequency ($\AA^{-1}$)')
-        py.ylabel('FSC')
+        py.xlabel(r'Spatial Frequency ($\AA^{-1}$)', fontsize=20)
+        py.ylabel('FSC', fontsize=20)
+        py.xticks(fontsize=15)
+        py.yticks(fontsize=15)
         py.ylim([0, 1])
         py.xlim([0, self.resolution_axis[-1]])
+        fig.tight_layout()
         py.savefig(self.dfsc_out_svg_file, dpi=100, transparent=True)
+        py.savefig(self.dfsc_out_png_file, dpi=100, transparent=True)
         py.close()
 
         # Plot resolution histogram
@@ -1506,6 +1672,7 @@ class ProjectFsc(Project):
         py.ylabel('Normalized counts')
         py.ylim([0, 1.1])
         py.savefig(self.dfsc_res_svg_file, dpi=100, transparent=True)
+        py.savefig(self.dfsc_res_png_file, dpi=100, transparent=True)
         py.close()
 
     def write_output_files(self):
@@ -2747,16 +2914,21 @@ class ProjectPlot(Project):
 
         self.fsc = np.array(self.fsc)
 
+    def create_figure(self):
+        '''
+        Create figure
+        '''
+        py.figure(figsize=(7, 5))
+
     def plot_fsc(self, color='blue', x_res=True):
         '''
         Plot fsc data
         '''
-        py.figure(figsize=(7, 5))
         if len(self.fsc) > 0:
             # Res labels
             res_labels = ["%.1f" % (x) for x in 1.0/self.fsc[1:, 0][::4]]
 
-            py.plot(self.fsc[:, 0], self.fsc[:, 1], '-', linewidth=5, color=color)
+            line, = py.plot(self.fsc[:, 0], self.fsc[:, 1], '-', linewidth=3, color=color)
             py.plot(self.fsc[:, 0], 0.143*np.ones(len(self.fsc[:, 0])), '--', color='gray')
 
             py.xticks(fontsize=15)
@@ -2770,6 +2942,8 @@ class ProjectPlot(Project):
 
             ax = py.gca()
             ax.xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+
+            return line
 
 
     def write_orientation(self):
