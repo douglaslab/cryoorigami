@@ -1,5 +1,5 @@
 # cryoorigami
-DNA Origami Goniometer assisted cryoEM data analysis package. Python scripts and classes in this package can be used for other cryo-EM projects. Please cite [...]() if you use this python package for your work. 
+DNA Origami Goniometer assisted cryoEM data analysis package. Python scripts and classes in this package can be used for other cryo-EM projects. Please cite [DNA Origami Goniometers](https://www.nature.com/articles/s41587-020-0716-8) if you use this python package for your work. 
 
 ## Dependencies
 
