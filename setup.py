@@ -30,7 +30,7 @@ setuptools.setup(
                       'prompt-toolkit==3.0.2',
                       'ptyprocess==0.6.0',
                       'pyFFTW==0.11.1',
-                      'Pygments==2.5.2',
+                      'Pygments==2.7.4',
                       'pyparsing==2.4.5',
                       'python-dateutil==2.8.1',
                       'pytz==2019.3',
