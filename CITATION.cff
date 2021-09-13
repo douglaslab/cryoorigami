@@ -4,7 +4,7 @@ authors:
   - family-names: Aksel
     given-names: Tural
     orcid: https://orcid.org/0000-0002-8477-557X
-title: "Cryo Origami"
+title: "Cryoorigami: Data analysis tools for DNA Origami assisted cryo-EM studies"
 version: 1.0.0
 doi: 10.1038/s41587-020-0716-8
 date-released: 2020-10-19
