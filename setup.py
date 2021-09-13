@@ -4,7 +4,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="cryoorigami1.0", # Replace with your own username
+    name="cryoorigami", # Replace with your own username
     version="1.0.0",
     author="Tural Aksel",
     author_email="turalaksel@gmail.com",
@@ -30,7 +30,7 @@ setuptools.setup(
                       'prompt-toolkit==3.0.2',
                       'ptyprocess==0.6.0',
                       'pyFFTW==0.11.1',
-                      'Pygments==2.5.2',
+                      'Pygments==2.7.4',
                       'pyparsing==2.4.5',
                       'python-dateutil==2.8.1',
                       'pytz==2019.3',
