@@ -35,7 +35,7 @@ setuptools.setup(
                       'python-dateutil==2.8.1',
                       'pytz==2019.3',
                       'PyYAML==5.4',
-                      'scipy==1.2.0',
+                      'scipy==1.10.0',
                       'sip==5.0.0',
                       'six==1.13.0',
                       'termcolor==1.1.0',
